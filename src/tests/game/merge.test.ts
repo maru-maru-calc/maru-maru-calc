@@ -75,8 +75,25 @@ describe('merge detection', () => {
       { id: 'loose-3', value: 1, count: 3, sign: 1, role: 'normal', x: 260, y: 120 },
     ];
 
-    expect(findMergeCluster(beads, 60)).toBeUndefined();
+    expect(findMergeCluster(beads, 60)?.beadIds).toEqual(['loose-7', 'loose-3']);
     expect(hasMergeableCount(beads)).toBe(true);
+  });
+
+  it('falls back to merging same value beads when enough exist across the field', () => {
+    const beads: BeadSnapshot[] = Array.from({ length: 10 }, (_, index) => ({
+      id: `wide-${index}`,
+      value: 10,
+      count: 1,
+      sign: 1,
+      role: 'normal',
+      x: 40 + index * 120,
+      y: 100 + (index % 2) * 60,
+    }));
+
+    const cluster = findMergeCluster(beads, 36);
+
+    expect(cluster?.value).toBe(10);
+    expect(cluster?.beadIds).toHaveLength(10);
   });
 
   it('keeps the represented total separate from the body count', () => {

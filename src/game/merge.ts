@@ -55,6 +55,18 @@ export function findMergeCluster(beads: BeadSnapshot[], clusterRadius = 72): Mer
         };
       }
     }
+
+    const sameValueCount = sameValueBeads.reduce((sum, bead) => sum + bead.count, 0);
+    if (sameValueCount >= MERGE_COUNT) {
+      const mergeBeads = pickMergeBeads(sameValueBeads);
+
+      return {
+        value,
+        sign,
+        beadIds: mergeBeads.map((nearBead) => nearBead.id),
+        center: getCenter(mergeBeads),
+      };
+    }
   }
 
   return undefined;

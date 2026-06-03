@@ -7,6 +7,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -30,6 +31,7 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/matter-js": "^0.20.2",
     "@types/react": "~19.1.0",
     "babel-preset-expo": "~54.0.10",

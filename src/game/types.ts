@@ -1,6 +1,6 @@
-export type PlaceValue = 1 | 10 | 100 | 1000;
+export type PlaceValue = 1 | 10 | 100 | 1000 | 10000 | 100000;
 export type BeadSign = 1 | -1;
-export type BeadRole = 'normal' | 'multiplicand' | 'product';
+export type BeadRole = 'normal' | 'multiplicand' | 'product' | 'division';
 
 export type BeadKind = {
   value: PlaceValue;
@@ -16,6 +16,10 @@ export type Stage = {
   title: string;
   target: number;
   allowedValues: PlaceValue[];
+  islandId: 'addition' | 'subtraction';
+  islandTitle: string;
+  setTitle: string;
+  bubbleCounts: number[];
 };
 
 export type BeadSnapshot = {
