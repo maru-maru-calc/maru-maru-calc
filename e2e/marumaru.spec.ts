@@ -67,7 +67,7 @@ test('uses a negative divisor after selecting minus then division', async ({ pag
   await expect(page.getByTestId('current-total-value')).toContainText('-1');
 });
 
-test('can multiply a negative result by another negative bubble', async ({ page }) => {
+test('pressing multiplication again clears a negative multiplier sign', async ({ page }) => {
   await page.goto('/');
 
   await page.getByTestId('stage-addition-10-ones').click();
@@ -83,6 +83,6 @@ test('can multiply a negative result by another negative bubble', async ({ page 
   await expect(page.getByTestId('expression-display-text')).toContainText('×');
 
   await page.getByLabel('multiply-1').first().click();
-  await expect(page.getByTestId('expression-display-text')).toContainText('× -1 = 1');
-  await expect(page.getByTestId('current-total-value')).toContainText('1');
+  await expect(page.getByTestId('expression-display-text')).toContainText('× 1 = -1');
+  await expect(page.getByTestId('current-total-value')).toContainText('-1');
 });

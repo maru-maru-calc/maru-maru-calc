@@ -17,7 +17,7 @@ import {
 } from '@/game/expression';
 import { findMergeCluster, getTotalValue, hasMergeableCount } from '@/game/merge';
 import { getStage, STAGES } from '@/game/stages';
-import { BeadRole, BeadSign, BeadSnapshot, PlaceValue } from '@/game/types';
+import { BeadRole, BeadSign, BeadSnapshot, MergeCluster, PlaceValue } from '@/game/types';
 
 type BeadEntity = {
   id: string;
@@ -73,13 +73,23 @@ type DivisionSplitAnimation = {
   progress: number;
 };
 
+type BubbleBurstAnimation = {
+  id: string;
+  x: number;
+  y: number;
+  radius: number;
+  count: number;
+  sign: BeadSign;
+  startedAt: number;
+};
+
 type OperationSource = {
   entities: BeadEntity[];
   count: number;
   sign: BeadSign;
 };
 
-type OperatorButtonSymbol = OperatorSymbol | '=';
+type OperatorButtonSymbol = OperatorSymbol;
 type MultiplierBubblePart = {
   value: PlaceValue;
   radius: number;
@@ -90,26 +100,30 @@ type ContainedBeadPart = {
 };
 
 const FIELD_MARGIN = 18;
-const FIELD_GAP = 10;
-const OPERATOR_RAIL_WIDTH = 56;
+const OPERATOR_TABS_HEIGHT = 64;
 const HEADER_HEIGHT = 148;
 const FOOTER_HEIGHT = 112;
 const PREVIEW_Y = 38;
 const ATTRACTION_RADIUS = 220;
 const ATTRACTION_FORCE = 0.00014;
-const BASIN_BODY_THICKNESS = 12;
-const BASIN_FRAME_THICKNESS = 3;
+const SEPARATION_RADIUS = 92;
+const SEPARATION_FORCE = 0.000075;
+const BASIN_BODY_THICKNESS = 14;
+const BASIN_FRAME_THICKNESS = 5;
 const FIELD_ENTITY_INSET = 10;
 const BUBBLE_ROW_Y = 56;
 const MERGE_ANIMATION_MS = 520;
-const UNIT_MERGE_ANIMATION_MS = 820;
+const UNIT_MERGE_ANIMATION_MS = 560;
 const MERGE_COOLDOWN_MS = 420;
-const UNIT_MERGE_COOLDOWN_MS = 900;
-const UNIT_MERGE_READY_DELAY_MS = 520;
+const UNIT_MERGE_COOLDOWN_MS = 540;
+const UNIT_MERGE_READY_DELAY_MS = 180;
+const UNIT_MERGE_MIN_SETTLED_Y_RATIO = 0.34;
+const UNIT_MERGE_MAX_CLUSTER_SPEED = 5.2;
+const BUBBLE_BURST_ANIMATION_MS = 120;
 const ANNIHILATION_ANIMATION_MS = 180;
 const DIVISION_SPLIT_ANIMATION_MS = 760;
 const PRODUCT_BUBBLE_BURST_DELAY_MS = 950;
-const OPERATORS: OperatorButtonSymbol[] = ['+', '-', '×', '÷', '='];
+const OPERATORS: OperatorButtonSymbol[] = ['+', '-', '×', '÷'];
 const DETAILED_RELEASE_BEAD_LIMIT = 80;
 const MULTIPLIER_BUBBLE_X_STEP = 0.34;
 const MULTIPLIER_BUBBLE_Y_STEP = 0.28;
@@ -123,10 +137,18 @@ const COLLISION_CATEGORY_BY_VALUE: Record<PlaceValue, number> = {
   100000: 0x0040,
 };
 
-export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIndex?: number; onBack?: () => void }) {
+export function MarumaruGame({
+  initialStageIndex = 0,
+  onBack,
+  onStageClear,
+}: {
+  initialStageIndex?: number;
+  onBack?: () => void;
+  onStageClear?: (stageId: string) => void;
+}) {
   const { width, height } = useWindowDimensions();
-  const fieldWidth = Math.max(240, width - FIELD_MARGIN * 2 - FIELD_GAP - OPERATOR_RAIL_WIDTH);
-  const fieldHeight = Math.max(360, height - HEADER_HEIGHT - FOOTER_HEIGHT);
+  const fieldWidth = Math.max(240, width - FIELD_MARGIN * 2);
+  const fieldHeight = Math.max(360, height - HEADER_HEIGHT - FOOTER_HEIGHT - OPERATOR_TABS_HEIGHT);
   const [stageIndex, setStageIndex] = useState(initialStageIndex);
   const stage = getStage(stageIndex);
   const [selectedOperator, setSelectedOperator] = useState<OperatorSymbol>('+');
@@ -142,16 +164,19 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
   const [mergeAnimation, setMergeAnimation] = useState<MergeAnimation | undefined>(undefined);
   const [annihilationAnimation, setAnnihilationAnimation] = useState<AnnihilationAnimation | undefined>(undefined);
   const [divisionSplitAnimation, setDivisionSplitAnimation] = useState<DivisionSplitAnimation | undefined>(undefined);
+  const [bubbleBurstAnimations, setBubbleBurstAnimations] = useState<BubbleBurstAnimation[]>([]);
   const [message, setMessage] = useState('あわをさわると まるがでるよ');
   const [isClear, setIsClear] = useState(false);
   const [isFailed, setIsFailed] = useState(false);
   const engineRef = useRef<Matter.Engine | null>(null);
   const entitiesRef = useRef<BeadEntity[]>([]);
   const draggingBeadIdRef = useRef<string | undefined>(undefined);
+  const [draggingBeadId, setDraggingBeadId] = useState<string | undefined>(undefined);
   const idRef = useRef(0);
   const lastMergeAtRef = useRef(0);
   const mergeReadySinceRef = useRef<number | undefined>(undefined);
   const resultReadySinceRef = useRef<number | undefined>(undefined);
+  const reportedClearStageIdRef = useRef<string | undefined>(undefined);
 
   const total = useMemo(() => getTotalValue(beads), [beads]);
   const displayBeads = useMemo(
@@ -193,6 +218,7 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
     setMergeAnimation(undefined);
     setAnnihilationAnimation(undefined);
     setDivisionSplitAnimation(undefined);
+    setBubbleBurstAnimations([]);
     setMessage('あわをさわると まるがでるよ');
     setIsClear(false);
     setIsFailed(false);
@@ -219,6 +245,19 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
   useEffect(() => {
     setStageIndex(initialStageIndex);
   }, [initialStageIndex]);
+
+  useEffect(() => {
+    reportedClearStageIdRef.current = undefined;
+  }, [stage.id]);
+
+  useEffect(() => {
+    if (!isClear || reportedClearStageIdRef.current === stage.id) {
+      return;
+    }
+
+    reportedClearStageIdRef.current = stage.id;
+    onStageClear?.(stage.id);
+  }, [isClear, onStageClear, stage.id]);
 
   useEffect(() => {
     if (isClear || !isStageReadyForResult(pendingBubbles)) {
@@ -352,6 +391,27 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
     }
   }, [expressionTokens, wrapMultiplicandForMultiplication]);
 
+  const triggerBubbleBurst = useCallback((bubble: PendingBubble, isOperatorBubble: boolean, sign: BeadSign) => {
+    if (!isOperatorBubble && bubble.count <= 1) {
+      return;
+    }
+
+    const radius = isOperatorBubble ? getMultiplierClusterRadius(bubble.count) : getEntityRadius(1, bubble.count);
+    const startedAt = Date.now();
+    setBubbleBurstAnimations((current) => [
+      ...current.slice(-5),
+      {
+        id: `bubble-burst-${bubble.id}-${startedAt}`,
+        x: bubble.x,
+        y: bubble.y,
+        radius,
+        count: bubble.count,
+        sign,
+        startedAt,
+      },
+    ]);
+  }, []);
+
   const multiplyWrappedGroup = useCallback(
     (bubble: PendingBubble) => {
       const engine = engineRef.current;
@@ -361,6 +421,8 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
         return;
       }
 
+      const multiplierSign = operatorSignRef.current;
+      triggerBubbleBurst(bubble, true, multiplierSign);
       setPendingBubbles((current) => current.filter((candidate) => candidate.id !== bubble.id));
       removeBodies(engine, source.entities);
       const sourceIds = new Set(source.entities.map((entity) => entity.id));
@@ -368,7 +430,6 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
       const remainingTotal = getTotalValue(toSnapshots(remainingEntities));
       entitiesRef.current = remainingEntities;
       const sourceCenter = getEntityCenter(source.entities);
-      const multiplierSign = operatorSignRef.current;
       const resultSign = multiplySigns(source.sign, multiplierSign);
       const signedSourceCount = source.count * source.sign;
       const signedMultiplier = bubble.count * multiplierSign;
@@ -396,7 +457,7 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
       setMessage(`${formatSignedCount(signedSourceCount)}のまとまりが ${formatSignedCount(signedMultiplier)}こ`);
       setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
     },
-    [addBead, fieldHeight, fieldWidth],
+    [addBead, fieldHeight, fieldWidth, triggerBubbleBurst],
   );
 
   const divideWrappedGroup = useCallback(
@@ -413,6 +474,8 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
         return;
       }
 
+      const divisorSign = operatorSignRef.current;
+      triggerBubbleBurst(bubble, true, divisorSign);
       setPendingBubbles((current) => current.filter((candidate) => candidate.id !== bubble.id));
       removeBodies(engine, source.entities);
       const sourceIds = new Set(source.entities.map((entity) => entity.id));
@@ -420,7 +483,6 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
       const remainingTotal = getTotalValue(toSnapshots(remainingEntities));
       entitiesRef.current = remainingEntities;
       const sourceCenter = getEntityCenter(source.entities);
-      const divisorSign = operatorSignRef.current;
       const resultSign = multiplySigns(source.sign, divisorSign);
       const signedSourceCount = source.count * source.sign;
       const signedDivisor = bubble.count * divisorSign;
@@ -455,7 +517,7 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
       setMessage(`${formatSignedCount(signedSourceCount)}を ${formatSignedCount(signedDivisor)}つに わけたよ`);
       setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
     },
-    [addBead, fieldHeight, fieldWidth],
+    [addBead, fieldHeight, fieldWidth, triggerBubbleBurst],
   );
 
   const unwrapProductGroups = useCallback(() => {
@@ -546,6 +608,7 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
       }
 
       const sign: BeadSign = selectedOperator === '-' ? -1 : 1;
+      triggerBubbleBurst(bubble, false, sign);
       setPendingBubbles((current) => current.filter((candidate) => candidate.id !== bubble.id));
       expressionTotalRef.current += bubble.count * sign;
       setExpressionTokens((current) => {
@@ -566,30 +629,18 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
       }
       setMessage(`${bubble.count}この まるがでたよ`);
     },
-    [addBead, divideWrappedGroup, isClear, isFailed, multiplyWrappedGroup, selectedOperator],
+    [addBead, divideWrappedGroup, isClear, isFailed, multiplyWrappedGroup, selectedOperator, triggerBubbleBurst],
   );
 
   const selectOperator = useCallback(
     (operator: OperatorButtonSymbol) => {
-      if (operator === '=') {
-        if (unwrapProductGroups()) {
-          return;
-        }
-
-        setExpressionTokens((current) => {
-          const nextTokens = evaluateExpressionOnEquals(current);
-          expressionTokensRef.current = nextTokens;
-          expressionHistoryRef.current = stripExpressionResult(nextTokens);
-          return nextTokens;
-        });
-        return;
-      }
-
       const nextOperatorSign: BeadSign = operator === '-' ? -1 : operator === '+' ? 1 : selectedOperatorRef.current === '-' ? -1 : operatorSignRef.current;
 
       if (operator === selectedOperator) {
-        operatorSignRef.current = nextOperatorSign;
-        setOperatorSign(nextOperatorSign);
+        const toggledOperatorSign: BeadSign = (operator === '×' || operator === '÷') && operatorSignRef.current < 0 ? 1 : nextOperatorSign;
+        operatorSignRef.current = toggledOperatorSign;
+        setOperatorSign(toggledOperatorSign);
+        setMessage(getOperatorHelpMessage(operator, toggledOperatorSign));
         if (operator === '×' || operator === '÷') {
           const nextTokens = replaceTrailingOperator(expressionTokensRef.current, operator);
           expressionTokensRef.current = nextTokens;
@@ -604,6 +655,7 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
       selectedOperatorRef.current = operator;
       operatorSignRef.current = nextOperatorSign;
       setOperatorSign(nextOperatorSign);
+      setMessage(getOperatorHelpMessage(operator, nextOperatorSign));
       const nextTokens = replaceTrailingOperator(expressionTokensRef.current, operator);
       expressionTokensRef.current = nextTokens;
       expressionHistoryRef.current = stripExpressionResult(nextTokens);
@@ -612,8 +664,29 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
         wrapMultiplicandForMultiplication(nextTokens);
       }
     },
-    [selectedOperator, unwrapProductGroups, wrapMultiplicandForMultiplication],
+    [selectedOperator, wrapMultiplicandForMultiplication],
   );
+
+  useEffect(() => {
+    if (!isStageReadyForResult(pendingBubbles)) {
+      return;
+    }
+
+    if (unwrapProductGroups()) {
+      return;
+    }
+
+    setExpressionTokens((current) => {
+      const nextTokens = evaluateExpressionOnEquals(current);
+      if (nextTokens.join('\u0000') === current.join('\u0000')) {
+        return current;
+      }
+
+      expressionTokensRef.current = nextTokens;
+      expressionHistoryRef.current = stripExpressionResult(nextTokens);
+      return nextTokens;
+    });
+  }, [pendingBubbles, unwrapProductGroups]);
 
   const moveBead = useCallback(
     (beadId: string, x: number, y: number) => {
@@ -742,13 +815,25 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
     [divisionSplitAnimation],
   );
 
+  const updateBubbleBurstAnimations = useCallback((now: number) => {
+    setBubbleBurstAnimations((current) => {
+      if (current.length === 0) {
+        return current;
+      }
+      const next = current.filter((animation) => now - animation.startedAt < BUBBLE_BURST_ANIMATION_MS);
+      return next.length === current.length ? current : next;
+    });
+  }, []);
+
   const startDragBead = useCallback((beadId: string) => {
     draggingBeadIdRef.current = beadId;
+    setDraggingBeadId(beadId);
   }, []);
 
   const endDragBead = useCallback((beadId: string) => {
     if (draggingBeadIdRef.current === beadId) {
       draggingBeadIdRef.current = undefined;
+      setDraggingBeadId(undefined);
     }
   }, []);
 
@@ -805,6 +890,11 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
         return;
       }
 
+      if (cluster.value === 1 && !isUnitMergeSettled(cluster, entitiesRef.current, fieldHeight)) {
+        mergeReadySinceRef.current = undefined;
+        return;
+      }
+
       const cooldown = cluster.value === 1 ? UNIT_MERGE_COOLDOWN_MS : MERGE_COOLDOWN_MS;
       if (now - lastMergeAtRef.current < cooldown) {
         return;
@@ -821,6 +911,11 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
 
       const latestCluster = findMergeCluster(toSnapshots(entitiesRef.current));
       if (!latestCluster) {
+        mergeReadySinceRef.current = undefined;
+        return;
+      }
+
+      if (latestCluster.value === 1 && !isUnitMergeSettled(latestCluster, entitiesRef.current, fieldHeight)) {
         mergeReadySinceRef.current = undefined;
         return;
       }
@@ -843,7 +938,7 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
       mergeReadySinceRef.current = undefined;
       setMessage('ぎゅっと まとまるよ');
     },
-    [],
+    [fieldHeight],
   );
 
   useEffect(() => {
@@ -860,10 +955,11 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
       const now = Date.now();
       const delta = Math.min(32, now - lastTime);
       lastTime = now;
-      applySameValueAttraction(entitiesRef.current, draggingBeadIdRef.current);
+      applyBeadForces(entitiesRef.current, draggingBeadIdRef.current);
       updateAnnihilationAnimation(now);
       updateDivisionSplitAnimation(now);
       updateMergeAnimation(now);
+      updateBubbleBurstAnimations(now);
       Matter.Engine.update(engine, delta);
       keepBodiesInsideField(fieldWidth, fieldHeight, entitiesRef.current);
       if (isPriorityOperator(expressionTokensRef.current[expressionTokensRef.current.length - 1])) {
@@ -907,6 +1003,7 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
     splitHigherBead,
     unwrapProductGroup,
     updateAnnihilationAnimation,
+    updateBubbleBurstAnimations,
     updateDivisionSplitAnimation,
     updateMergeAnimation,
     wrapMultiplicandForMultiplication,
@@ -932,16 +1029,22 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
             <Text style={styles.title}>{stage.title}</Text>
           </View>
         </View>
-        <View style={styles.totalBox} testID="current-total">
-          <Text style={styles.totalLabel}>いま</Text>
-          <Text style={styles.totalValue} testID="current-total-value">
-            {total}
-          </Text>
-        </View>
+        <Text testID="current-total-value" style={styles.hiddenMetric}>
+          {total}
+        </Text>
       </View>
 
-      <View style={styles.playArea}>
+      <View style={[styles.playArea, { width: fieldWidth }]}>
+        <OperatorRail
+          selectedOperator={selectedOperator}
+          operatorSign={operatorSign}
+          isLocked={isStageReadyForResult(pendingBubbles)}
+          onSelect={selectOperator}
+        />
         <View style={[styles.field, { width: fieldWidth, height: fieldHeight }]}>
+          <View pointerEvents="none" style={[styles.fieldBubbleMark, styles.fieldBubbleMarkLarge]} />
+          <View pointerEvents="none" style={[styles.fieldBubbleMark, styles.fieldBubbleMarkSmall]} />
+          <View pointerEvents="none" style={[styles.fieldBubbleMark, styles.fieldBubbleMarkTiny]} />
           {basinFrameSegments.map((segment) => (
             <View
               key={segment.id}
@@ -971,6 +1074,9 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
               />
             );
           })}
+          {bubbleBurstAnimations.map((animation) => (
+            <BubbleBurst key={animation.id} animation={animation} />
+          ))}
           {displayBeads.map((bead) => (
             divisionSplitAnimation?.resultBeadId === bead.id ? null :
             <DraggableBeadView
@@ -979,16 +1085,13 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
               onMove={moveBead}
               onDragStart={startDragBead}
               onDragEnd={endDragBead}
+              isDragging={draggingBeadId === bead.id}
               onTap={bead.id !== 'expression-wrap-preview' && canBurstBead(bead) ? () => unwrapBeadGroup(bead.id) : undefined}
             />
           ))}
           {mergeAnimation ? <MergePulse animation={mergeAnimation} /> : null}
           {divisionSplitAnimation ? <DivisionSplitOverlay animation={divisionSplitAnimation} /> : null}
-          {message ? (
-            <View style={styles.messagePill}>
-              <Text style={styles.messageText}>{message}</Text>
-            </View>
-          ) : null}
+          {isClear ? <ClearSplash /> : null}
           {isClear ? (
             <View style={styles.clearPanel}>
               <Text style={styles.clearTitle}>できた!</Text>
@@ -1011,12 +1114,14 @@ export function MarumaruGame({ initialStageIndex = 0, onBack }: { initialStageIn
             </View>
           ) : null}
         </View>
-        <OperatorRail selectedOperator={selectedOperator} onSelect={selectOperator} />
       </View>
 
       <View style={styles.footer}>
-        <ExpressionDisplay tokens={expressionTokens} />
-        <GameButton label="リトライ" onPress={resetStage} variant="secondary" />
+        <StatusMessage message={message} />
+        <View style={styles.footerControls}>
+          <ExpressionDisplay tokens={expressionTokens} />
+          <GameButton label="やりなおす" onPress={resetStage} variant="secondary" />
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -1030,6 +1135,7 @@ function BeadView({
   x,
   y,
   isPreview = false,
+  isFocused = false,
 }: {
   value: PlaceValue;
   count: number;
@@ -1038,6 +1144,7 @@ function BeadView({
   x: number;
   y: number;
   isPreview?: boolean;
+  isFocused?: boolean;
 }) {
   const kind = getBeadKind(value);
   const palette = getSignedPalette(kind, sign);
@@ -1050,6 +1157,7 @@ function BeadView({
       pointerEvents="none"
       style={[
         styles.bead,
+        isFocused && styles.focusedBead,
         isGroupBubble && styles.groupBubble,
         role === 'product' && styles.productBubble,
         role === 'multiplicand' && styles.multiplicandBubble,
@@ -1058,8 +1166,8 @@ function BeadView({
           width: radius * 2,
           height: radius * 2,
           borderRadius: radius,
-          backgroundColor: isGroupBubble ? (sign < 0 ? 'rgba(80, 92, 112, 0.32)' : 'rgba(215, 246, 255, 0.36)') : palette.color,
-          borderColor: isGroupBubble ? (sign < 0 ? '#5E6B87' : '#8ED8EF') : palette.rimColor,
+          backgroundColor: isGroupBubble ? (sign < 0 ? 'rgba(75, 91, 119, 0.3)' : 'rgba(215, 246, 255, 0.36)') : palette.color,
+          borderColor: isGroupBubble ? (sign < 0 ? '#51627D' : '#8ED8EF') : palette.rimColor,
           left: x - radius,
           top: y - radius,
           opacity: isPreview ? 0.86 : getBeadLayerOpacity(value),
@@ -1127,22 +1235,200 @@ function BeadView({
 
 function MergePulse({ animation }: { animation: MergeAnimation }) {
   const nextKind = getBeadKind(animation.nextValue);
+  const particles = Array.from({ length: 10 }, (_, index) => {
+    const angle = -Math.PI / 2 + (Math.PI * 2 * index) / 10;
+    const distance = nextKind.radius + 22 + (index % 2) * 8;
+    const size = index % 3 === 0 ? 9 : 6;
+    return {
+      id: `merge-pop-${index}`,
+      left: animation.center.x + Math.cos(angle) * distance - size / 2,
+      top: animation.center.y + Math.sin(angle) * distance - size / 2,
+      size,
+      opacity: index % 2 === 0 ? 0.78 : 0.52,
+    };
+  });
+
   return (
-    <View
-      pointerEvents="none"
-      style={[
-        styles.mergePulse,
-        {
-          left: animation.center.x - nextKind.radius - 18,
-          top: animation.center.y - nextKind.radius - 18,
-          width: (nextKind.radius + 18) * 2,
-          height: (nextKind.radius + 18) * 2,
-          borderRadius: nextKind.radius + 18,
-          borderColor: nextKind.rimColor,
-          backgroundColor: nextKind.shineColor,
-        },
-      ]}
-    />
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <View
+        style={[
+          styles.mergePulse,
+          {
+            left: animation.center.x - nextKind.radius - 20,
+            top: animation.center.y - nextKind.radius - 20,
+            width: (nextKind.radius + 20) * 2,
+            height: (nextKind.radius + 20) * 2,
+            borderRadius: nextKind.radius + 20,
+            borderColor: nextKind.rimColor,
+            backgroundColor: nextKind.shineColor,
+          },
+        ]}
+      />
+      {particles.map((particle) => (
+        <View
+          key={particle.id}
+          style={[
+            styles.mergePopParticle,
+            {
+              left: particle.left,
+              top: particle.top,
+              width: particle.size,
+              height: particle.size,
+              borderRadius: particle.size / 2,
+              opacity: particle.opacity,
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+function BubbleBurst({ animation }: { animation: BubbleBurstAnimation }) {
+  const progress = clamp((Date.now() - animation.startedAt) / BUBBLE_BURST_ANIMATION_MS, 0, 1);
+  const fade = 1 - progress;
+  const ringRadius = animation.radius + 3 + progress * 8;
+  const innerRingRadius = animation.radius * 0.58 + progress * 4;
+  const isNegative = animation.sign < 0;
+  const drops = Array.from({ length: 12 }, (_, index) => {
+    const angle = -Math.PI / 2 + (Math.PI * 2 * index) / 12;
+    const distance = animation.radius + 7 + progress * (10 + (index % 3) * 3);
+    const size = 4 + (index % 3);
+    return {
+      id: `drop-${index}`,
+      left: animation.x + Math.cos(angle) * distance - size / 2,
+      top: animation.y + Math.sin(angle) * distance - size / 2,
+      size,
+      opacity: fade * (index % 2 === 0 ? 0.58 : 0.34),
+    };
+  });
+  const shards = Array.from({ length: 7 }, (_, index) => {
+    const angle = -Math.PI / 2 + (Math.PI * 2 * (index + 0.35)) / 7;
+    const distance = animation.radius * 0.72 + progress * 10;
+    return {
+      id: `shard-${index}`,
+      left: animation.x + Math.cos(angle) * distance - 7,
+      top: animation.y + Math.sin(angle) * distance - 2,
+      rotate: `${angle + Math.PI / 2}rad`,
+      opacity: fade * 0.42,
+    };
+  });
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <View
+        style={[
+          styles.bubbleBurstRing,
+          isNegative && styles.bubbleBurstRingNegative,
+          {
+            left: animation.x - ringRadius,
+            top: animation.y - ringRadius,
+            width: ringRadius * 2,
+            height: ringRadius * 2,
+            borderRadius: ringRadius,
+            opacity: fade * 0.62,
+          },
+        ]}
+      />
+      <View
+        style={[
+          styles.bubbleBurstInnerRing,
+          {
+            left: animation.x - innerRingRadius,
+            top: animation.y - innerRingRadius,
+            width: innerRingRadius * 2,
+            height: innerRingRadius * 2,
+            borderRadius: innerRingRadius,
+            opacity: fade * 0.42,
+          },
+        ]}
+      />
+      {drops.map((drop) => (
+        <View
+          key={drop.id}
+          style={[
+            styles.bubbleBurstDrop,
+            isNegative && styles.bubbleBurstDropNegative,
+            {
+              left: drop.left,
+              top: drop.top,
+              width: drop.size,
+              height: drop.size,
+              borderRadius: drop.size / 2,
+              opacity: drop.opacity,
+            },
+          ]}
+        />
+      ))}
+      {shards.map((shard) => (
+        <View
+          key={shard.id}
+          style={[
+            styles.bubbleBurstShard,
+            {
+              left: shard.left,
+              top: shard.top,
+              opacity: shard.opacity,
+              transform: [{ rotate: shard.rotate }],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+function ClearSplash() {
+  const splashes = [
+    { left: 44, top: 122, size: 18 },
+    { left: 94, top: 92, size: 9 },
+    { right: 76, top: 98, size: 16 },
+    { right: 38, top: 148, size: 10 },
+    { left: 142, top: 176, size: 7 },
+    { right: 154, top: 182, size: 8 },
+  ];
+  const sparkles = [
+    { left: 118, top: 136, size: 22 },
+    { right: 116, top: 132, size: 18 },
+    { left: 0, right: 0, top: 82, size: 15 },
+  ];
+
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.clearCelebrationLayer]}>
+      {splashes.map((splash, index) => (
+        <View
+          key={`clear-splash-${index}`}
+          style={[
+            styles.clearSplashDrop,
+            {
+              left: splash.left,
+              right: splash.right,
+              top: splash.top,
+              width: splash.size,
+              height: splash.size,
+              borderRadius: splash.size / 2,
+            },
+          ]}
+        />
+      ))}
+      {sparkles.map((sparkle, index) => (
+        <Text
+          key={`clear-sparkle-${index}`}
+          style={[
+            styles.clearSparkle,
+            {
+              left: sparkle.left,
+              right: sparkle.right,
+              top: sparkle.top,
+              fontSize: sparkle.size,
+              textAlign: sparkle.left === 0 && sparkle.right === 0 ? 'center' : undefined,
+            },
+          ]}
+        >
+          ✦
+        </Text>
+      ))}
+    </View>
   );
 }
 
@@ -1195,32 +1481,120 @@ function DivisionSplitOverlay({ animation }: { animation: DivisionSplitAnimation
 
 function OperatorRail({
   selectedOperator,
+  operatorSign,
+  isLocked,
   onSelect,
 }: {
   selectedOperator: OperatorSymbol;
+  operatorSign: BeadSign;
+  isLocked: boolean;
   onSelect: (operator: OperatorButtonSymbol) => void;
 }) {
   return (
     <View style={styles.operatorRail}>
       {OPERATORS.map((operator) => {
-        const isSelected = operator !== '=' && operator === selectedOperator;
+        const isMainSelected = operator === selectedOperator;
+        const isSignSelected = operator === '-' && operatorSign < 0 && (selectedOperator === '×' || selectedOperator === '÷');
+        const isSelected = isMainSelected || isSignSelected;
         return (
           <Pressable
             key={operator}
             accessibilityRole="button"
             accessibilityState={{ selected: isSelected }}
+            disabled={isLocked}
             testID={`operator-${operator}`}
             onPress={() => onSelect(operator)}
             style={({ pressed }) => [
               styles.operatorButton,
-              isSelected && styles.selectedOperatorButton,
+              isMainSelected && styles.selectedOperatorButton,
+              isSignSelected && styles.selectedSignOperatorButton,
+              isLocked && styles.disabledOperatorButton,
               pressed && styles.pressedButton,
             ]}
           >
-            <Text style={[styles.operatorButtonText, isSelected && styles.selectedOperatorButtonText]}>{operator}</Text>
+            <Text
+              style={[
+                styles.operatorButtonText,
+                isSelected && styles.selectedOperatorButtonText,
+                isSignSelected && styles.selectedSignOperatorButtonText,
+                isLocked && styles.disabledOperatorButtonText,
+              ]}
+            >
+              {operator}
+            </Text>
+            <Text
+              style={[
+                styles.operatorButtonLabel,
+                isSelected && styles.selectedOperatorButtonText,
+                isSignSelected && styles.selectedSignOperatorButtonText,
+                isLocked && styles.disabledOperatorButtonText,
+              ]}
+            >
+              {getOperatorButtonLabel(operator)}
+            </Text>
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+function getOperatorButtonLabel(operator: OperatorButtonSymbol) {
+  if (operator === '+') {
+    return 'たす';
+  }
+  if (operator === '-') {
+    return 'ひく';
+  }
+  if (operator === '×') {
+    return 'かける';
+  }
+  if (operator === '÷') {
+    return 'わる';
+  }
+  return 'こたえ';
+}
+
+function getOperatorHelpMessage(operator: OperatorButtonSymbol, sign: BeadSign) {
+  if (operator === '+') {
+    return 'まるを ふやすよ';
+  }
+  if (operator === '-') {
+    return 'まるを へらすよ';
+  }
+  if (operator === '×') {
+    return sign < 0 ? 'まとまりを マイナスで ふやすよ' : 'まとまりを ふやすよ';
+  }
+  return sign < 0 ? 'まとまりを マイナスで わるよ' : 'まとまりを わるよ';
+}
+
+function GoalCup({ target, total }: { target: number; total: number }) {
+  const progress = target > 0 ? clamp(total / target, 0, 1) : 0;
+  const fillHeight = Math.round(progress * 44);
+  const remaining = target - total;
+  const statusText = remaining === 0 ? 'ぴったり' : remaining > 0 ? `あと ${remaining}` : `${Math.abs(remaining)} おおい`;
+
+  return (
+    <View style={styles.goalCupBox}>
+      <Text style={styles.goalCupLabel}>めあて {target}</Text>
+      <View style={styles.goalCup}>
+        <View style={[styles.goalCupFill, { height: fillHeight }]} />
+        <View style={styles.goalCupRim} />
+        <Text style={styles.goalCupValue}>{total}</Text>
+      </View>
+      <Text style={styles.goalCupStatus} numberOfLines={1} adjustsFontSizeToFit>
+        {statusText}
+      </Text>
+    </View>
+  );
+}
+
+function StatusMessage({ message }: { message: string }) {
+  return (
+    <View style={styles.statusMessageBox}>
+      <Text style={[styles.statusMessageText, !message && styles.statusMessagePlaceholder]} numberOfLines={1} adjustsFontSizeToFit>
+        {message || ' '}
+      </Text>
     </View>
   );
 }
@@ -1393,12 +1767,14 @@ function DraggableBeadView({
   onMove,
   onDragStart,
   onDragEnd,
+  isDragging,
   onTap,
 }: {
   bead: BeadSnapshot;
   onMove: (beadId: string, x: number, y: number) => void;
   onDragStart: (beadId: string) => void;
   onDragEnd: (beadId: string) => void;
+  isDragging: boolean;
   onTap?: () => void;
 }) {
   const startPositionRef = useRef({ x: bead.x, y: bead.y });
@@ -1445,12 +1821,12 @@ function DraggableBeadView({
           width: radius * 2 + 16,
           height: radius * 2 + 16,
           borderRadius: radius + 8,
-          zIndex: getBeadLayerZIndex(bead.value),
+          zIndex: isDragging ? 40 : getBeadLayerZIndex(bead.value),
         },
       ]}
       {...panResponder.panHandlers}
     >
-      <BeadView value={bead.value} count={bead.count} sign={bead.sign} role={bead.role} x={radius + 8} y={radius + 8} />
+      <BeadView value={bead.value} count={bead.count} sign={bead.sign} role={bead.role} x={radius + 8} y={radius + 8} isFocused={isDragging} />
     </View>
   );
 }
@@ -1484,7 +1860,7 @@ function canBurstBead(bead: BeadSnapshot) {
 }
 
 function isBurstableWrappedGroup(bead: Pick<BeadSnapshot, 'value' | 'count' | 'role'>) {
-  return bead.value === 1 && bead.count > 1 && (bead.role === 'normal' || bead.role === 'product' || bead.role === 'division');
+  return bead.value === 1 && bead.count > 1 && (bead.role === 'product' || bead.role === 'division');
 }
 
 function isWrappableEntity(entity: Pick<BeadEntity, 'role'>) {
@@ -1542,7 +1918,10 @@ function getOperationSource(entities: BeadEntity[], expressionTokens: string[]):
     };
   }
 
-  return getMultiplicationSource(entities, targetSign);
+  const wrappableEntities = entities.filter((entity) => isWrappableEntity(entity));
+  const wrappedGroup = wrappableEntities.find((entity) => entity.role === 'multiplicand');
+  const fallbackSign = wrappedGroup?.sign ?? wrappableEntities[0]?.sign ?? targetSign;
+  return getMultiplicationSource(entities, fallbackSign);
 }
 
 function findDecompositionPair(beads: BeadSnapshot[]) {
@@ -1621,6 +2000,26 @@ function findAnnihilationPair(beads: BeadSnapshot[]) {
   return undefined;
 }
 
+function isUnitMergeSettled(cluster: MergeCluster, entities: BeadEntity[], fieldHeight: number) {
+  const clusterIds = new Set(cluster.beadIds);
+  const clusterEntities = entities.filter((entity) => clusterIds.has(entity.id));
+  if (clusterEntities.length === 0) {
+    return false;
+  }
+
+  const averageY = clusterEntities.reduce((sum, entity) => sum + entity.body.position.y, 0) / clusterEntities.length;
+  if (averageY < fieldHeight * UNIT_MERGE_MIN_SETTLED_Y_RATIO) {
+    return false;
+  }
+
+  const maxSpeed = clusterEntities.reduce((speed, entity) => {
+    const velocity = entity.body.velocity;
+    return Math.max(speed, Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y));
+  }, 0);
+
+  return maxSpeed <= UNIT_MERGE_MAX_CLUSTER_SPEED;
+}
+
 function keepBodiesInsideField(fieldWidth: number, fieldHeight: number, entities: BeadEntity[]) {
   for (const entity of entities) {
     const currentX = entity.body.position.x;
@@ -1656,8 +2055,8 @@ function getSignedPalette(kind: ReturnType<typeof getBeadKind>, sign: BeadSign) 
 
   return {
     color: '#4B5B77',
-    rimColor: '#26344D',
-    shineColor: '#AFC5E8',
+    rimColor: '#253B56',
+    shineColor: '#B9D8F2',
   };
 }
 
@@ -1745,18 +2144,18 @@ function getBeadLayerOpacity(value: PlaceValue) {
     return 1;
   }
   if (value === 10) {
-    return 0.82;
+    return 0.74;
   }
   if (value === 100) {
-    return 0.68;
+    return 0.56;
   }
   if (value === 1000) {
-    return 0.58;
+    return 0.48;
   }
   if (value === 10000) {
-    return 0.52;
+    return 0.42;
   }
-  return 0.46;
+  return 0.36;
 }
 
 function getMultiplierClusterRadius(count: number) {
@@ -1908,7 +2307,7 @@ function getOverlappedRowWidth(row: MultiplierBubblePart[]) {
   }, 0);
 }
 
-function applySameValueAttraction(entities: BeadEntity[], draggingBeadId?: string) {
+function applyBeadForces(entities: BeadEntity[], draggingBeadId?: string) {
   for (let leftIndex = 0; leftIndex < entities.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < entities.length; rightIndex += 1) {
       const left = entities[leftIndex];
@@ -1916,20 +2315,27 @@ function applySameValueAttraction(entities: BeadEntity[], draggingBeadId?: strin
       if (left.id === draggingBeadId || right.id === draggingBeadId) {
         continue;
       }
-      if (left.sign !== right.sign || left.value !== right.value || !getNextPlaceValue(left.value)) {
-        continue;
-      }
 
       const dx = right.body.position.x - left.body.position.x;
       const dy = right.body.position.y - left.body.position.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      if (distance <= 1 || distance > ATTRACTION_RADIUS) {
+      if (distance <= 1) {
         continue;
       }
 
       const leftSpeed = Math.sqrt(left.body.velocity.x * left.body.velocity.x + left.body.velocity.y * left.body.velocity.y);
       const rightSpeed = Math.sqrt(right.body.velocity.x * right.body.velocity.x + right.body.velocity.y * right.body.velocity.y);
       const velocityFactor = clamp(1 - (leftSpeed + rightSpeed) / 18, 0.35, 1);
+
+      if (left.sign !== right.sign || left.value !== right.value || !getNextPlaceValue(left.value)) {
+        applySeparationForce(left, right, dx, dy, distance, velocityFactor);
+        continue;
+      }
+
+      if (distance > ATTRACTION_RADIUS) {
+        continue;
+      }
+
       const closeness = 1 - distance / ATTRACTION_RADIUS;
       const strength = ATTRACTION_FORCE * closeness * closeness * velocityFactor;
       const force = {
@@ -1944,6 +2350,27 @@ function applySameValueAttraction(entities: BeadEntity[], draggingBeadId?: strin
       });
     }
   }
+}
+
+function applySeparationForce(left: BeadEntity, right: BeadEntity, dx: number, dy: number, distance: number, velocityFactor: number) {
+  const radiusSum = getEntityRadius(left.value, left.count) + getEntityRadius(right.value, right.count);
+  const threshold = Math.min(SEPARATION_RADIUS, radiusSum * 1.08);
+  if (distance >= threshold) {
+    return;
+  }
+
+  const closeness = 1 - distance / threshold;
+  const strength = SEPARATION_FORCE * closeness * closeness * velocityFactor;
+  const force = {
+    x: (dx / distance) * strength,
+    y: (dy / distance) * strength,
+  };
+
+  Matter.Body.applyForce(left.body, left.body.position, {
+    x: -force.x,
+    y: -force.y,
+  });
+  Matter.Body.applyForce(right.body, right.body.position, force);
 }
 
 function createBasinBodies(fieldWidth: number, fieldHeight: number) {
@@ -1989,28 +2416,34 @@ function getBasinFrameSegments(fieldWidth: number, fieldHeight: number) {
 
 function getBasinPoints(fieldWidth: number, fieldHeight: number) {
   const curve = getBasinCurveMetrics(fieldWidth, fieldHeight);
-  const pointCount = 97;
+  const pointCount = 121;
 
   return Array.from({ length: pointCount }, (_, index) => {
     const progress = index / (pointCount - 1);
-    const x = curve.inset + (fieldWidth - curve.inset * 2) * progress;
-    const distanceFromCenter = Math.abs(progress - 0.5) * 2;
-    const y = curve.bottomY - curve.depth * Math.pow(distanceFromCenter, 0.92);
+    const arcX = -curve.halfWidth + curve.halfWidth * 2 * progress;
+    const x = curve.centerX + arcX;
+    const y = curve.arcCenterY + Math.sqrt(Math.max(0, curve.radius * curve.radius - arcX * arcX));
 
     return { x, y };
   });
 }
 
 function getBasinCurveMetrics(fieldWidth: number, fieldHeight: number) {
-  const bottomY = fieldHeight - 12 - BASIN_BODY_THICKNESS / 2;
-  const depth = Math.min(292, fieldHeight * 0.58);
+  const inset = 14;
+  const bottomY = fieldHeight - 18 - BASIN_BODY_THICKNESS / 2;
+  const halfWidth = Math.max(80, fieldWidth / 2 - inset);
+  const depth = Math.min(fieldHeight * 0.52, Math.max(168, halfWidth * 0.62));
+  const radius = (halfWidth * halfWidth + depth * depth) / (2 * depth);
   return {
     width: fieldWidth,
     centerX: fieldWidth / 2,
     bottomY,
     depth,
+    halfWidth,
+    radius,
+    arcCenterY: bottomY - radius,
     sideY: bottomY - depth,
-    inset: 4,
+    inset,
   };
 }
 
@@ -2058,6 +2491,10 @@ function getMultiplicationExpressionTokens(
   const previousExpression = getPreviousExpressionForValue(previousTokens, multiplicand);
   const leftTokens = previousExpression ?? [String(multiplicand)];
   const multiplicationTokens = [...leftTokens, '×', String(multiplier)];
+  if (previousExpression) {
+    return [...multiplicationTokens, '=', String(multiplicand * multiplier)];
+  }
+
   if (remainingTotal === 0) {
     return [...multiplicationTokens, '=', String(result)];
   }
@@ -2076,6 +2513,10 @@ function getDivisionExpressionTokens(
   const previousExpression = getPreviousExpressionForValue(previousTokens, dividend);
   const leftTokens = previousExpression ?? [String(dividend)];
   const divisionTokens = [...leftTokens, '÷', String(divisor)];
+  if (previousExpression) {
+    return [...divisionTokens, '=', String(dividend / divisor)];
+  }
+
   if (remainingTotal === 0) {
     return [...divisionTokens, '=', String(result)];
   }
@@ -2122,118 +2563,277 @@ function clamp(value: number, min: number, max: number) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#F6F1E8',
+    backgroundColor: '#EAFBFF',
   },
   header: {
     minHeight: 116,
-    paddingHorizontal: 18,
+    paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 16,
+    gap: 10,
   },
   headerTitleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
     flexShrink: 1,
   },
   backButton: {
     width: 38,
     height: 38,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#B8AD9C',
+    borderRadius: 16,
+    borderWidth: 3,
+    borderColor: '#BAE6FD',
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
   },
   backButtonText: {
-    color: '#25342C',
+    color: '#075985',
     fontSize: 32,
     fontWeight: '900',
     lineHeight: 34,
   },
   stageLabel: {
-    color: '#4E5D54',
-    fontSize: 14,
+    color: '#0284C7',
+    fontSize: 13,
     fontWeight: '700',
   },
   title: {
     marginTop: 4,
-    color: '#25342C',
-    fontSize: 30,
+    color: '#12334A',
+    fontSize: 28,
     fontWeight: '900',
   },
-  totalBox: {
-    minWidth: 86,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#D1C8B9',
+  hiddenMetric: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
+    overflow: 'hidden',
+  },
+  scoreShelf: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 8,
+  },
+  goalCupBox: {
+    width: 92,
+    minHeight: 92,
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    borderRadius: 18,
+    backgroundColor: '#E0F7FF',
+    borderWidth: 3,
+    borderColor: '#38BDF8',
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.16,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  goalCupLabel: {
+    color: '#075985',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 14,
+  },
+  goalCup: {
+    width: 48,
+    height: 44,
+    marginTop: 4,
+    overflow: 'hidden',
+    borderRadius: 12,
+    borderWidth: 3,
+    borderTopWidth: 5,
+    borderColor: '#0284C7',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  goalCupFill: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#7DD3FC',
+  },
+  goalCupRim: {
+    position: 'absolute',
+    left: 7,
+    right: 7,
+    top: 6,
+    height: 5,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+  },
+  goalCupValue: {
+    color: '#075985',
+    fontSize: 20,
+    fontWeight: '900',
+    lineHeight: 24,
+  },
+  goalCupStatus: {
+    marginTop: 3,
+    color: '#075985',
+    fontSize: 12,
+    fontWeight: '900',
+    lineHeight: 14,
+    maxWidth: 74,
+  },
+  totalBox: {
+    minWidth: 68,
+    paddingVertical: 9,
+    paddingHorizontal: 9,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 3,
+    borderColor: '#38BDF8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.16,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
   },
   totalLabel: {
-    color: '#6D766F',
+    color: '#075985',
     fontSize: 13,
     fontWeight: '800',
   },
   totalValue: {
-    color: '#25342C',
+    color: '#12334A',
     fontSize: 28,
     fontWeight: '900',
   },
   playArea: {
     alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: FIELD_GAP,
+    alignItems: 'center',
   },
   field: {
     overflow: 'hidden',
-    borderRadius: 18,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 22,
+    borderBottomRightRadius: 22,
+    backgroundColor: '#EAFBFF',
+  },
+  fieldBubbleMark: {
+    position: 'absolute',
     borderWidth: 3,
-    borderColor: '#8A7E6D',
-    backgroundColor: '#FBF8F0',
+    borderColor: 'rgba(125, 211, 252, 0.48)',
+    backgroundColor: 'rgba(255, 255, 255, 0.42)',
+  },
+  fieldBubbleMarkLarge: {
+    right: -32,
+    top: 24,
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+  },
+  fieldBubbleMarkSmall: {
+    left: 18,
+    bottom: 38,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+  },
+  fieldBubbleMarkTiny: {
+    right: 82,
+    bottom: 84,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderColor: 'rgba(186, 230, 253, 0.72)',
+    backgroundColor: 'rgba(224, 247, 255, 0.42)',
   },
   operatorRail: {
-    width: OPERATOR_RAIL_WIDTH,
-    paddingVertical: 6,
-    gap: 8,
-    alignItems: 'center',
+    width: '100%',
+    height: OPERATOR_TABS_HEIGHT,
+    paddingHorizontal: 0,
+    paddingTop: 8,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 6,
+    backgroundColor: '#EAFBFF',
   },
   operatorButton: {
-    width: 48,
+    flex: 1,
     height: 48,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#B8AD9C',
-    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    borderWidth: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.58)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   selectedOperatorButton: {
-    borderColor: '#2F7D68',
-    backgroundColor: '#2F7D68',
+    backgroundColor: 'rgba(255, 255, 255, 0.62)',
+    shadowOpacity: 0,
+    height: 56,
+    borderBottomWidth: 4,
+    borderBottomColor: '#0EA5E9',
+  },
+  selectedSignOperatorButton: {
+    borderColor: '#0EA5E9',
+    backgroundColor: '#E0F7FF',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.18,
+    shadowRadius: 7,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+    height: 56,
+  },
+  disabledOperatorButton: {
+    borderColor: '#BAE6FD',
+    backgroundColor: '#F0FCFF',
+    shadowOpacity: 0.03,
   },
   operatorButtonText: {
-    color: '#25342C',
-    fontSize: 27,
+    color: '#7DD3FC',
+    fontSize: 24,
     fontWeight: '900',
-    lineHeight: 31,
+    lineHeight: 27,
+  },
+  operatorButtonLabel: {
+    color: '#7DD3FC',
+    fontSize: 10,
+    fontWeight: '900',
+    lineHeight: 12,
+    marginTop: -1,
   },
   selectedOperatorButtonText: {
-    color: '#FFFFFF',
+    color: '#075985',
+  },
+  selectedSignOperatorButtonText: {
+    color: '#0284C7',
+  },
+  disabledOperatorButtonText: {
+    color: '#7DD3FC',
   },
   basinFrameSegment: {
     position: 'absolute',
     height: BASIN_FRAME_THICKNESS,
     borderRadius: BASIN_FRAME_THICKNESS,
-    backgroundColor: '#8A7E6D',
+    backgroundColor: 'rgba(125, 211, 252, 0.84)',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
   },
   pendingBubbleButton: {
     position: 'absolute',
@@ -2249,30 +2849,30 @@ const styles = StyleSheet.create({
   multiplierMiniBubble: {
     position: 'absolute',
     borderWidth: 3,
-    borderColor: '#8ED8EF',
-    backgroundColor: 'rgba(219, 248, 255, 0.34)',
-    shadowColor: '#62B9D9',
+    borderColor: '#38BDF8',
+    backgroundColor: 'rgba(224, 247, 255, 0.48)',
+    shadowColor: '#0284C7',
     shadowOpacity: 0.2,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
   multiplierMiniBubbleNegative: {
-    borderColor: '#7E8EA5',
-    backgroundColor: 'rgba(87, 102, 124, 0.2)',
-    shadowColor: '#506079',
+    borderColor: '#64748B',
+    backgroundColor: 'rgba(71, 85, 105, 0.2)',
+    shadowColor: '#475569',
   },
   divisionSurvivorMiniBubble: {
-    borderColor: '#53BFD9',
+    borderColor: '#38BDF8',
     borderWidth: 3,
-    backgroundColor: 'rgba(219, 248, 255, 0.5)',
+    backgroundColor: 'rgba(224, 247, 255, 0.58)',
     shadowOpacity: 0.3,
   },
   divisionGhostMiniBubble: {
     borderStyle: 'dashed',
     borderWidth: 3,
-    borderColor: 'rgba(98, 185, 217, 0.58)',
-    backgroundColor: 'rgba(219, 248, 255, 0.12)',
+    borderColor: 'rgba(56, 189, 248, 0.46)',
+    backgroundColor: 'rgba(224, 247, 255, 0.16)',
     shadowOpacity: 0.04,
     opacity: 0.62,
   },
@@ -2317,6 +2917,53 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     opacity: 0.28,
   },
+  mergePopParticle: {
+    position: 'absolute',
+    zIndex: 4,
+    backgroundColor: '#7DD3FC',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.84)',
+  },
+  bubbleBurstRing: {
+    position: 'absolute',
+    zIndex: 6,
+    borderWidth: 4,
+    borderColor: '#7DD3FC',
+    backgroundColor: 'rgba(224, 247, 255, 0.18)',
+  },
+  bubbleBurstRingNegative: {
+    borderColor: '#8FA9C5',
+    backgroundColor: 'rgba(75, 91, 119, 0.12)',
+  },
+  bubbleBurstInnerRing: {
+    position: 'absolute',
+    zIndex: 6,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.82)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  bubbleBurstDrop: {
+    position: 'absolute',
+    zIndex: 7,
+    backgroundColor: '#BAE6FD',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  bubbleBurstDropNegative: {
+    backgroundColor: '#9FB5D0',
+  },
+  bubbleBurstShard: {
+    position: 'absolute',
+    zIndex: 7,
+    width: 14,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.86)',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
   divisionSplitPart: {
     position: 'absolute',
   },
@@ -2327,30 +2974,37 @@ const styles = StyleSheet.create({
   bead: {
     position: 'absolute',
     borderWidth: 3,
-    shadowColor: '#3D3327',
+    shadowColor: '#0284C7',
     shadowOpacity: 0.22,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 3 },
     elevation: 3,
   },
+  focusedBead: {
+    borderWidth: 5,
+    shadowOpacity: 0.32,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 8,
+  },
   groupBubble: {
     borderWidth: 3,
-    shadowColor: '#62B9D9',
+    shadowColor: '#0284C7',
     shadowOpacity: 0.24,
     shadowRadius: 8,
   },
   multiplicandBubble: {
-    borderColor: '#2F7D68',
+    borderColor: '#0EA5E9',
     borderWidth: 4,
   },
   productBubble: {
-    borderColor: '#4D6FB5',
-    shadowColor: '#4D6FB5',
+    borderColor: '#38BDF8',
+    shadowColor: '#0284C7',
     shadowOpacity: 0.28,
   },
   divisionBubble: {
-    borderColor: '#8A6FAD',
-    shadowColor: '#8A6FAD',
+    borderColor: '#7DD3FC',
+    shadowColor: '#0284C7',
     shadowOpacity: 0.24,
   },
   beadShine: {
@@ -2397,18 +3051,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     borderRadius: 13,
     borderWidth: 2,
-    borderColor: '#8A7E6D',
+    borderColor: '#BAE6FD',
     backgroundColor: 'rgba(255, 255, 255, 0.94)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#3D3327',
+    shadowColor: '#0284C7',
     shadowOpacity: 0.16,
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
   bubbleNumberBadgeText: {
-    color: '#25342C',
+    color: '#12334A',
     fontSize: 16,
     fontWeight: '900',
     lineHeight: 18,
@@ -2416,7 +3070,7 @@ const styles = StyleSheet.create({
   containedBead: {
     position: 'absolute',
     borderWidth: 3,
-    shadowColor: '#3D3327',
+    shadowColor: '#0284C7',
     shadowOpacity: 0.12,
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 1 },
@@ -2429,43 +3083,56 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     opacity: 0.82,
   },
-  messagePill: {
-    position: 'absolute',
-    top: 78,
-    alignSelf: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#2F473A',
-  },
-  messageText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
-  },
   clearPanel: {
     position: 'absolute',
+    zIndex: 6,
     left: 24,
     right: 24,
     top: '34%',
     padding: 18,
-    borderRadius: 8,
+    borderRadius: 22,
     borderWidth: 3,
-    borderColor: '#2F473A',
+    borderColor: '#0EA5E9',
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 6,
+  },
+  clearCelebrationLayer: {
+    zIndex: 5,
+  },
+  clearSplashDrop: {
+    position: 'absolute',
+    backgroundColor: 'rgba(125, 211, 252, 0.62)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.82)',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.14,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  clearSparkle: {
+    position: 'absolute',
+    color: 'rgba(255, 255, 255, 0.94)',
+    fontWeight: '900',
+    textShadowColor: 'rgba(2, 132, 199, 0.38)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 5,
   },
   failedPanel: {
-    borderColor: '#9B6B5C',
+    borderColor: '#38BDF8',
   },
   clearTitle: {
-    color: '#25342C',
+    color: '#12334A',
     fontSize: 34,
     fontWeight: '900',
   },
   clearText: {
     marginTop: 4,
-    color: '#4E5D54',
+    color: '#0284C7',
     fontSize: 18,
     fontWeight: '800',
   },
@@ -2475,9 +3142,30 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   footer: {
-    minHeight: 96,
+    minHeight: 104,
     paddingHorizontal: 18,
-    paddingVertical: 14,
+    paddingTop: 10,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  statusMessageBox: {
+    minHeight: 34,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    justifyContent: 'center',
+  },
+  statusMessageText: {
+    color: '#075985',
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  statusMessagePlaceholder: {
+    color: 'transparent',
+  },
+  footerControls: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -2486,34 +3174,39 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 52,
     paddingHorizontal: 14,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#D1C8B9',
-    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.84)',
     justifyContent: 'center',
   },
   expressionText: {
-    color: '#25342C',
+    color: '#12334A',
     fontSize: 24,
     lineHeight: 30,
     fontWeight: '900',
   },
   expressionPlaceholder: {
-    color: '#9B9387',
+    color: '#7DD3FC',
   },
   button: {
     minHeight: 48,
     minWidth: 92,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2F7D68',
+    backgroundColor: '#0EA5E9',
+    borderWidth: 3,
+    borderColor: '#0284C7',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 3,
   },
   secondaryButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#B8AD9C',
+    backgroundColor: 'rgba(255, 255, 255, 0.84)',
+    borderWidth: 0,
+    shadowOpacity: 0,
   },
   pressedButton: {
     transform: [{ scale: 0.98 }],
@@ -2525,6 +3218,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   secondaryButtonText: {
-    color: '#25342C',
+    color: '#12334A',
   },
 });
