@@ -55,8 +55,8 @@ export default function IndexScreen() {
             <View style={[styles.brandDot, styles.brandDotSmall]} />
             <View style={[styles.brandDot, styles.brandDotTiny]} />
           </View>
-          <Text style={styles.appTitle}>まるまる電卓</Text>
-          <Text style={styles.appSubtitle}>まるの道をすすんで、めあての数をつくろう</Text>
+          <Text style={styles.appTitle}>まるまるでんたく</Text>
+          <Text style={styles.appSubtitle}>まるをまとめるたびにでよう</Text>
         </View>
 
         {nextStage ? (
@@ -75,7 +75,7 @@ export default function IndexScreen() {
             </View>
             <View style={styles.nextStageBubble}>
               <Text style={styles.nextStageTarget}>{nextStage.target}</Text>
-              <Text style={styles.nextStageTargetLabel}>をつくる</Text>
+              <Text style={styles.nextStageTargetLabel}>にまとめる</Text>
             </View>
           </Pressable>
         ) : null}
@@ -296,7 +296,7 @@ function getStageObjective(stage: Stage) {
   if (stage.islandId === 'subtraction' && firstCount > stage.target) {
     return `ひいて ${stage.target} にしよう`;
   }
-  return `${stage.target}をつくろう`;
+  return `${stage.target}にまとめよう`;
 }
 
 function getStatusLabel(status: StageStatus) {
@@ -310,17 +310,17 @@ function getStatusLabel(status: StageStatus) {
 }
 
 function getFriendlySetTitle(setTitle: string) {
-  if (setTitle === '10の塔') {
-    return '10のあわみち';
+  if (setTitle === '10のとう') {
+    return '10にまとめるみち';
   }
-  if (setTitle === '20の丘') {
-    return '20のうみべ';
+  if (setTitle === '20のおか') {
+    return '20にまとめるうみべ';
   }
-  if (setTitle === '大きな数の広場') {
-    return '大きなすいそう';
+  if (setTitle === 'おおきなかずのひろば') {
+    return 'おおきくまとめるすいそう';
   }
-  if (setTitle === '10にもどす道') {
-    return 'ひき算のすいろ';
+  if (setTitle === '10にもどすみち') {
+    return 'ひいてまとめるすいろ';
   }
   return setTitle;
 }

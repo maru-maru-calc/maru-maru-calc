@@ -99,13 +99,13 @@ type ContainedBeadPart = {
   radius: number;
 };
 
-const FIELD_MARGIN = 18;
+const FIELD_MARGIN = 28;
 const OPERATOR_TABS_HEIGHT = 64;
-const HEADER_HEIGHT = 148;
-const FOOTER_HEIGHT = 112;
+const HEADER_HEIGHT = 112;
+const FOOTER_HEIGHT = 92;
 const PREVIEW_Y = 38;
 const ATTRACTION_RADIUS = 220;
-const ATTRACTION_FORCE = 0.00014;
+const ATTRACTION_FORCE = 0.000095;
 const SEPARATION_RADIUS = 92;
 const SEPARATION_FORCE = 0.000075;
 const BASIN_BODY_THICKNESS = 14;
@@ -183,6 +183,7 @@ export function MarumaruGame({
     () => getDisplayBeadsForPendingPriorityExpression(beads, expressionTokens),
     [beads, expressionTokens],
   );
+  const almostMergeBeadIds = useMemo(() => findAlmostMergeBeadIds(displayBeads), [displayBeads]);
   const basinFrameSegments = useMemo(() => getBasinFrameSegments(fieldWidth, fieldHeight), [fieldHeight, fieldWidth]);
 
   const resetStage = useCallback(() => {
@@ -281,7 +282,7 @@ export function MarumaruGame({
 
     if (!isFailed && !hasMergeableCount(beads) && !mergeAnimation) {
       setIsFailed(true);
-      setMessage('もう一回 やってみよう');
+      setMessage('もういっかい やってみよう');
     }
 
     return undefined;
@@ -721,9 +722,10 @@ export function MarumaruGame({
           continue;
         }
 
-        const dx = mergeAnimation.center.x - entity.body.position.x;
-        const dy = mergeAnimation.center.y - entity.body.position.y;
-        const pull = 0.16 + progress * 0.52;
+        const alignTarget = getMergeAnimationTarget(entity.id, mergeAnimation, progress);
+        const dx = alignTarget.x - entity.body.position.x;
+        const dy = alignTarget.y - entity.body.position.y;
+        const pull = mergeAnimation.value === 1 && progress < 0.72 ? 0.22 + progress * 0.34 : 0.16 + progress * 0.52;
         Matter.Body.setVelocity(entity.body, {
           x: dx * pull,
           y: dy * pull,
@@ -973,7 +975,7 @@ export function MarumaruGame({
         const decomposition = productCollision ? undefined : findDecompositionPair(toSnapshots(entitiesRef.current));
         if (decomposition) {
           splitHigherBead(decomposition.higherBeadId, decomposition.lowerValue);
-          setMessage('大きなまるが こまかくなったよ');
+          setMessage('おおきなまるが こまかくなったよ');
         }
         const pair = decomposition || productCollision ? undefined : findAnnihilationPair(toSnapshots(entitiesRef.current));
         if (pair) {
@@ -1086,6 +1088,7 @@ export function MarumaruGame({
               onDragStart={startDragBead}
               onDragEnd={endDragBead}
               isDragging={draggingBeadId === bead.id}
+              isAlmostMerge={almostMergeBeadIds.has(bead.id)}
               onTap={bead.id !== 'expression-wrap-preview' && canBurstBead(bead) ? () => unwrapBeadGroup(bead.id) : undefined}
             />
           ))}
@@ -1097,7 +1100,7 @@ export function MarumaruGame({
               <Text style={styles.clearTitle}>できた!</Text>
               <Text style={styles.clearText}>{stage.target} になったよ</Text>
               <View style={styles.clearActions}>
-                <GameButton label="もう一回" onPress={resetStage} variant="secondary" />
+                <GameButton label="もういっかい" onPress={resetStage} variant="secondary" />
                 <GameButton label="つぎへ" onPress={goNextStage} />
               </View>
             </View>
@@ -1106,10 +1109,10 @@ export function MarumaruGame({
             <View style={[styles.clearPanel, styles.failedPanel]}>
               <Text style={styles.clearTitle}>ざんねん</Text>
               <Text style={styles.clearText}>
-                {total} になったよ。{stage.target} をつくろう
+                {total} になったよ。{stage.target} にまとめよう
               </Text>
               <View style={styles.clearActions}>
-                <GameButton label="もう一回" onPress={resetStage} variant="secondary" />
+                <GameButton label="もういっかい" onPress={resetStage} variant="secondary" />
               </View>
             </View>
           ) : null}
@@ -1136,6 +1139,7 @@ function BeadView({
   y,
   isPreview = false,
   isFocused = false,
+  isAlmostMerge = false,
 }: {
   value: PlaceValue;
   count: number;
@@ -1145,6 +1149,7 @@ function BeadView({
   y: number;
   isPreview?: boolean;
   isFocused?: boolean;
+  isAlmostMerge?: boolean;
 }) {
   const kind = getBeadKind(value);
   const palette = getSignedPalette(kind, sign);
@@ -1158,6 +1163,7 @@ function BeadView({
       style={[
         styles.bead,
         isFocused && styles.focusedBead,
+        isAlmostMerge && styles.almostMergeBead,
         isGroupBubble && styles.groupBubble,
         role === 'product' && styles.productBubble,
         role === 'multiplicand' && styles.multiplicandBubble,
@@ -1166,7 +1172,7 @@ function BeadView({
           width: radius * 2,
           height: radius * 2,
           borderRadius: radius,
-          backgroundColor: isGroupBubble ? (sign < 0 ? 'rgba(75, 91, 119, 0.3)' : 'rgba(215, 246, 255, 0.36)') : palette.color,
+          backgroundColor: isGroupBubble ? (sign < 0 ? 'rgba(75, 91, 119, 0.3)' : 'rgba(215, 246, 255, 0.36)') : getTranslucentBeadColor(value, palette.color),
           borderColor: isGroupBubble ? (sign < 0 ? '#51627D' : '#8ED8EF') : palette.rimColor,
           left: x - radius,
           top: y - radius,
@@ -1193,7 +1199,7 @@ function BeadView({
                   width: bead.radius * 2,
                   height: bead.radius * 2,
                   borderRadius: bead.radius,
-                  backgroundColor: beadPalette.color,
+                  backgroundColor: getTranslucentBeadColor(bead.value, beadPalette.color),
                   borderColor: beadPalette.rimColor,
                 },
               ]}
@@ -1216,6 +1222,7 @@ function BeadView({
         </>
       ) : (
         <>
+          <View style={styles.beadInnerGlass} />
           <View
             style={[
               styles.beadShine,
@@ -1768,6 +1775,7 @@ function DraggableBeadView({
   onDragStart,
   onDragEnd,
   isDragging,
+  isAlmostMerge,
   onTap,
 }: {
   bead: BeadSnapshot;
@@ -1775,6 +1783,7 @@ function DraggableBeadView({
   onDragStart: (beadId: string) => void;
   onDragEnd: (beadId: string) => void;
   isDragging: boolean;
+  isAlmostMerge: boolean;
   onTap?: () => void;
 }) {
   const startPositionRef = useRef({ x: bead.x, y: bead.y });
@@ -1826,7 +1835,16 @@ function DraggableBeadView({
       ]}
       {...panResponder.panHandlers}
     >
-      <BeadView value={bead.value} count={bead.count} sign={bead.sign} role={bead.role} x={radius + 8} y={radius + 8} isFocused={isDragging} />
+      <BeadView
+        value={bead.value}
+        count={bead.count}
+        sign={bead.sign}
+        role={bead.role}
+        x={radius + 8}
+        y={radius + 8}
+        isFocused={isDragging}
+        isAlmostMerge={isAlmostMerge}
+      />
     </View>
   );
 }
@@ -2070,6 +2088,69 @@ function isStageReadyForResult(pendingBubbles: PendingBubble[]) {
   return pendingBubbles.length === 0;
 }
 
+function findAlmostMergeBeadIds(beads: BeadSnapshot[]) {
+  const highlightedIds = new Set<string>();
+  const candidates = beads.filter((bead) => bead.role === 'normal' && bead.value === 1 && bead.count === 1);
+  const visitedIds = new Set<string>();
+
+  for (const startBead of candidates) {
+    if (visitedIds.has(startBead.id)) {
+      continue;
+    }
+
+    const connected = findConnectedAlmostMergeBeads(startBead, candidates);
+    connected.forEach((bead) => visitedIds.add(bead.id));
+    if (connected.length >= 7 && connected.length < 10) {
+      connected.forEach((bead) => highlightedIds.add(bead.id));
+    }
+  }
+
+  return highlightedIds;
+}
+
+function findConnectedAlmostMergeBeads(startBead: BeadSnapshot, beads: BeadSnapshot[]) {
+  const connectedBeads: BeadSnapshot[] = [];
+  const queuedBeads = [startBead];
+  const visitedIds = new Set<string>();
+
+  while (queuedBeads.length > 0) {
+    const bead = queuedBeads.shift();
+    if (!bead || visitedIds.has(bead.id)) {
+      continue;
+    }
+
+    visitedIds.add(bead.id);
+    connectedBeads.push(bead);
+
+    for (const candidate of beads) {
+      if (candidate.sign !== bead.sign || visitedIds.has(candidate.id)) {
+        continue;
+      }
+      if (getPointDistance(bead, candidate) <= 82) {
+        queuedBeads.push(candidate);
+      }
+    }
+  }
+
+  return connectedBeads;
+}
+
+function getMergeAnimationTarget(beadId: string, animation: MergeAnimation, progress: number) {
+  if (animation.value !== 1 || progress >= 0.72) {
+    return animation.center;
+  }
+
+  const beadIndex = Math.max(0, animation.beadIds.indexOf(beadId));
+  const beadCount = Math.max(animation.beadIds.length, 1);
+  const angle = -Math.PI / 2 + (Math.PI * 2 * beadIndex) / beadCount;
+  const ringRadius = 24;
+
+  return {
+    x: animation.center.x + Math.cos(angle) * ringRadius,
+    y: animation.center.y + Math.sin(angle) * ringRadius,
+  };
+}
+
 function getEntityRadius(value: PlaceValue, count: number) {
   if (value === 1 && count > 1) {
     return 34 + Math.min(count, 10) * 3;
@@ -2141,21 +2222,41 @@ function getBeadLayerZIndex(value: PlaceValue) {
 
 function getBeadLayerOpacity(value: PlaceValue) {
   if (value === 1) {
-    return 1;
+    return 0.72;
   }
   if (value === 10) {
-    return 0.74;
+    return 0.8;
   }
   if (value === 100) {
-    return 0.56;
+    return 0.86;
   }
   if (value === 1000) {
-    return 0.48;
+    return 0.82;
   }
   if (value === 10000) {
-    return 0.42;
+    return 0.8;
   }
-  return 0.36;
+  return 0.78;
+}
+
+function getTranslucentBeadColor(value: PlaceValue, color: string) {
+  const opacityByValue: Record<PlaceValue, number> = {
+    1: 0.34,
+    10: 0.48,
+    100: 0.58,
+    1000: 0.52,
+    10000: 0.5,
+    100000: 0.48,
+  };
+  return hexToRgba(color, opacityByValue[value]);
+}
+
+function hexToRgba(hex: string, opacity: number) {
+  const normalized = hex.replace('#', '');
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 }
 
 function getMultiplierClusterRadius(count: number) {
@@ -2308,6 +2409,8 @@ function getOverlappedRowWidth(row: MultiplierBubblePart[]) {
 }
 
 function applyBeadForces(entities: BeadEntity[], draggingBeadId?: string) {
+  const attractionCounts = getAttractionCounts(entities, draggingBeadId);
+
   for (let leftIndex = 0; leftIndex < entities.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < entities.length; rightIndex += 1) {
       const left = entities[leftIndex];
@@ -2336,8 +2439,13 @@ function applyBeadForces(entities: BeadEntity[], draggingBeadId?: string) {
         continue;
       }
 
+      const attractionMultiplier = getAttractionMultiplier(Math.min(attractionCounts.get(left.id) ?? left.count, attractionCounts.get(right.id) ?? right.count));
+      if (attractionMultiplier <= 0) {
+        continue;
+      }
+
       const closeness = 1 - distance / ATTRACTION_RADIUS;
-      const strength = ATTRACTION_FORCE * closeness * closeness * velocityFactor;
+      const strength = ATTRACTION_FORCE * attractionMultiplier * closeness * closeness * velocityFactor;
       const force = {
         x: (dx / distance) * strength,
         y: (dy / distance) * strength,
@@ -2350,6 +2458,52 @@ function applyBeadForces(entities: BeadEntity[], draggingBeadId?: string) {
       });
     }
   }
+}
+
+function getAttractionCounts(entities: BeadEntity[], draggingBeadId?: string) {
+  const counts = new Map<string, number>();
+
+  for (const entity of entities) {
+    if (entity.id === draggingBeadId || !getNextPlaceValue(entity.value)) {
+      continue;
+    }
+
+    let nearbyCount = entity.count;
+    for (const candidate of entities) {
+      if (
+        candidate.id === entity.id ||
+        candidate.id === draggingBeadId ||
+        candidate.value !== entity.value ||
+        candidate.sign !== entity.sign ||
+        !getNextPlaceValue(candidate.value)
+      ) {
+        continue;
+      }
+
+      const dx = candidate.body.position.x - entity.body.position.x;
+      const dy = candidate.body.position.y - entity.body.position.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance <= ATTRACTION_RADIUS) {
+        nearbyCount += candidate.count;
+      }
+    }
+    counts.set(entity.id, nearbyCount);
+  }
+
+  return counts;
+}
+
+function getAttractionMultiplier(nearbyCount: number) {
+  if (nearbyCount >= 10) {
+    return 1.05;
+  }
+  if (nearbyCount >= 7) {
+    return 0.48;
+  }
+  if (nearbyCount >= 4) {
+    return 0.12;
+  }
+  return 0;
 }
 
 function applySeparationForce(left: BeadEntity, right: BeadEntity, dx: number, dy: number, distance: number, velocityFactor: number) {
@@ -2567,7 +2721,7 @@ const styles = StyleSheet.create({
   },
   header: {
     minHeight: 116,
-    paddingHorizontal: 14,
+    paddingHorizontal: 24,
     paddingTop: 10,
     paddingBottom: 14,
     flexDirection: 'row',
@@ -2721,6 +2875,7 @@ const styles = StyleSheet.create({
   playArea: {
     alignSelf: 'center',
     alignItems: 'center',
+    marginTop: 4,
   },
   field: {
     overflow: 'hidden',
@@ -2973,7 +3128,7 @@ const styles = StyleSheet.create({
   },
   bead: {
     position: 'absolute',
-    borderWidth: 3,
+    borderWidth: 2,
     shadowColor: '#0284C7',
     shadowOpacity: 0.22,
     shadowRadius: 4,
@@ -2986,6 +3141,13 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 7 },
     elevation: 8,
+  },
+  almostMergeBead: {
+    shadowColor: '#7DD3FC',
+    shadowOpacity: 0.58,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 7,
   },
   groupBubble: {
     borderWidth: 3,
@@ -3011,6 +3173,17 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginLeft: 5,
     opacity: 0.82,
+  },
+  beadInnerGlass: {
+    position: 'absolute',
+    left: 4,
+    right: 4,
+    top: 4,
+    bottom: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.44)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   bubbleShine: {
     position: 'absolute',
@@ -3143,7 +3316,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     minHeight: 104,
-    paddingHorizontal: 18,
+    paddingHorizontal: 28,
     paddingTop: 10,
     paddingBottom: 12,
     gap: 8,
