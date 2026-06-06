@@ -1,4 +1,5 @@
 import * as Matter from 'matter-js';
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,8 +17,8 @@ import {
   stripExpressionResult,
 } from '@/game/expression';
 import { findMergeCluster, getTotalValue, hasMergeableCount } from '@/game/merge';
-import { getStage, STAGES } from '@/game/stages';
-import { BeadRole, BeadSign, BeadSnapshot, MergeCluster, PlaceValue } from '@/game/types';
+import { getStage } from '@/game/stages';
+import { BeadRole, BeadSign, BeadSnapshot, MergeCluster, OperatorUsageLimit, OperatorUsageLimits, PlaceValue } from '@/game/types';
 
 type BeadEntity = {
   id: string;
@@ -98,8 +99,16 @@ type ContainedBeadPart = {
   value: PlaceValue;
   radius: number;
 };
+type BackgroundBubbleSpec = {
+  id: string;
+  xRatio: number;
+  size: number;
+  speed: number;
+  delay: number;
+  drift: number;
+};
 
-const FIELD_MARGIN = 28;
+const FIELD_MARGIN = 0;
 const OPERATOR_TABS_HEIGHT = 64;
 const HEADER_HEIGHT = 112;
 const FOOTER_HEIGHT = 92;
@@ -123,6 +132,7 @@ const BUBBLE_BURST_ANIMATION_MS = 120;
 const ANNIHILATION_ANIMATION_MS = 180;
 const DIVISION_SPLIT_ANIMATION_MS = 760;
 const PRODUCT_BUBBLE_BURST_DELAY_MS = 950;
+const BACKGROUND_BUBBLE_TICK_MS = 90;
 const OPERATORS: OperatorButtonSymbol[] = ['+', '-', '×', '÷'];
 const DETAILED_RELEASE_BEAD_LIMIT = 80;
 const MULTIPLIER_BUBBLE_X_STEP = 0.34;
@@ -141,14 +151,18 @@ export function MarumaruGame({
   initialStageIndex = 0,
   onBack,
   onStageClear,
+  mode = 'stage',
+  onComplete,
 }: {
   initialStageIndex?: number;
   onBack?: () => void;
   onStageClear?: (stageId: string) => void;
+  mode?: 'stage' | 'launch';
+  onComplete?: () => void;
 }) {
   const { width, height } = useWindowDimensions();
   const fieldWidth = Math.max(240, width - FIELD_MARGIN * 2);
-  const fieldHeight = Math.max(360, height - HEADER_HEIGHT - FOOTER_HEIGHT - OPERATOR_TABS_HEIGHT);
+  const fieldHeight = Math.max(360, height - HEADER_HEIGHT - FOOTER_HEIGHT - OPERATOR_TABS_HEIGHT - 20);
   const [stageIndex, setStageIndex] = useState(initialStageIndex);
   const stage = getStage(stageIndex);
   const [selectedOperator, setSelectedOperator] = useState<OperatorSymbol>('+');
@@ -166,8 +180,13 @@ export function MarumaruGame({
   const [divisionSplitAnimation, setDivisionSplitAnimation] = useState<DivisionSplitAnimation | undefined>(undefined);
   const [bubbleBurstAnimations, setBubbleBurstAnimations] = useState<BubbleBurstAnimation[]>([]);
   const [message, setMessage] = useState('あわをさわると まるがでるよ');
+  const [operatorUsage, setOperatorUsage] = useState<OperatorUsageLimits>(() => getInitialOperatorUsage(getStage(initialStageIndex), mode));
+  const [hasReleasedBubble, setHasReleasedBubble] = useState(false);
   const [isClear, setIsClear] = useState(false);
   const [isFailed, setIsFailed] = useState(false);
+  const [idleHintTick, setIdleHintTick] = useState(() => Date.now());
+  const [backgroundBubbleTick, setBackgroundBubbleTick] = useState(() => Date.now());
+  const [backgroundBubbleStarts, setBackgroundBubbleStarts] = useState<Record<string, number>>({});
   const engineRef = useRef<Matter.Engine | null>(null);
   const entitiesRef = useRef<BeadEntity[]>([]);
   const draggingBeadIdRef = useRef<string | undefined>(undefined);
@@ -177,6 +196,8 @@ export function MarumaruGame({
   const mergeReadySinceRef = useRef<number | undefined>(undefined);
   const resultReadySinceRef = useRef<number | undefined>(undefined);
   const reportedClearStageIdRef = useRef<string | undefined>(undefined);
+  const reportedCompleteRef = useRef(false);
+  const lastBubbleInteractionAtRef = useRef(Date.now());
 
   const total = useMemo(() => getTotalValue(beads), [beads]);
   const displayBeads = useMemo(
@@ -185,8 +206,24 @@ export function MarumaruGame({
   );
   const almostMergeBeadIds = useMemo(() => findAlmostMergeBeadIds(displayBeads), [displayBeads]);
   const basinFrameSegments = useMemo(() => getBasinFrameSegments(fieldWidth, fieldHeight), [fieldHeight, fieldWidth]);
+  const backgroundBubbles = useMemo(() => getBackgroundBubbleSpecs(width), [width]);
+  const markBubbleInteraction = useCallback(() => {
+    const now = Date.now();
+    lastBubbleInteractionAtRef.current = now;
+    setIdleHintTick(now);
+  }, []);
+  const shouldHintPendingBubbles =
+    mode === 'launch' &&
+    pendingBubbles.length > 0 &&
+    !isClear &&
+    !isFailed &&
+    draggingBeadId === undefined &&
+    idleHintTick - lastBubbleInteractionAtRef.current >= 2200;
+  const shouldPulsePendingBubbles =
+    shouldHintPendingBubbles && Math.floor((idleHintTick - lastBubbleInteractionAtRef.current - 2200) / 720) % 2 === 0;
 
   const resetStage = useCallback(() => {
+    markBubbleInteraction();
     const engine = Matter.Engine.create({ gravity: { x: 0, y: 1.08 } });
     const wallThickness = 80;
     const floor = Matter.Bodies.rectangle(fieldWidth / 2, fieldHeight + wallThickness / 2, fieldWidth, wallThickness, {
@@ -205,31 +242,51 @@ export function MarumaruGame({
 
     Matter.Composite.add(engine.world, [floor, ...basinSegments, leftWall, rightWall]);
     engineRef.current = engine;
-    entitiesRef.current = [];
-    setBeads([]);
-    setPendingBubbles(createPendingBubbles(fieldWidth, stage.bubbleCounts));
-    expressionTokensRef.current = [];
-    setExpressionTokens([]);
+    const initialEntities = mode === 'launch' ? createLaunchBeads(engine, fieldWidth, fieldHeight) : [];
+    entitiesRef.current = initialEntities;
+    setBeads(toSnapshots(initialEntities, { width: fieldWidth, height: fieldHeight }));
+    setPendingBubbles(createPendingBubbles(fieldWidth, mode === 'launch' ? [2] : stage.bubbleCounts));
+    const initialExpression = mode === 'launch' ? ['8', '+'] : [];
+    expressionTokensRef.current = initialExpression;
+    setExpressionTokens(initialExpression);
     expressionHistoryRef.current = [];
-    expressionTotalRef.current = 0;
-    selectedOperatorRef.current = '+';
+    expressionTotalRef.current = mode === 'launch' ? 8 : 0;
+    const nextOperatorUsage = getInitialOperatorUsage(stage, mode);
+    const nextSelectedOperator = getInitialSelectedOperator(nextOperatorUsage);
+    setOperatorUsage(nextOperatorUsage);
+    selectedOperatorRef.current = nextSelectedOperator;
     operatorSignRef.current = 1;
-    setSelectedOperator('+');
+    setSelectedOperator(nextSelectedOperator);
     setOperatorSign(1);
+    setHasReleasedBubble(false);
     setMergeAnimation(undefined);
     setAnnihilationAnimation(undefined);
     setDivisionSplitAnimation(undefined);
     setBubbleBurstAnimations([]);
-    setMessage('あわをさわると まるがでるよ');
+    setMessage('');
     setIsClear(false);
     setIsFailed(false);
     mergeReadySinceRef.current = undefined;
     resultReadySinceRef.current = undefined;
-  }, [fieldHeight, fieldWidth, stage.bubbleCounts]);
+  }, [fieldHeight, fieldWidth, markBubbleInteraction, mode, stage.bubbleCounts]);
 
   useEffect(() => {
     resetStage();
   }, [resetStage]);
+
+  useEffect(() => {
+    const interval = setInterval(() => setBackgroundBubbleTick(Date.now()), BACKGROUND_BUBBLE_TICK_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (pendingBubbles.length === 0 || isClear || isFailed) {
+      return undefined;
+    }
+
+    const interval = setInterval(() => setIdleHintTick(Date.now()), 260);
+    return () => clearInterval(interval);
+  }, [isClear, isFailed, pendingBubbles.length]);
 
   useEffect(() => {
     expressionTokensRef.current = expressionTokens;
@@ -249,6 +306,7 @@ export function MarumaruGame({
 
   useEffect(() => {
     reportedClearStageIdRef.current = undefined;
+    reportedCompleteRef.current = false;
   }, [stage.id]);
 
   useEffect(() => {
@@ -259,6 +317,16 @@ export function MarumaruGame({
     reportedClearStageIdRef.current = stage.id;
     onStageClear?.(stage.id);
   }, [isClear, onStageClear, stage.id]);
+
+  useEffect(() => {
+    if (!isClear || mode !== 'launch' || reportedCompleteRef.current) {
+      return;
+    }
+
+    reportedCompleteRef.current = true;
+    const timeout = setTimeout(() => onComplete?.(), 2600);
+    return () => clearTimeout(timeout);
+  }, [isClear, mode, onComplete]);
 
   useEffect(() => {
     if (isClear || !isStageReadyForResult(pendingBubbles)) {
@@ -595,25 +663,37 @@ export function MarumaruGame({
 
   const burstBubble = useCallback(
     (bubble: PendingBubble) => {
+      markBubbleInteraction();
       if (isClear || isFailed) {
         return;
       }
+      const hasPriorValue = hasExpressionValue(expressionTokensRef.current);
+      const activeOperator: OperatorButtonSymbol = hasPriorValue ? selectedOperator : '+';
+      if (hasPriorValue && !canUseOperator(operatorUsage[activeOperator])) {
+        return;
+      }
 
-      if (selectedOperator === '×') {
+      setHasReleasedBubble(true);
+      if (hasPriorValue && activeOperator === '×') {
+        consumeOperatorUsage(activeOperator);
         multiplyWrappedGroup(bubble);
         return;
       }
-      if (selectedOperator === '÷') {
+      if (hasPriorValue && activeOperator === '÷') {
+        consumeOperatorUsage(activeOperator);
         divideWrappedGroup(bubble);
         return;
       }
 
-      const sign: BeadSign = selectedOperator === '-' ? -1 : 1;
+      if (hasPriorValue) {
+        consumeOperatorUsage(activeOperator);
+      }
+      const sign: BeadSign = hasPriorValue && activeOperator === '-' ? -1 : 1;
       triggerBubbleBurst(bubble, false, sign);
       setPendingBubbles((current) => current.filter((candidate) => candidate.id !== bubble.id));
       expressionTotalRef.current += bubble.count * sign;
       setExpressionTokens((current) => {
-        const nextTokens = addNumberToExpression(current, bubble.count, selectedOperator, expressionTotalRef.current);
+        const nextTokens = addNumberToExpression(current, bubble.count, activeOperator, expressionTotalRef.current);
         expressionTokensRef.current = nextTokens;
         expressionHistoryRef.current = stripExpressionResult(nextTokens);
         return nextTokens;
@@ -630,11 +710,28 @@ export function MarumaruGame({
       }
       setMessage(`${bubble.count}この まるがでたよ`);
     },
-    [addBead, divideWrappedGroup, isClear, isFailed, multiplyWrappedGroup, selectedOperator, triggerBubbleBurst],
+    [addBead, divideWrappedGroup, isClear, isFailed, markBubbleInteraction, multiplyWrappedGroup, operatorUsage, selectedOperator, triggerBubbleBurst],
   );
+
+  const consumeOperatorUsage = (operator: OperatorButtonSymbol) => {
+    setOperatorUsage((current) => {
+      const remaining = current[operator];
+      if (remaining === 'infinite' || remaining <= 0) {
+        return current;
+      }
+      return {
+        ...current,
+        [operator]: remaining - 1,
+      };
+    });
+  };
 
   const selectOperator = useCallback(
     (operator: OperatorButtonSymbol) => {
+      markBubbleInteraction();
+      if (!canUseOperator(operatorUsage[operator])) {
+        return;
+      }
       const nextOperatorSign: BeadSign = operator === '-' ? -1 : operator === '+' ? 1 : selectedOperatorRef.current === '-' ? -1 : operatorSignRef.current;
 
       if (operator === selectedOperator) {
@@ -665,11 +762,15 @@ export function MarumaruGame({
         wrapMultiplicandForMultiplication(nextTokens);
       }
     },
-    [selectedOperator, wrapMultiplicandForMultiplication],
+    [markBubbleInteraction, operatorUsage, selectedOperator, wrapMultiplicandForMultiplication],
   );
 
   useEffect(() => {
     if (!isStageReadyForResult(pendingBubbles)) {
+      return;
+    }
+
+    if (mode === 'launch' && total === 8) {
       return;
     }
 
@@ -687,7 +788,7 @@ export function MarumaruGame({
       expressionHistoryRef.current = stripExpressionResult(nextTokens);
       return nextTokens;
     });
-  }, [pendingBubbles, unwrapProductGroups]);
+  }, [mode, pendingBubbles, total, unwrapProductGroups]);
 
   const moveBead = useCallback(
     (beadId: string, x: number, y: number) => {
@@ -841,6 +942,7 @@ export function MarumaruGame({
 
   const moveBubble = useCallback(
     (bubbleId: string, x: number, y: number) => {
+      markBubbleInteraction();
       setPendingBubbles((current) =>
         current.map((bubble) => {
           if (bubble.id !== bubbleId) {
@@ -856,7 +958,7 @@ export function MarumaruGame({
         }),
       );
     },
-    [fieldHeight, fieldWidth],
+    [fieldHeight, fieldWidth, markBubbleInteraction],
   );
 
   const splitHigherBead = useCallback(
@@ -972,12 +1074,7 @@ export function MarumaruGame({
         if (productCollision) {
           unwrapProductGroup(productCollision.productGroupId);
         }
-        const decomposition = productCollision ? undefined : findDecompositionPair(toSnapshots(entitiesRef.current));
-        if (decomposition) {
-          splitHigherBead(decomposition.higherBeadId, decomposition.lowerValue);
-          setMessage('おおきなまるが こまかくなったよ');
-        }
-        const pair = decomposition || productCollision ? undefined : findAnnihilationPair(toSnapshots(entitiesRef.current));
+        const pair = productCollision ? undefined : findAnnihilationPair(toSnapshots(entitiesRef.current));
         if (pair) {
           setAnnihilationAnimation({
             id: `annihilation-${now}`,
@@ -987,7 +1084,13 @@ export function MarumaruGame({
           });
           setMessage('');
         } else {
-          settleMergeIfReady(now);
+          const decomposition = productCollision ? undefined : findDecompositionPair(toSnapshots(entitiesRef.current));
+          if (decomposition) {
+            splitHigherBead(decomposition.higherBeadId, decomposition.lowerValue);
+            setMessage('おおきなまるが こまかくなったよ');
+          } else {
+            settleMergeIfReady(now);
+          }
         }
       }
       setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
@@ -1011,25 +1114,33 @@ export function MarumaruGame({
     wrapMultiplicandForMultiplication,
   ]);
 
-  const goNextStage = () => {
-    setStageIndex((current) => Math.min(current + 1, STAGES.length - 1));
+  const playPendingBubbles = () => {
+    markBubbleInteraction();
+    pendingBubbles.forEach((bubble, index) => {
+      setTimeout(() => burstBubble(bubble), index * 220);
+    });
   };
+  const clearEquation = `${formatResultExpression(expressionTokens, stage.target)} = ${stage.target}`;
+  const failedEquation = `${total} ≠ ${stage.target}`;
 
   return (
     <SafeAreaView style={styles.screen}>
+      <BackgroundBubbleLayer
+        bubbles={backgroundBubbles}
+        fieldWidth={width}
+        fieldHeight={height}
+        tick={backgroundBubbleTick}
+        bubbleStarts={backgroundBubbleStarts}
+        onPop={(bubbleId) => setBackgroundBubbleStarts((current) => ({ ...current, [bubbleId]: Date.now() }))}
+      />
       <View style={styles.header}>
         <View style={styles.headerTitleGroup}>
-          {onBack ? (
-            <Pressable accessibilityRole="button" onPress={onBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressedButton]}>
+          {onBack && mode !== 'launch' ? (
+            <Pressable accessibilityLabel="Back" accessibilityRole="button" onPress={onBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressedButton]}>
               <Text style={styles.backButtonText}>‹</Text>
             </Pressable>
           ) : null}
-          <View>
-            <Text style={styles.stageLabel}>
-              {stage.islandTitle} / {stage.setTitle} / ステージ {stageIndex + 1}
-            </Text>
-            <Text style={styles.title}>{stage.title}</Text>
-          </View>
+          {mode === 'launch' ? <LaunchLogo /> : <Text style={styles.launchGameTitle}>●● = {stage.target}</Text>}
         </View>
         <Text testID="current-total-value" style={styles.hiddenMetric}>
           {total}
@@ -1040,13 +1151,12 @@ export function MarumaruGame({
         <OperatorRail
           selectedOperator={selectedOperator}
           operatorSign={operatorSign}
+          operatorUsage={operatorUsage}
+          hasActiveSelection={hasReleasedBubble}
           isLocked={isStageReadyForResult(pendingBubbles)}
           onSelect={selectOperator}
         />
         <View style={[styles.field, { width: fieldWidth, height: fieldHeight }]}>
-          <View pointerEvents="none" style={[styles.fieldBubbleMark, styles.fieldBubbleMarkLarge]} />
-          <View pointerEvents="none" style={[styles.fieldBubbleMark, styles.fieldBubbleMarkSmall]} />
-          <View pointerEvents="none" style={[styles.fieldBubbleMark, styles.fieldBubbleMarkTiny]} />
           {basinFrameSegments.map((segment) => (
             <View
               key={segment.id}
@@ -1071,6 +1181,7 @@ export function MarumaruGame({
                 sign={bubbleSign}
                 isMultiplier={selectedOperator === '×'}
                 isDivider={selectedOperator === '÷'}
+                isHinting={shouldPulsePendingBubbles}
                 onBurst={burstBubble}
                 onMove={moveBubble}
               />
@@ -1094,39 +1205,79 @@ export function MarumaruGame({
           ))}
           {mergeAnimation ? <MergePulse animation={mergeAnimation} /> : null}
           {divisionSplitAnimation ? <DivisionSplitOverlay animation={divisionSplitAnimation} /> : null}
-          {isClear ? <ClearSplash /> : null}
-          {isClear ? (
-            <View style={styles.clearPanel}>
-              <Text style={styles.clearTitle}>できた!</Text>
-              <Text style={styles.clearText}>{stage.target} になったよ</Text>
-              <View style={styles.clearActions}>
-                <GameButton label="もういっかい" onPress={resetStage} variant="secondary" />
-                <GameButton label="つぎへ" onPress={goNextStage} />
-              </View>
+          {isClear && mode === 'launch' ? (
+            <View testID="launch-tada" style={[styles.clearPanel, styles.launchTadaPanel]}>
+              <LaunchLogo variant="tada" />
+              <Text style={styles.launchTadaText}>Welcome!</Text>
             </View>
           ) : null}
+          {isClear && mode !== 'launch' ? (
+            <StageResultOverlay
+              equation={clearEquation}
+              result="clear"
+              onRetry={resetStage}
+              onStageSelect={onBack}
+            />
+          ) : null}
           {isFailed ? (
-            <View style={[styles.clearPanel, styles.failedPanel]}>
-              <Text style={styles.clearTitle}>ざんねん</Text>
-              <Text style={styles.clearText}>
-                {total} になったよ。{stage.target} にまとめよう
-              </Text>
-              <View style={styles.clearActions}>
-                <GameButton label="もういっかい" onPress={resetStage} variant="secondary" />
-              </View>
-            </View>
+            <StageResultOverlay
+              equation={failedEquation}
+              result="failed"
+              onRetry={resetStage}
+              onStageSelect={onBack}
+            />
           ) : null}
         </View>
       </View>
 
       <View style={styles.footer}>
-        <StatusMessage message={message} />
         <View style={styles.footerControls}>
-          <ExpressionDisplay tokens={expressionTokens} />
-          <GameButton label="やりなおす" onPress={resetStage} variant="secondary" />
+          <ExpressionDisplay tokens={mode === 'launch' && pendingBubbles.length > 0 ? ['8', '+'] : expressionTokens} />
+          {mode === 'launch' ? (
+            <Pressable
+              accessibilityLabel="play bubbles"
+              accessibilityRole="button"
+              disabled={pendingBubbles.length === 0}
+              testID="launch-play"
+              onPress={playPendingBubbles}
+              style={({ pressed }) => [styles.launchPlayButton, pressed && styles.pressedButton]}
+            >
+              <View style={styles.launchPlayIcon} />
+            </Pressable>
+          ) : (
+            <Pressable
+              accessibilityLabel="retry"
+              accessibilityRole="button"
+              onPress={resetStage}
+              style={({ pressed }) => [styles.launchPlayButton, pressed && styles.pressedButton]}
+            >
+              <Text style={styles.retryIcon}>↺</Text>
+            </Pressable>
+          )}
         </View>
       </View>
     </SafeAreaView>
+  );
+}
+
+function LaunchLogo({ variant = 'header' }: { variant?: 'header' | 'tada' }) {
+  return (
+    <View accessibilityLabel="●● calc. logo" style={[styles.launchLogo, variant === 'tada' && styles.launchLogoTada]}>
+      <View style={styles.launchLogoMark}>
+        <LogoDot />
+        <LogoDot raised />
+      </View>
+      <Text style={styles.launchLogoWord}>calc.</Text>
+    </View>
+  );
+}
+
+function LogoDot({ raised = false }: { raised?: boolean }) {
+  return (
+    <View style={[styles.launchLogoDot, raised && styles.launchLogoDotSecond]}>
+      <View style={styles.launchLogoDotRing} />
+      <View style={styles.launchLogoDotShine} />
+    </View>
   );
 }
 
@@ -1489,33 +1640,39 @@ function DivisionSplitOverlay({ animation }: { animation: DivisionSplitAnimation
 function OperatorRail({
   selectedOperator,
   operatorSign,
+  operatorUsage,
+  hasActiveSelection,
   isLocked,
   onSelect,
 }: {
   selectedOperator: OperatorSymbol;
   operatorSign: BeadSign;
+  operatorUsage: OperatorUsageLimits;
+  hasActiveSelection: boolean;
   isLocked: boolean;
   onSelect: (operator: OperatorButtonSymbol) => void;
 }) {
   return (
     <View style={styles.operatorRail}>
       {OPERATORS.map((operator) => {
-        const isMainSelected = operator === selectedOperator;
-        const isSignSelected = operator === '-' && operatorSign < 0 && (selectedOperator === '×' || selectedOperator === '÷');
+        const isMainSelected = hasActiveSelection && operator === selectedOperator;
+        const isSignSelected = hasActiveSelection && operator === '-' && operatorSign < 0 && (selectedOperator === '×' || selectedOperator === '÷');
         const isSelected = isMainSelected || isSignSelected;
+        const usage = operatorUsage[operator];
+        const isDisabled = !hasActiveSelection || isLocked || !canUseOperator(usage);
         return (
           <Pressable
             key={operator}
             accessibilityRole="button"
-            accessibilityState={{ selected: isSelected }}
-            disabled={isLocked}
+            accessibilityState={{ selected: isSelected, disabled: isDisabled }}
+            disabled={isDisabled}
             testID={`operator-${operator}`}
             onPress={() => onSelect(operator)}
             style={({ pressed }) => [
               styles.operatorButton,
               isMainSelected && styles.selectedOperatorButton,
               isSignSelected && styles.selectedSignOperatorButton,
-              isLocked && styles.disabledOperatorButton,
+              isDisabled && styles.disabledOperatorButton,
               pressed && styles.pressedButton,
             ]}
           >
@@ -1524,26 +1681,55 @@ function OperatorRail({
                 styles.operatorButtonText,
                 isSelected && styles.selectedOperatorButtonText,
                 isSignSelected && styles.selectedSignOperatorButtonText,
-                isLocked && styles.disabledOperatorButtonText,
+                isDisabled && styles.disabledOperatorButtonText,
               ]}
             >
               {operator}
             </Text>
-            <Text
-              style={[
-                styles.operatorButtonLabel,
-                isSelected && styles.selectedOperatorButtonText,
-                isSignSelected && styles.selectedSignOperatorButtonText,
-                isLocked && styles.disabledOperatorButtonText,
-              ]}
-            >
-              {getOperatorButtonLabel(operator)}
-            </Text>
+            {typeof usage === 'number' && usage > 0 ? (
+              <View testID={`operator-${operator}-usage`} style={styles.operatorUsageBadge}>
+                <Text style={styles.operatorUsageBadgeText}>{usage}</Text>
+              </View>
+            ) : null}
           </Pressable>
         );
       })}
     </View>
   );
+}
+
+function getInitialOperatorUsage(stage: ReturnType<typeof getStage>, mode: 'stage' | 'launch'): OperatorUsageLimits {
+  const base: OperatorUsageLimits = getDefaultOperatorUsage(stage, mode);
+
+  return {
+    ...base,
+    ...stage.operatorLimits,
+  };
+}
+
+function getDefaultOperatorUsage(stage: ReturnType<typeof getStage>, mode: 'stage' | 'launch'): OperatorUsageLimits {
+  if (mode === 'launch' || stage.islandId === 'addition') {
+    return { '+': 'infinite', '-': 0, '×': 0, '÷': 0 };
+  }
+  if (stage.islandId === 'subtraction') {
+    return { '+': 'infinite', '-': 'infinite', '×': 0, '÷': 0 };
+  }
+  if (stage.islandId === 'mixed3Free' || stage.islandId === 'mixed4Free' || stage.islandId === 'mixed5Free') {
+    return { '+': 'infinite', '-': 'infinite', '×': 'infinite', '÷': 'infinite' };
+  }
+  return { '+': 0, '-': 0, '×': 0, '÷': 0 };
+}
+
+function getInitialSelectedOperator(_operatorUsage: OperatorUsageLimits): OperatorButtonSymbol {
+  return '+';
+}
+
+function canUseOperator(usage: OperatorUsageLimit) {
+  return usage === 'infinite' || usage > 0;
+}
+
+function hasExpressionValue(tokens: string[]) {
+  return stripExpressionResult(tokens).some((token) => !isOperatorToken(token));
 }
 
 function getOperatorButtonLabel(operator: OperatorButtonSymbol) {
@@ -1621,11 +1807,67 @@ function ExpressionDisplay({ tokens }: { tokens: string[] }) {
   );
 }
 
+function BackgroundBubbleLayer({
+  bubbles,
+  fieldWidth,
+  fieldHeight,
+  tick,
+  bubbleStarts,
+  onPop,
+}: {
+  bubbles: BackgroundBubbleSpec[];
+  fieldWidth: number;
+  fieldHeight: number;
+  tick: number;
+  bubbleStarts: Record<string, number>;
+  onPop: (bubbleId: string) => void;
+}) {
+  return (
+    <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+      {bubbles.map((bubble) => {
+        const startAt = bubbleStarts[bubble.id] ?? 0;
+        const elapsedSeconds = Math.max(0, (tick - startAt - bubble.delay) / 1000);
+        const travel = fieldHeight + bubble.size * 3;
+        const cycle = (elapsedSeconds * bubble.speed) % travel;
+        const y = fieldHeight + bubble.size - cycle;
+        const drift = Math.sin(elapsedSeconds * 0.62 + bubble.delay * 0.001) * bubble.drift;
+        const x = bubble.xRatio * fieldWidth + drift - bubble.size / 2;
+        const opacity = elapsedSeconds < 0.24 ? elapsedSeconds / 0.24 : 1;
+
+        return (
+          <Pressable
+            key={bubble.id}
+            accessibilityLabel="decorative bubble"
+            accessibilityRole="button"
+            testID={`background-bubble-${bubble.id}`}
+            onPress={() => onPop(bubble.id)}
+            style={({ pressed }) => [
+              styles.backgroundBubble,
+              pressed && styles.backgroundBubblePressed,
+              {
+                left: x,
+                top: y,
+                width: bubble.size,
+                height: bubble.size,
+                borderRadius: bubble.size / 2,
+                opacity: opacity * 0.78,
+              },
+            ]}
+          >
+            <View style={styles.backgroundBubbleShine} />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 function DraggableBubbleView({
   bubble,
   sign,
   isMultiplier,
   isDivider,
+  isHinting,
   onBurst,
   onMove,
 }: {
@@ -1633,6 +1875,7 @@ function DraggableBubbleView({
   sign: BeadSign;
   isMultiplier: boolean;
   isDivider: boolean;
+  isHinting: boolean;
   onBurst: (bubble: PendingBubble) => void;
   onMove: (bubbleId: string, x: number, y: number) => void;
 }) {
@@ -1681,10 +1924,12 @@ function DraggableBubbleView({
           width: radius * 2,
           height: radius * 2,
           borderRadius: radius,
+          transform: getPendingBubbleTransform(isOperatorBubble, isHinting),
         },
       ]}
       {...panResponder.panHandlers}
     >
+      {isHinting ? <View pointerEvents="none" testID="pending-bubble-hint" style={styles.pendingBubbleHintRing} /> : null}
       {isOperatorBubble ? (
         <OperatorBubbleCluster count={bubble.count} sign={sign} radius={radius} operator={isDivider ? '÷' : '×'} />
       ) : (
@@ -1692,6 +1937,14 @@ function DraggableBubbleView({
       )}
     </View>
   );
+}
+
+function getPendingBubbleTransform(isOperatorBubble: boolean, isHinting: boolean) {
+  const scale = isHinting ? 1.035 : 1;
+  if (isOperatorBubble) {
+    return [{ rotate: '-10deg' }, { scaleY: 0.92 }, { scale }];
+  }
+  return [{ scale }];
 }
 
 function OperatorBubbleCluster({ count, sign, radius, operator }: { count: number; sign: BeadSign; radius: number; operator: '×' | '÷' }) {
@@ -1849,6 +2102,140 @@ function DraggableBeadView({
   );
 }
 
+function StageResultOverlay({
+  equation,
+  result,
+  onRetry,
+  onStageSelect,
+}: {
+  equation: string;
+  result: 'clear' | 'failed';
+  onRetry: () => void;
+  onStageSelect?: () => void;
+}) {
+  const isClearResult = result === 'clear';
+  const equationFontSize = getResultEquationFontSize(equation);
+
+  return (
+    <View style={[styles.resultPanel, !isClearResult && styles.resultPanelFailed]}>
+      <View style={styles.resultMain}>
+        {isClearResult ? <ResultStar /> : <BrokenResultStar />}
+        <Text
+          accessibilityLabel={isClearResult ? 'clear equation' : 'failed equation'}
+          style={[
+            styles.resultEquation,
+            { fontSize: equationFontSize, lineHeight: Math.round(equationFontSize * 1.2) },
+            !isClearResult && styles.failedEquation,
+          ]}
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          minimumFontScale={0.32}
+          ellipsizeMode="clip"
+        >
+          {equation}
+        </Text>
+      </View>
+      <View style={[styles.resultActions, !isClearResult && styles.resultActionsFailed]}>
+        <ResultActionButton accessibilityLabel="Retry" primary onPress={onRetry}>
+          <Text style={styles.resultRetryIcon}>↺</Text>
+        </ResultActionButton>
+        {onStageSelect ? (
+          <ResultActionButton accessibilityLabel="Stage select" onPress={onStageSelect}>
+            <HomeIcon />
+          </ResultActionButton>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function getResultEquationFontSize(equation: string) {
+  if (equation.length > 44) {
+    return 18;
+  }
+  if (equation.length > 34) {
+    return 21;
+  }
+  if (equation.length > 26) {
+    return 25;
+  }
+  return 34;
+}
+
+function ResultStar() {
+  return (
+    <View accessibilityLabel="clear star" style={styles.resultStar}>
+      <Text style={styles.resultStarGlyph}>★</Text>
+    </View>
+  );
+}
+
+function BrokenResultStar() {
+  return (
+    <View accessibilityLabel="broken medal" style={styles.brokenMedal}>
+      <View style={[styles.brokenMedalHalf, styles.brokenMedalLeft]}>
+        <View style={[styles.brokenMedalFace, styles.brokenMedalFaceLeft]}>
+          <Text style={styles.brokenMedalStar}>★</Text>
+        </View>
+      </View>
+      <View style={[styles.brokenMedalHalf, styles.brokenMedalRight]}>
+        <View style={[styles.brokenMedalFace, styles.brokenMedalFaceRight]}>
+          <Text style={styles.brokenMedalStar}>★</Text>
+        </View>
+      </View>
+      <View style={styles.brokenMedalGapTop} />
+      <View style={styles.brokenMedalGapBottom} />
+    </View>
+  );
+}
+
+function ResultActionButton({
+  accessibilityLabel,
+  children,
+  onPress,
+  primary = false,
+}: {
+  accessibilityLabel: string;
+  children: ReactNode;
+  onPress: () => void;
+  primary?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.resultActionButton, primary && styles.resultActionButtonPrimary, pressed && styles.pressedButton]}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <View style={styles.homeIcon}>
+      <View style={styles.homeRoof} />
+      <View style={styles.homeBody}>
+        <View style={styles.homeDoor} />
+      </View>
+    </View>
+  );
+}
+
+function formatResultExpression(tokens: string[], target: number) {
+  const expressionTokens = stripExpressionResult(tokens);
+  const meaningfulTokens = isOperatorToken(expressionTokens[expressionTokens.length - 1])
+    ? expressionTokens.slice(0, -1)
+    : expressionTokens;
+
+  if (meaningfulTokens.length === 0) {
+    return String(target);
+  }
+
+  return meaningfulTokens.join(' ');
+}
+
 function GameButton({ label, onPress, variant = 'primary' }: { label: string; onPress: () => void; variant?: 'primary' | 'secondary' }) {
   return (
     <Pressable
@@ -1994,6 +2381,7 @@ function findProductBubbleCollision(entities: BeadEntity[], now: number) {
 function findAnnihilationPair(beads: BeadSnapshot[]) {
   const positives = beads.filter((bead) => bead.sign > 0);
   const negatives = beads.filter((bead) => bead.sign < 0);
+  const candidates: Array<{ beadIds: string[]; center: { x: number; y: number }; value: PlaceValue; distance: number }> = [];
 
   for (const positive of positives) {
     for (const negative of negatives) {
@@ -2004,18 +2392,21 @@ function findAnnihilationPair(beads: BeadSnapshot[]) {
       const distance = getPointDistance(positive, negative);
       const threshold = getEntityRadius(positive.value, positive.count) * 2.35;
       if (distance <= threshold) {
-        return {
+        candidates.push({
           beadIds: [positive.id, negative.id],
           center: {
             x: (positive.x + negative.x) / 2,
             y: (positive.y + negative.y) / 2,
           },
-        };
+          value: positive.value,
+          distance,
+        });
       }
     }
   }
 
-  return undefined;
+  const pair = candidates.sort((left, right) => left.value - right.value || left.distance - right.distance)[0];
+  return pair ? { beadIds: pair.beadIds, center: pair.center } : undefined;
 }
 
 function isUnitMergeSettled(cluster: MergeCluster, entities: BeadEntity[], fieldHeight: number) {
@@ -2277,6 +2668,58 @@ function createPendingBubbles(fieldWidth: number, counts: number[]): PendingBubb
     x: gap * (index + 1),
     y: BUBBLE_ROW_Y,
   }));
+}
+
+function createLaunchBeads(engine: Matter.Engine, fieldWidth: number, fieldHeight: number): BeadEntity[] {
+  const radius = getEntityRadius(1, 1);
+  const curve = getBasinCurveMetrics(fieldWidth, fieldHeight);
+  const xPositions = [0.33, 0.39, 0.45, 0.5, 0.55, 0.61, 0.67, 0.73];
+  const entities = xPositions.map((ratio, index) => {
+    const x = fieldWidth * ratio;
+    const arcX = x - curve.centerX;
+    const surfaceY = curve.arcCenterY + Math.sqrt(Math.max(0, curve.radius * curve.radius - arcX * arcX));
+    const y = surfaceY - radius - 5;
+    const body = Matter.Bodies.circle(x, y, radius, {
+      restitution: 0.08,
+      friction: 0.22,
+      frictionStatic: 0.02,
+      frictionAir: 0.004,
+      density: 0.0028,
+      label: 'bead-1',
+      collisionFilter: getBeadCollisionFilter(1),
+    });
+
+    return {
+      id: `launch-bead-${index}`,
+      value: 1 as const,
+      count: 1,
+      sign: 1 as const,
+      role: 'normal' as const,
+      createdAt: Date.now() - 1000,
+      body,
+    };
+  });
+
+  Matter.Composite.add(engine.world, entities.map((entity) => entity.body));
+  return entities;
+}
+
+function getBackgroundBubbleSpecs(fieldWidth: number): BackgroundBubbleSpec[] {
+  const wideOffset = fieldWidth > 520 ? 0.04 : 0;
+  return [
+    { id: 'large-right', xRatio: 0.94 - wideOffset, size: 116, speed: 15, delay: 0, drift: 9 },
+    { id: 'small-left', xRatio: 0.12 + wideOffset, size: 60, speed: 21, delay: 900, drift: 7 },
+    { id: 'tiny-right', xRatio: 0.78, size: 30, speed: 18, delay: 1600, drift: 5 },
+    { id: 'medium-left', xRatio: 0.22, size: 42, speed: 13, delay: 2400, drift: 10 },
+    { id: 'tiny-center', xRatio: 0.52, size: 18, speed: 24, delay: 3200, drift: 4 },
+    { id: 'medium-right', xRatio: 0.84, size: 54, speed: 12, delay: 4100, drift: 8 },
+    { id: 'soft-low-left', xRatio: 0.05 + wideOffset, size: 92, speed: 10, delay: 1700, drift: 7 },
+    { id: 'soft-top-left', xRatio: 0.28, size: 26, speed: 17, delay: 5200, drift: 6 },
+    { id: 'soft-center-right', xRatio: 0.66, size: 36, speed: 14, delay: 6100, drift: 9 },
+    { id: 'tiny-far-left', xRatio: 0.02 + wideOffset, size: 22, speed: 20, delay: 6800, drift: 5 },
+    { id: 'wide-center', xRatio: 0.44, size: 72, speed: 11, delay: 7600, drift: 11 },
+    { id: 'tiny-far-right', xRatio: 0.98 - wideOffset, size: 24, speed: 19, delay: 8300, drift: 5 },
+  ];
 }
 
 function getGroupDotPositions(count: number, radius: number, dotSize: number) {
@@ -2718,44 +3161,42 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: '#EAFBFF',
+    position: 'relative',
+    overflow: 'hidden',
   },
   header: {
+    zIndex: 1,
     minHeight: 116,
-    paddingHorizontal: 24,
+    paddingHorizontal: 18,
     paddingTop: 10,
-    paddingBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  headerTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-    flexShrink: 1,
-  },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 16,
-    borderWidth: 3,
-    borderColor: '#BAE6FD',
-    backgroundColor: '#FFFFFF',
+    paddingBottom: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0284C7',
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 2,
+  },
+  headerTitleGroup: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  backButton: {
+    position: 'absolute',
+    left: 4,
+    top: 4,
+    zIndex: 2,
+    width: 42,
+    height: 42,
+    borderRadius: 17,
+    borderWidth: 3,
+    borderColor: '#BAE6FD',
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   backButtonText: {
     color: '#075985',
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '900',
-    lineHeight: 34,
+    lineHeight: 36,
   },
   stageLabel: {
     color: '#0284C7',
@@ -2767,6 +3208,72 @@ const styles = StyleSheet.create({
     color: '#12334A',
     fontSize: 28,
     fontWeight: '900',
+  },
+  launchGameTitle: {
+    color: '#12334A',
+    fontSize: 36,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  launchLogo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  launchLogoTada: {
+    transform: [{ scale: 1.03 }],
+  },
+  launchLogoMark: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    transform: [{ translateY: 1 }],
+  },
+  launchLogoDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 3,
+    borderColor: '#CFA83A',
+    backgroundColor: '#FDE68A',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  launchLogoDotSecond: {
+    transform: [{ translateY: 4 }, { rotate: '8deg' }],
+  },
+  launchLogoDotRing: {
+    position: 'absolute',
+    left: 4,
+    right: 4,
+    top: 4,
+    bottom: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.56)',
+  },
+  launchLogoDotShine: {
+    position: 'absolute',
+    left: 7,
+    top: 5,
+    width: 9,
+    height: 7,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  launchLogoWord: {
+    color: '#12334A',
+    fontSize: 36,
+    lineHeight: 40,
+    fontWeight: '900',
+    letterSpacing: -1.3,
+    textShadowColor: 'rgba(255, 255, 255, 0.72)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 0,
   },
   hiddenMetric: {
     position: 'absolute',
@@ -2873,17 +3380,37 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   playArea: {
+    zIndex: 1,
     alignSelf: 'center',
     alignItems: 'center',
-    marginTop: 4,
   },
   field: {
     overflow: 'hidden',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderBottomLeftRadius: 22,
-    borderBottomRightRadius: 22,
-    backgroundColor: '#EAFBFF',
+    backgroundColor: 'rgba(234, 251, 255, 0.36)',
+  },
+  backgroundBubble: {
+    position: 'absolute',
+    zIndex: 0,
+    borderWidth: 4,
+    borderColor: 'rgba(125, 211, 252, 0.42)',
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    shadowColor: '#7DD3FC',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  backgroundBubblePressed: {
+    opacity: 0.18,
+    transform: [{ scale: 0.72 }],
+  },
+  backgroundBubbleShine: {
+    position: 'absolute',
+    left: '22%',
+    top: '18%',
+    width: '26%',
+    height: '26%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.58)',
   },
   fieldBubbleMark: {
     position: 'absolute',
@@ -2915,16 +3442,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(224, 247, 255, 0.42)',
   },
   operatorRail: {
+    zIndex: 1,
     width: '100%',
     height: OPERATOR_TABS_HEIGHT,
-    paddingHorizontal: 0,
+    paddingHorizontal: 26,
     paddingTop: 8,
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 6,
-    backgroundColor: '#EAFBFF',
+    backgroundColor: 'rgba(234, 251, 255, 0.24)',
   },
   operatorButton: {
+    position: 'relative',
     flex: 1,
     height: 48,
     borderTopLeftRadius: 15,
@@ -2956,6 +3485,7 @@ const styles = StyleSheet.create({
   disabledOperatorButton: {
     borderColor: '#BAE6FD',
     backgroundColor: '#F0FCFF',
+    opacity: 0.52,
     shadowOpacity: 0.03,
   },
   operatorButtonText: {
@@ -2978,7 +3508,31 @@ const styles = StyleSheet.create({
     color: '#0284C7',
   },
   disabledOperatorButtonText: {
-    color: '#7DD3FC',
+    color: '#A7DCEF',
+  },
+  operatorUsageBadge: {
+    position: 'absolute',
+    top: -7,
+    right: -5,
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 6,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#0EA5E9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  operatorUsageBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: '900',
   },
   basinFrameSegment: {
     position: 'absolute',
@@ -2993,6 +3547,22 @@ const styles = StyleSheet.create({
   pendingBubbleButton: {
     position: 'absolute',
     zIndex: 2,
+  },
+  pendingBubbleHintRing: {
+    position: 'absolute',
+    left: -5,
+    right: -5,
+    top: -5,
+    bottom: -5,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: 'rgba(14, 165, 233, 0.22)',
+    backgroundColor: 'rgba(186, 230, 253, 0.06)',
+    shadowColor: '#0EA5E9',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 1,
   },
   multiplierBubbleButton: {
     transform: [{ rotate: '-10deg' }, { scaleY: 0.92 }],
@@ -3298,6 +3868,217 @@ const styles = StyleSheet.create({
   failedPanel: {
     borderColor: '#38BDF8',
   },
+  resultPanel: {
+    position: 'absolute',
+    zIndex: 6,
+    left: 30,
+    right: 30,
+    top: '22%',
+    padding: 18,
+    borderRadius: 24,
+    backgroundColor: 'rgba(246, 253, 255, 0.88)',
+    alignItems: 'center',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 6,
+  },
+  resultPanelFailed: {
+    top: '24%',
+  },
+  resultMain: {
+    alignItems: 'center',
+    gap: 16,
+    width: '100%',
+  },
+  resultStar: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 5,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: '#FACC15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#CA8A04',
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 13 },
+    elevation: 5,
+  },
+  resultStarGlyph: {
+    color: '#FFFFFF',
+    fontSize: 43,
+    lineHeight: 48,
+    fontWeight: '900',
+  },
+  brokenMedal: {
+    position: 'relative',
+    width: 76,
+    height: 76,
+    shadowColor: '#CA8A04',
+    shadowOpacity: 0.24,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 13 },
+    elevation: 5,
+  },
+  brokenMedalHalf: {
+    position: 'absolute',
+    top: 0,
+    width: 38,
+    height: 76,
+    overflow: 'hidden',
+  },
+  brokenMedalLeft: {
+    left: 0,
+    transform: [{ translateX: -4 }, { rotate: '-8deg' }],
+  },
+  brokenMedalRight: {
+    right: 0,
+    transform: [{ translateX: 4 }, { rotate: '8deg' }],
+  },
+  brokenMedalFace: {
+    position: 'absolute',
+    top: 0,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 5,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: '#FACC15',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brokenMedalFaceLeft: {
+    left: 0,
+  },
+  brokenMedalFaceRight: {
+    right: 0,
+  },
+  brokenMedalStar: {
+    color: '#FFFFFF',
+    fontSize: 43,
+    lineHeight: 48,
+    fontWeight: '900',
+  },
+  brokenMedalGapTop: {
+    position: 'absolute',
+    left: 37,
+    top: 7,
+    width: 4,
+    height: 35,
+    borderRadius: 999,
+    backgroundColor: 'rgba(246, 253, 255, 0.92)',
+    transform: [{ rotate: '16deg' }],
+  },
+  brokenMedalGapBottom: {
+    position: 'absolute',
+    left: 34,
+    top: 36,
+    width: 4,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: 'rgba(246, 253, 255, 0.92)',
+    transform: [{ rotate: '-18deg' }],
+  },
+  resultEquation: {
+    color: '#12334A',
+    fontSize: 34,
+    lineHeight: 42,
+    fontWeight: '900',
+    letterSpacing: -0.6,
+    textAlign: 'center',
+    maxWidth: '100%',
+  },
+  failedEquation: {
+    fontSize: 34,
+  },
+  resultActions: {
+    marginTop: 24,
+    width: '100%',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  resultActionsFailed: {
+    marginTop: 24,
+  },
+  resultActionButton: {
+    width: 58,
+    height: 54,
+    borderRadius: 18,
+    borderWidth: 3,
+    borderColor: 'rgba(186, 230, 253, 0.82)',
+    backgroundColor: 'rgba(255, 255, 255, 0.76)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 3,
+  },
+  resultActionButtonPrimary: {
+    flex: 1,
+    borderColor: '#0EA5E9',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+  },
+  resultRetryIcon: {
+    color: '#075985',
+    fontSize: 31,
+    lineHeight: 34,
+    fontWeight: '900',
+  },
+  homeIcon: {
+    position: 'relative',
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+  },
+  homeRoof: {
+    position: 'absolute',
+    top: 2,
+    width: 24,
+    height: 24,
+    borderLeftWidth: 5,
+    borderTopWidth: 5,
+    borderColor: '#075985',
+    transform: [{ rotate: '45deg' }],
+    borderRadius: 2,
+  },
+  homeBody: {
+    position: 'absolute',
+    bottom: 2,
+    width: 24,
+    height: 20,
+    borderWidth: 5,
+    borderTopWidth: 0,
+    borderColor: '#075985',
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  homeDoor: {
+    width: 7,
+    height: 10,
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+    backgroundColor: '#075985',
+  },
+  launchTadaPanel: {
+    top: '38%',
+    paddingVertical: 18,
+    backgroundColor: 'rgba(255, 255, 255, 0.86)',
+  },
+  launchTadaText: {
+    marginTop: 6,
+    color: '#0EA5E9',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 0.2,
+  },
   clearTitle: {
     color: '#12334A',
     fontSize: 34,
@@ -3315,11 +4096,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   footer: {
-    minHeight: 104,
+    zIndex: 1,
+    minHeight: 92,
     paddingHorizontal: 28,
-    paddingTop: 10,
-    paddingBottom: 12,
-    gap: 8,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
   statusMessageBox: {
     minHeight: 34,
@@ -3343,19 +4124,49 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
+  launchPlayButton: {
+    width: 62,
+    height: 52,
+    borderRadius: 18,
+    borderWidth: 3,
+    borderColor: '#BAE6FD',
+    backgroundColor: 'rgba(255, 255, 255, 0.58)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  launchPlayIcon: {
+    width: 0,
+    height: 0,
+    marginLeft: 4,
+    borderTopWidth: 10,
+    borderBottomWidth: 10,
+    borderLeftWidth: 16,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: '#075985',
+  },
+  retryIcon: {
+    color: '#075985',
+    fontSize: 30,
+    lineHeight: 32,
+    fontWeight: '900',
+  },
   expressionBox: {
     flex: 1,
-    minHeight: 52,
+    minHeight: 50,
     paddingHorizontal: 14,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.84)',
+    borderWidth: 3,
+    borderColor: 'rgba(186, 230, 253, 0.72)',
+    backgroundColor: 'rgba(255, 255, 255, 0.58)',
     justifyContent: 'center',
   },
   expressionText: {
-    color: '#12334A',
-    fontSize: 24,
+    color: '#075985',
+    fontSize: 18,
     lineHeight: 30,
     fontWeight: '900',
+    textAlign: 'center',
   },
   expressionPlaceholder: {
     color: '#7DD3FC',

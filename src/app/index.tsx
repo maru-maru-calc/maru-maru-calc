@@ -6,35 +6,34 @@ import { MarumaruGame } from '@/components/MarumaruGame';
 import { getStageIndexById, STAGE_ISLANDS, STAGES } from '@/game/stages';
 import { Stage } from '@/game/types';
 
-type StageStatus = 'done' | 'next' | 'waiting';
+type AppScreen = 'launch' | 'world' | 'stage' | 'game';
+type StageStatus = 'done' | 'open' | 'locked';
 
 export default function IndexScreen() {
   const { width } = useWindowDimensions();
+  const [screen, setScreen] = useState<AppScreen>('launch');
   const [selectedIslandId, setSelectedIslandId] = useState<Stage['islandId']>('addition');
-  const [playingStageIndex, setPlayingStageIndex] = useState<number | undefined>(undefined);
+  const [playingStageIndex, setPlayingStageIndex] = useState(0);
   const [completedStageIds, setCompletedStageIds] = useState<Set<string>>(() => new Set());
 
   const selectedIsland = STAGE_ISLANDS.find((island) => island.id === selectedIslandId) ?? STAGE_ISLANDS[0];
-  const mapWidth = Math.max(300, width - 32);
   const selectedStages = useMemo(() => STAGES.filter((stage) => stage.islandId === selectedIslandId), [selectedIslandId]);
-  const nextStage = useMemo(() => selectedStages.find((stage) => !completedStageIds.has(stage.id)) ?? selectedStages[0], [completedStageIds, selectedStages]);
-  const stagesBySet = useMemo(() => {
-    return selectedIsland.stageSetTitles.map((setTitle) => ({
-      setTitle,
-      stages: selectedStages.filter((stage) => stage.setTitle === setTitle),
-    }));
-  }, [selectedIsland.stageSetTitles, selectedStages]);
-  const completedCount = selectedStages.filter((stage) => completedStageIds.has(stage.id)).length;
+  const mapWidth = Math.max(320, width);
 
   const startStage = (stage: Stage) => {
     setPlayingStageIndex(getStageIndexById(stage.id));
+    setScreen('game');
   };
 
-  if (playingStageIndex !== undefined) {
+  if (screen === 'launch') {
+    return <MarumaruGame mode="launch" onComplete={() => setScreen('world')} />;
+  }
+
+  if (screen === 'game') {
     return (
       <MarumaruGame
         initialStageIndex={playingStageIndex}
-        onBack={() => setPlayingStageIndex(undefined)}
+        onBack={() => setScreen('stage')}
         onStageClear={(stageId) => {
           setCompletedStageIds((current) => {
             const next = new Set(current);
@@ -46,147 +45,302 @@ export default function IndexScreen() {
     );
   }
 
+  if (screen === 'stage') {
+    return (
+      <StageSelect
+        island={selectedIsland}
+        stages={selectedStages}
+        completedStageIds={completedStageIds}
+        mapWidth={mapWidth}
+        onBack={() => setScreen('world')}
+        onStartStage={startStage}
+      />
+    );
+  }
+
+  return (
+    <WorldSelect
+      completedStageIds={completedStageIds}
+      mapWidth={mapWidth}
+      onSelectIsland={(islandId) => {
+        setSelectedIslandId(islandId);
+        setScreen('stage');
+      }}
+    />
+  );
+}
+
+function WorldSelect({
+  completedStageIds,
+  mapWidth,
+  onSelectIsland,
+}: {
+  completedStageIds: Set<string>;
+  mapWidth: number;
+  onSelectIsland: (islandId: Stage['islandId']) => void;
+}) {
+  const completedByIsland = (islandId: Stage['islandId']) => STAGES.filter((stage) => stage.islandId === islandId && completedStageIds.has(stage.id)).length;
+  const layouts = getWorldNodeLayouts(mapWidth);
+
   return (
     <SafeAreaView style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <View style={styles.brandRow}>
-            <View style={styles.brandDot} />
-            <View style={[styles.brandDot, styles.brandDotSmall]} />
-            <View style={[styles.brandDot, styles.brandDotTiny]} />
-          </View>
-          <Text style={styles.appTitle}>まるまるでんたく</Text>
-          <Text style={styles.appSubtitle}>まるをまとめるたびにでよう</Text>
+      <View testID="world-select" style={styles.depthScene}>
+        <View pointerEvents="none" style={styles.depthBackdrop}>
+          <View style={[styles.bigBubble, styles.bigBubbleTop]} />
+          <View style={[styles.bigBubble, styles.bigBubbleRight]} />
+          <View style={[styles.softPatch, styles.softPatchLeft]} />
+          <View style={[styles.softPatch, styles.softPatchBottom]} />
         </View>
-
-        {nextStage ? (
-          <Pressable
-            accessibilityRole="button"
-            testID={`recommended-stage-${nextStage.id}`}
-            onPress={() => startStage(nextStage)}
-            style={({ pressed }) => [styles.nextStageCard, pressed && styles.pressed]}
-          >
-            <View style={styles.nextStageTextGroup}>
-              <Text style={styles.nextStageEyebrow}>まずはここから</Text>
-              <Text style={styles.nextStageTitle}>{getStageObjective(nextStage)}</Text>
-              <Text style={styles.nextStageMeta}>
-                {nextStage.setTitle} / ステージ {getIslandStageNumber(nextStage, selectedStages)}
-              </Text>
-            </View>
-            <View style={styles.nextStageBubble}>
-              <Text style={styles.nextStageTarget}>{nextStage.target}</Text>
-              <Text style={styles.nextStageTargetLabel}>にまとめる</Text>
-            </View>
-          </Pressable>
-        ) : null}
-
-        <View style={styles.islandTabs}>
-          {STAGE_ISLANDS.map((island) => {
-            const isSelected = island.id === selectedIslandId;
-            const islandStages = STAGES.filter((stage) => stage.islandId === island.id);
-            const islandDoneCount = islandStages.filter((stage) => completedStageIds.has(stage.id)).length;
-            return (
-              <Pressable
-                key={island.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isSelected }}
-                testID={`island-${island.id}`}
-                onPress={() => setSelectedIslandId(island.id)}
-                style={({ pressed }) => [styles.islandTab, isSelected && styles.selectedIslandTab, pressed && styles.pressed]}
-              >
-                <View style={[styles.islandMark, isSelected && styles.selectedIslandMark]}>
-                  <Text style={[styles.islandMarkText, isSelected && styles.selectedIslandMarkText]}>{island.title.slice(0, 1)}</Text>
-                </View>
-                <View style={styles.islandTextGroup}>
-                  <Text style={[styles.islandTitle, isSelected && styles.selectedIslandTitle]} numberOfLines={1} adjustsFontSizeToFit>
-                    {island.title}
-                  </Text>
-                  <Text style={[styles.islandProgress, isSelected && styles.selectedIslandProgress]}>
-                    {islandDoneCount}/{islandStages.length} できた
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.stageArea}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>{selectedIsland.title}</Text>
-              <Text style={styles.sectionSubtitle}>{selectedIsland.description}</Text>
-            </View>
-            <View style={styles.progressBubble}>
-              <Text style={styles.progressValue}>
-                {completedCount}/{selectedStages.length}
-              </Text>
-              <Text style={styles.progressLabel}>できた</Text>
-            </View>
-          </View>
-
-          {stagesBySet.map(({ setTitle, stages }) => (
-            <WorldMapSet
-              key={setTitle}
-              setTitle={setTitle}
-              stages={stages}
-              islandStages={selectedStages}
-              nextStageId={nextStage?.id}
-              completedStageIds={completedStageIds}
-              mapWidth={mapWidth}
-              onStartStage={startStage}
+        <ScrollView
+          style={styles.worldScroll}
+          contentContainerStyle={styles.worldScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.routeLayer}>
+            {layouts.slice(0, -1).map((layout, index) => (
+              <RouteSegment key={`world-route-${index}`} from={layout} to={layouts[index + 1]} />
+            ))}
+            <WorldNode
+              label="+"
+              title="+"
+              progress={completedByIsland('addition')}
+              total={STAGES.filter((stage) => stage.islandId === 'addition').length}
+              x={layouts[0].x}
+              y={layouts[0].y}
+              active
+              onPress={() => onSelectIsland('addition')}
             />
-          ))}
-        </View>
-      </ScrollView>
+            <WorldNode
+              label="-"
+              title="−"
+              progress={completedByIsland('subtraction')}
+              total={STAGES.filter((stage) => stage.islandId === 'subtraction').length}
+              x={layouts[1].x}
+              y={layouts[1].y}
+              onPress={() => onSelectIsland('subtraction')}
+            />
+            <WorldNode
+              label="×"
+              title="×"
+              progress={completedByIsland('multiplication')}
+              total={STAGES.filter((stage) => stage.islandId === 'multiplication').length}
+              x={layouts[2].x}
+              y={layouts[2].y}
+              onPress={() => onSelectIsland('multiplication')}
+            />
+            <WorldNode
+              label="÷"
+              title="÷"
+              progress={completedByIsland('division')}
+              total={STAGES.filter((stage) => stage.islandId === 'division').length}
+              x={layouts[3].x}
+              y={layouts[3].y}
+              onPress={() => onSelectIsland('division')}
+            />
+            <MixedWorldNode label="mixed-3" count={3} x={layouts[4].x} y={layouts[4].y} onPress={() => onSelectIsland('mixed3')} />
+            <MixedWorldNode label="mixed-4" count={4} x={layouts[5].x} y={layouts[5].y} onPress={() => onSelectIsland('mixed4')} />
+            <MixedWorldNode label="mixed-5" count={5} x={layouts[6].x} y={layouts[6].y} onPress={() => onSelectIsland('mixed5')} />
+            <MixedWorldNode label="mixed-3-free" count={3} x={layouts[7].x} y={layouts[7].y} free onPress={() => onSelectIsland('mixed3Free')} />
+            <MixedWorldNode label="mixed-4-free" count={4} x={layouts[8].x} y={layouts[8].y} free onPress={() => onSelectIsland('mixed4Free')} />
+            <MixedWorldNode label="mixed-5-free" count={5} x={layouts[9].x} y={layouts[9].y} free onPress={() => onSelectIsland('mixed5Free')} />
+          </View>
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
-function WorldMapSet({
-  setTitle,
-  stages,
-  islandStages,
-  nextStageId,
-  completedStageIds,
-  mapWidth,
-  onStartStage,
+function WorldNode({
+  label,
+  title,
+  progress,
+  total,
+  x,
+  y,
+  active = false,
+  onPress,
 }: {
-  setTitle: string;
-  stages: Stage[];
-  islandStages: Stage[];
-  nextStageId?: string;
-  completedStageIds: Set<string>;
-  mapWidth: number;
-  onStartStage: (stage: Stage) => void;
+  label: string;
+  title: string;
+  progress: number;
+  total: number;
+  x: number;
+  y: number;
+  active?: boolean;
+  onPress: () => void;
 }) {
-  const layouts = stages.map((_stage, index) => getMapNodeLayout(index, mapWidth));
-  const mapHeight = getMapHeight(stages.length);
-
   return (
-    <View style={styles.worldSet}>
-      <Text style={styles.stageSetTitle}>{getFriendlySetTitle(setTitle)}</Text>
-      <View style={[styles.worldMap, { height: mapHeight }]}>
-        <MapDecorations />
-        {layouts.slice(0, -1).map((layout, index) => (
-          <RouteSegment key={`route-${stages[index].id}`} from={layout} to={layouts[index + 1]} />
-        ))}
-        {stages.map((stage, index) => {
-          const status: StageStatus = completedStageIds.has(stage.id) ? 'done' : stage.id === nextStageId ? 'next' : 'waiting';
-          return (
-            <StageMapNode
-              key={stage.id}
-              stage={stage}
-              stageNumber={getIslandStageNumber(stage, islandStages)}
-              layout={layouts[index]}
-              status={status}
-              onPress={() => onStartStage(stage)}
-            />
-          );
-        })}
-      </View>
-    </View>
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.worldNode,
+        active && styles.worldNodeActive,
+        {
+          left: x - 45,
+          top: y - 45,
+        },
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.worldSymbol, active && styles.worldSymbolActive]}>{title}</Text>
+      <Text style={[styles.worldProgress, active && styles.worldProgressActive]}>
+        {progress}/{total}
+      </Text>
+    </Pressable>
   );
 }
+
+function MixedWorldNode({
+  label,
+  count,
+  x,
+  y,
+  free = false,
+  onPress,
+}: {
+  label: string;
+  count: 3 | 4 | 5;
+  x: number;
+  y: number;
+  free?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.worldNode,
+        styles.mixedWorldNode,
+        free && styles.freeMixedWorldNode,
+        {
+          left: x - 45,
+          top: y - 45,
+        },
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={styles.mixedWorldSymbols}>+ −</Text>
+      <Text style={styles.mixedWorldSymbols}>× ÷</Text>
+      <View style={styles.mixedCountBadge}>
+        <Text style={styles.mixedCountText}>{count}</Text>
+      </View>
+      {free ? (
+        <View style={styles.freeBadge}>
+          <Text style={styles.freeBadgeText}>∞</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+function StageSelect({
+  island,
+  stages,
+  completedStageIds,
+  mapWidth,
+  onBack,
+  onStartStage,
+}: {
+  island: (typeof STAGE_ISLANDS)[number];
+  stages: Stage[];
+  completedStageIds: Set<string>;
+  mapWidth: number;
+  onBack: () => void;
+  onStartStage: (stage: Stage) => void;
+}) {
+  const openStageCount = Math.min(stages.length, Math.max(3, completedStageIds.size + 2));
+  const layouts = stages.map((_stage, index) => getStageNodeLayout(index, mapWidth));
+  const mapHeight = Math.max(620, getStageMapHeight(stages.length));
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <View style={styles.depthScene}>
+        <View pointerEvents="none" style={styles.depthBackdrop}>
+          <View style={[styles.bigBubble, styles.bigBubbleTop]} />
+          <View style={[styles.bigBubble, styles.bigBubbleRight]} />
+          <View style={[styles.softPatch, styles.softPatchBottom]} />
+        </View>
+        <Pressable accessibilityLabel="Back" accessibilityRole="button" onPress={onBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
+          <Text style={styles.backText}>‹</Text>
+        </Pressable>
+        <ScrollView
+          style={styles.stageScroll}
+          contentContainerStyle={[styles.stageScrollContent, { height: mapHeight }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.stageMap, { height: mapHeight }]}>
+            {layouts.slice(0, -1).map((layout, index) => (
+              <RouteSegment key={`route-${stages[index].id}`} from={layout} to={layouts[index + 1]} />
+            ))}
+            {stages.map((stage, index) => {
+              const status: StageStatus = completedStageIds.has(stage.id) ? 'done' : index < openStageCount ? 'open' : 'locked';
+              return (
+                <StageNode
+                  key={stage.id}
+                  stage={stage}
+                  number={index + 1}
+                  layout={layouts[index]}
+                  status={status}
+                  onPress={() => onStartStage(stage)}
+                />
+              );
+            })}
+          </View>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function StageNode({
+  stage,
+  number,
+  layout,
+  status,
+  onPress,
+}: {
+  stage: Stage;
+  number: number;
+  layout: MapNodeLayout;
+  status: StageStatus;
+  onPress: () => void;
+}) {
+  const isLocked = status === 'locked';
+  const isDone = status === 'done';
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isLocked }}
+      disabled={isLocked}
+      testID={`stage-${stage.id}`}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.stageNode,
+        {
+          left: layout.x - 40,
+          top: layout.y - 40,
+        },
+        isLocked && styles.stageNodeLocked,
+        isDone && styles.stageNodeDone,
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.stageNumber, isLocked && styles.stageNumberLocked]}>#{number}</Text>
+      <Text style={[styles.stageTarget, isLocked && styles.stageNumberLocked]}>{stage.target}</Text>
+      {isDone ? <Text style={styles.stageDoneStar}>★</Text> : null}
+    </Pressable>
+  );
+}
+
+type MapNodeLayout = {
+  x: number;
+  y: number;
+};
 
 function RouteSegment({ from, to }: { from: MapNodeLayout; to: MapNodeLayout }) {
   const dx = to.x - from.x;
@@ -198,10 +352,10 @@ function RouteSegment({ from, to }: { from: MapNodeLayout; to: MapNodeLayout }) 
     <View
       pointerEvents="none"
       style={[
-        styles.routeSegment,
+        styles.stageRoute,
         {
           left: (from.x + to.x) / 2 - length / 2,
-          top: (from.y + to.y) / 2 - 4,
+          top: (from.y + to.y) / 2 - 3,
           width: length,
           transform: [{ rotate: `${angle}rad` }],
         },
@@ -210,119 +364,40 @@ function RouteSegment({ from, to }: { from: MapNodeLayout; to: MapNodeLayout }) 
   );
 }
 
-function MapDecorations() {
-  return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <View style={[styles.mapBubbleMark, styles.mapBubbleMarkLarge]} />
-      <View style={[styles.mapBubbleMark, styles.mapBubbleMarkSmall]} />
-      <View style={[styles.mapBubbleMark, styles.mapBubbleMarkTiny]} />
-      <View style={[styles.mapIslandPatch, styles.mapIslandPatchLeft]} />
-      <View style={[styles.mapIslandPatch, styles.mapIslandPatchRight]} />
-    </View>
-  );
-}
-
-function StageMapNode({
-  stage,
-  stageNumber,
-  layout,
-  status,
-  onPress,
-}: {
-  stage: Stage;
-  stageNumber: number;
-  layout: MapNodeLayout;
-  status: StageStatus;
-  onPress: () => void;
-}) {
-  const isNext = status === 'next';
-  const isDone = status === 'done';
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      testID={`stage-${stage.id}`}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.stageNode,
-        {
-          left: layout.x - 36,
-          top: layout.y - 36,
-        },
-        isNext && styles.nextStageNode,
-        isDone && styles.doneStageNode,
-        pressed && styles.pressed,
-      ]}
-    >
-      <View style={[styles.stageBubble, isNext && styles.nextStageNodeBubble, isDone && styles.doneStageNodeBubble]}>
-        <Text style={[styles.stageNumber, isNext && styles.nextStageNumber, isDone && styles.doneStageNumber]}>{stageNumber}</Text>
-      </View>
-      <View style={[styles.mapStatusBadge, isNext && styles.nextStatusPill, isDone && styles.doneStatusPill]}>
-        <Text style={[styles.mapStatusText, isNext && styles.nextStatusText, isDone && styles.doneStatusText]}>{getStatusLabel(status)}</Text>
-      </View>
-      {isNext ? <Text style={styles.nextFlag}>つぎ</Text> : null}
-    </Pressable>
-  );
-}
-
-type MapNodeLayout = {
-  x: number;
-  y: number;
-};
-
-function getMapNodeLayout(index: number, mapWidth: number): MapNodeLayout {
-  const row = Math.floor(index / 3);
-  const column = index % 3;
-  const columnOrder = row % 2 === 0 ? column : 2 - column;
-  const xPositions = [58, mapWidth / 2, mapWidth - 58];
-  const waveOffset = row % 2 === 0 ? 0 : 18;
+function getStageNodeLayout(index: number, mapWidth: number): MapNodeLayout {
+  const centerX = mapWidth / 2;
+  const swing = Math.min(92, mapWidth * 0.24);
+  const side = index % 2 === 0 ? -1 : 1;
   return {
-    x: xPositions[columnOrder],
-    y: 58 + row * 108 + waveOffset,
+    x: centerX + side * swing * (index === 0 ? 0 : 1),
+    y: 96 + index * 118,
   };
 }
 
-function getMapHeight(stageCount: number) {
-  const rows = Math.max(1, Math.ceil(stageCount / 3));
-  return 116 + (rows - 1) * 108;
+function getWorldNodeLayouts(mapWidth: number): MapNodeLayout[] {
+  const centerX = mapWidth / 2;
+  const swing = Math.min(84, mapWidth * 0.22);
+  const xs = [
+    centerX,
+    centerX + swing * 0.72,
+    centerX - swing,
+    centerX + swing * 0.9,
+    centerX - swing * 0.78,
+    centerX + swing * 0.86,
+    centerX - swing * 0.86,
+    centerX + swing * 0.78,
+    centerX - swing * 0.72,
+    centerX + swing * 0.72,
+  ];
+
+  return xs.map((x, index) => ({
+    x,
+    y: 104 + index * 130,
+  }));
 }
 
-function getIslandStageNumber(stage: Stage, islandStages: Stage[]) {
-  return Math.max(1, islandStages.findIndex((candidate) => candidate.id === stage.id) + 1);
-}
-
-function getStageObjective(stage: Stage) {
-  const firstCount = stage.bubbleCounts[0] ?? 0;
-  if (stage.islandId === 'subtraction' && firstCount > stage.target) {
-    return `ひいて ${stage.target} にしよう`;
-  }
-  return `${stage.target}にまとめよう`;
-}
-
-function getStatusLabel(status: StageStatus) {
-  if (status === 'done') {
-    return 'できた';
-  }
-  if (status === 'next') {
-    return 'つぎ';
-  }
-  return 'まだ';
-}
-
-function getFriendlySetTitle(setTitle: string) {
-  if (setTitle === '10のとう') {
-    return '10にまとめるみち';
-  }
-  if (setTitle === '20のおか') {
-    return '20にまとめるうみべ';
-  }
-  if (setTitle === 'おおきなかずのひろば') {
-    return 'おおきくまとめるすいそう';
-  }
-  if (setTitle === '10にもどすみち') {
-    return 'ひいてまとめるすいろ';
-  }
-  return setTitle;
+function getStageMapHeight(stageCount: number) {
+  return 180 + Math.max(0, stageCount - 1) * 118;
 }
 
 const styles = StyleSheet.create({
@@ -330,391 +405,239 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#EAFBFF',
   },
-  content: {
-    padding: 16,
-    paddingBottom: 36,
-    gap: 16,
+  depthScene: {
+    flex: 1,
+    overflow: 'hidden',
+    backgroundColor: '#EAFBFF',
   },
-  header: {
-    paddingTop: 8,
-    paddingBottom: 2,
+  depthBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  bigBubble: {
+    position: 'absolute',
+    borderWidth: 5,
+    borderColor: 'rgba(125, 211, 252, 0.42)',
+    backgroundColor: 'rgba(255, 255, 255, 0.34)',
+  },
+  bigBubbleTop: {
+    width: 156,
+    height: 156,
+    borderRadius: 78,
+    top: -72,
+    right: -44,
+  },
+  bigBubbleRight: {
+    width: 164,
+    height: 164,
+    borderRadius: 82,
+    top: 292,
+    right: -92,
+  },
+  softPatch: {
+    position: 'absolute',
+    backgroundColor: 'rgba(187, 247, 208, 0.22)',
+  },
+  softPatchLeft: {
+    width: 138,
+    height: 138,
+    borderRadius: 69,
+    left: -72,
+    bottom: 128,
+  },
+  softPatchBottom: {
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    right: -110,
+    bottom: -70,
+  },
+  worldScroll: {
+    flex: 1,
+  },
+  worldScrollContent: {
+    minHeight: 1460,
+    paddingTop: 76,
+    paddingBottom: 90,
+  },
+  routeLayer: {
+    position: 'relative',
+    minHeight: 1460,
+  },
+  worldNode: {
+    position: 'absolute',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 5,
+    borderColor: 'rgba(125, 211, 252, 0.7)',
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    alignItems: 'center',
     justifyContent: 'center',
-  },
-  brandRow: {
-    height: 28,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 5,
-    marginBottom: 6,
-  },
-  brandDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 3,
-    borderColor: '#0284C7',
-    backgroundColor: '#38BDF8',
     shadowColor: '#0284C7',
-    shadowOpacity: 0.16,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    shadowOpacity: 0.13,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 5,
   },
-  brandDotSmall: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  worldNodeActive: {
     borderColor: '#0EA5E9',
-    backgroundColor: '#7DD3FC',
-  },
-  brandDotTiny: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderColor: '#38BDF8',
-    backgroundColor: '#BAE6FD',
-  },
-  appTitle: {
-    color: '#12334A',
-    fontSize: 34,
-    fontWeight: '900',
-  },
-  appSubtitle: {
-    marginTop: 4,
-    color: '#0284C7',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  nextStageCard: {
-    minHeight: 128,
-    padding: 16,
-    borderRadius: 24,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 3,
-    borderColor: '#38BDF8',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 14,
-    shadowColor: '#0284C7',
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 4,
-  },
-  nextStageTextGroup: {
-    flex: 1,
-    minWidth: 0,
-  },
-  nextStageEyebrow: {
-    color: '#0284C7',
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  nextStageTitle: {
-    marginTop: 5,
-    color: '#12334A',
-    fontSize: 29,
-    fontWeight: '900',
-    lineHeight: 34,
-  },
-  nextStageMeta: {
-    marginTop: 6,
-    color: '#075985',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  nextStageBubble: {
-    width: 94,
-    height: 94,
-    borderRadius: 47,
-    borderWidth: 4,
-    borderColor: '#7DD3FC',
-    backgroundColor: '#E0F7FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nextStageTarget: {
-    color: '#075985',
-    fontSize: 32,
-    fontWeight: '900',
-    lineHeight: 36,
-  },
-  nextStageTargetLabel: {
-    color: '#0284C7',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  islandTabs: {
-    flexDirection: 'row',
-    gap: 9,
-  },
-  islandTab: {
-    flex: 1,
-    minHeight: 74,
-    padding: 10,
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: '#BAE6FD',
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    shadowColor: '#0284C7',
-    shadowOpacity: 0.09,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 2,
-  },
-  selectedIslandTab: {
-    borderColor: '#0284C7',
-    backgroundColor: '#0EA5E9',
-  },
-  islandMark: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 3,
-    borderColor: '#BAE6FD',
-    backgroundColor: '#E0F7FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectedIslandMark: {
-    borderColor: '#FFFFFF',
     backgroundColor: '#FFFFFF',
   },
-  islandMarkText: {
+  mixedWorldNode: {
+    gap: 0,
+  },
+  freeMixedWorldNode: {
+    borderColor: '#FACC15',
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+  },
+  worldSymbol: {
     color: '#075985',
-    fontSize: 22,
-    fontWeight: '900',
-    lineHeight: 28,
-  },
-  selectedIslandMarkText: {
-    color: '#0284C7',
-  },
-  islandTextGroup: {
-    flex: 1,
-    minWidth: 0,
-  },
-  islandTitle: {
-    color: '#12334A',
-    fontSize: 18,
+    fontSize: 36,
+    lineHeight: 40,
     fontWeight: '900',
   },
-  selectedIslandTitle: {
-    color: '#FFFFFF',
+  worldSymbolActive: {
+    color: '#0EA5E9',
   },
-  islandProgress: {
-    marginTop: 3,
-    color: '#0284C7',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  selectedIslandProgress: {
-    color: '#EAFBFF',
-  },
-  stageArea: {
-    gap: 15,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  sectionTitle: {
-    color: '#12334A',
-    fontSize: 25,
-    fontWeight: '900',
-  },
-  sectionSubtitle: {
-    marginTop: 3,
-    color: '#0284C7',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  progressBubble: {
-    minWidth: 72,
-    height: 58,
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: '#BAE6FD',
-    backgroundColor: 'rgba(255, 255, 255, 0.78)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  progressValue: {
-    color: '#075985',
-    fontSize: 17,
-    fontWeight: '900',
-    lineHeight: 20,
-  },
-  progressLabel: {
+  worldProgress: {
     color: '#0284C7',
     fontSize: 11,
     fontWeight: '900',
   },
-  worldSet: {
-    gap: 10,
-  },
-  stageSetTitle: {
+  worldProgressActive: {
     color: '#075985',
-    fontSize: 20,
+  },
+  mixedWorldSymbols: {
+    color: '#075985',
+    fontSize: 18,
+    lineHeight: 22,
     fontWeight: '900',
   },
-  worldMap: {
-    position: 'relative',
-    overflow: 'hidden',
-    borderRadius: 28,
+  mixedCountBadge: {
+    position: 'absolute',
+    right: -2,
+    bottom: -2,
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#0EA5E9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mixedCountText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  freeBadge: {
+    position: 'absolute',
+    left: -2,
+    bottom: -2,
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#FACC15',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  freeBadgeText: {
+    color: '#12334A',
+    fontSize: 16,
+    lineHeight: 18,
+    fontWeight: '900',
+  },
+  backButton: {
+    position: 'absolute',
+    left: 22,
+    top: 42,
+    zIndex: 3,
+    width: 42,
+    height: 42,
+    borderRadius: 17,
     borderWidth: 3,
     borderColor: '#BAE6FD',
-    backgroundColor: 'rgba(255, 255, 255, 0.45)',
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backText: {
+    color: '#075985',
+    fontSize: 34,
+    lineHeight: 36,
+    fontWeight: '900',
+  },
+  stageScroll: {
+    flex: 1,
+  },
+  stageScrollContent: {
+    paddingTop: 76,
+    paddingBottom: 90,
+  },
+  stageMap: {
+    position: 'relative',
+  },
+  stageRoute: {
+    position: 'absolute',
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(125, 211, 252, 0.42)',
   },
   stageNode: {
     position: 'absolute',
-    width: 72,
-    height: 86,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    zIndex: 8,
-  },
-  nextStageNode: {
-    zIndex: 12,
-  },
-  doneStageNode: {
-    zIndex: 10,
-  },
-  stageBubble: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    borderWidth: 3,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 5,
     borderColor: '#7DD3FC',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#0284C7',
     shadowOpacity: 0.12,
-    shadowRadius: 7,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 3,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 4,
   },
-  nextStageNodeBubble: {
-    borderColor: '#0284C7',
-    backgroundColor: '#38BDF8',
+  stageNodeLocked: {
+    opacity: 0.48,
+    borderColor: 'rgba(186, 230, 253, 0.8)',
   },
-  doneStageNodeBubble: {
-    borderColor: '#24AFA3',
-    backgroundColor: '#8DEBD8',
+  stageNodeDone: {
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
   },
   stageNumber: {
-    color: '#075985',
+    color: '#0284C7',
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '900',
+  },
+  stageTarget: {
+    color: '#12334A',
+    fontSize: 24,
+    lineHeight: 28,
+    fontWeight: '900',
+  },
+  stageNumberLocked: {
+    color: '#7DD3FC',
+  },
+  stageDoneStar: {
+    position: 'absolute',
+    right: -4,
+    top: -7,
+    color: '#FACC15',
     fontSize: 22,
+    lineHeight: 24,
     fontWeight: '900',
-    lineHeight: 26,
-  },
-  nextStageNumber: {
-    color: '#FFFFFF',
-  },
-  doneStageNumber: {
-    color: '#075985',
-  },
-  mapStatusBadge: {
-    minWidth: 44,
-    marginTop: -4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    borderWidth: 2,
-    borderColor: '#BAE6FD',
-    backgroundColor: '#E0F7FF',
-  },
-  nextStatusPill: {
-    backgroundColor: '#0EA5E9',
-  },
-  doneStatusPill: {
-    backgroundColor: '#8DEBD8',
-  },
-  mapStatusText: {
-    color: '#075985',
-    fontSize: 11,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  nextStatusText: {
-    color: '#FFFFFF',
-  },
-  doneStatusText: {
-    color: '#075985',
-  },
-  nextFlag: {
-    position: 'absolute',
-    top: -18,
-    minWidth: 46,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 999,
-    overflow: 'hidden',
-    backgroundColor: '#0EA5E9',
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  routeSegment: {
-    position: 'absolute',
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(56, 189, 248, 0.48)',
-    zIndex: 2,
-  },
-  mapBubbleMark: {
-    position: 'absolute',
-    borderWidth: 3,
-    borderColor: 'rgba(186, 230, 253, 0.68)',
-    backgroundColor: 'rgba(224, 247, 255, 0.45)',
-  },
-  mapBubbleMarkLarge: {
-    right: -18,
-    top: 18,
-    width: 82,
-    height: 82,
-    borderRadius: 41,
-  },
-  mapBubbleMarkSmall: {
-    left: 18,
-    bottom: 18,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-  },
-  mapBubbleMarkTiny: {
-    right: 96,
-    bottom: 30,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-  },
-  mapIslandPatch: {
-    position: 'absolute',
-    width: 128,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: 'rgba(141, 235, 216, 0.22)',
-  },
-  mapIslandPatchLeft: {
-    left: 18,
-    top: 88,
-    transform: [{ rotate: '-12deg' }],
-  },
-  mapIslandPatchRight: {
-    right: 22,
-    bottom: 76,
-    transform: [{ rotate: '9deg' }],
+    textShadowColor: 'rgba(255, 255, 255, 0.95)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 0,
   },
   pressed: {
-    opacity: 0.84,
+    opacity: 0.72,
     transform: [{ scale: 0.98 }],
   },
 });

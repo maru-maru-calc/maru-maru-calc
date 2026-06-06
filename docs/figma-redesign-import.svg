@@ -1,0 +1,222 @@
+<svg width="900" height="950" viewBox="0 0 900 950" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0284C7" flood-opacity="0.16"/>
+    </filter>
+    <filter id="beadGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#7DD3FC" flood-opacity="0.58"/>
+    </filter>
+    <style>
+      .jp { font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif; }
+      .heavy { font-weight: 900; }
+      .bold { font-weight: 800; }
+      .label { font-size: 12px; fill: #075985; font-weight: 900; }
+      .sub { font-size: 13px; fill: #0284C7; font-weight: 800; }
+      .title { font-size: 30px; fill: #12334A; font-weight: 900; }
+      .small { font-size: 11px; fill: #075985; font-weight: 900; }
+    </style>
+  </defs>
+
+  <rect width="900" height="950" fill="#F6FDFF"/>
+  <text x="40" y="42" class="jp heavy" font-size="20" fill="#12334A">まるまるでんたく / Figma redesign import</text>
+  <text x="40" y="66" class="jp bold" font-size="12" fill="#075985">SVGをFigmaにドラッグ&amp;ドロップして、各画面をFrame化してください。</text>
+
+  <!-- Stage Select Frame -->
+  <g id="StageSelect_default" transform="translate(40 86)">
+    <rect width="390" height="844" rx="32" fill="#EAFBFF" stroke="#BAE6FD" stroke-width="2"/>
+    <g transform="translate(16 22)">
+      <circle cx="15" cy="18" r="14" fill="#38BDF8" stroke="#0284C7" stroke-width="3"/>
+      <circle cx="40" cy="22" r="10" fill="#7DD3FC" stroke="#0EA5E9" stroke-width="3"/>
+      <circle cx="58" cy="25" r="7" fill="#BAE6FD" stroke="#38BDF8" stroke-width="3"/>
+      <text x="0" y="70" class="jp title">まるまるでんたく</text>
+      <text x="0" y="96" class="jp sub">まるをまとめるたびにでよう</text>
+    </g>
+
+    <g transform="translate(16 144)" filter="url(#softShadow)">
+      <rect width="358" height="126" rx="24" fill="#FFFFFF" stroke="#38BDF8" stroke-width="3"/>
+      <text x="16" y="32" class="jp label">まずはここから</text>
+      <text x="16" y="69" class="jp heavy" font-size="28" fill="#12334A">10にまとめよう</text>
+      <text x="16" y="96" class="jp sub">10にまとめるみち / ステージ 1</text>
+      <circle cx="302" cy="63" r="46" fill="#E0F7FF" stroke="#7DD3FC" stroke-width="4"/>
+      <ellipse cx="288" cy="47" rx="17" ry="10" fill="#FFFFFF" fill-opacity="0.82" transform="rotate(-24 288 47)"/>
+      <text x="302" y="61" text-anchor="middle" class="jp heavy" font-size="32" fill="#075985">10</text>
+      <text x="302" y="82" text-anchor="middle" class="jp small">にまとめる</text>
+    </g>
+
+    <g transform="translate(16 286)">
+      <g filter="url(#softShadow)">
+        <rect width="174" height="74" rx="20" fill="#0EA5E9" stroke="#0284C7" stroke-width="3"/>
+        <circle cx="31" cy="37" r="21" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="3"/>
+        <text x="31" y="45" text-anchor="middle" class="jp heavy" font-size="21" fill="#0284C7">た</text>
+        <text x="62" y="32" class="jp heavy" font-size="17" fill="#FFFFFF">たしざんのしま</text>
+        <text x="62" y="53" class="jp heavy" font-size="12" fill="#EAFBFF">0/25 できた</text>
+      </g>
+      <g transform="translate(184 0)" filter="url(#softShadow)">
+        <rect width="174" height="74" rx="20" fill="#FFFFFF" stroke="#BAE6FD" stroke-width="3"/>
+        <circle cx="31" cy="37" r="21" fill="#E0F7FF" stroke="#BAE6FD" stroke-width="3"/>
+        <text x="31" y="45" text-anchor="middle" class="jp heavy" font-size="21" fill="#075985">ひ</text>
+        <text x="62" y="32" class="jp heavy" font-size="17" fill="#12334A">ひきざんのしま</text>
+        <text x="62" y="53" class="jp heavy" font-size="12" fill="#0284C7">0/10 できた</text>
+      </g>
+    </g>
+
+    <g transform="translate(16 386)">
+      <text x="0" y="26" class="jp heavy" font-size="25" fill="#12334A">たしざんのしま</text>
+      <text x="0" y="48" class="jp bold" font-size="13" fill="#0284C7">あわせて、ぴったりにまとめる</text>
+      <g transform="translate(286 0)">
+        <rect width="72" height="58" rx="20" fill="#FFFFFF" fill-opacity="0.78" stroke="#BAE6FD" stroke-width="3"/>
+        <text x="36" y="25" text-anchor="middle" class="jp heavy" font-size="17" fill="#075985">0/25</text>
+        <text x="36" y="43" text-anchor="middle" class="jp small">できた</text>
+      </g>
+    </g>
+
+    <g transform="translate(16 462)">
+      <text x="0" y="22" class="jp heavy" font-size="20" fill="#075985">10にまとめるみち</text>
+      <g transform="translate(0 34)">
+        <rect width="358" height="250" rx="28" fill="#FFFFFF" fill-opacity="0.45" stroke="#BAE6FD" stroke-width="3"/>
+        <circle cx="330" cy="42" r="41" fill="#E0F7FF" fill-opacity="0.45" stroke="#BAE6FD" stroke-opacity="0.68" stroke-width="3"/>
+        <circle cx="42" cy="214" r="24" fill="#E0F7FF" fill-opacity="0.45" stroke="#BAE6FD" stroke-opacity="0.68" stroke-width="3"/>
+        <ellipse cx="88" cy="106" rx="64" ry="21" fill="#8DEBD8" fill-opacity="0.22" transform="rotate(-12 88 106)"/>
+        <ellipse cx="270" cy="180" rx="64" ry="21" fill="#8DEBD8" fill-opacity="0.22" transform="rotate(9 270 180)"/>
+        <path d="M58 58 L179 74 L300 58 L300 166 L179 148 L58 166" stroke="#38BDF8" stroke-opacity="0.48" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <g transform="translate(58 58)">
+          <circle r="31" fill="#38BDF8" stroke="#0284C7" stroke-width="3"/>
+          <text y="8" text-anchor="middle" class="jp heavy" font-size="22" fill="#FFFFFF">1</text>
+          <rect x="-23" y="25" width="46" height="22" rx="11" fill="#0EA5E9"/>
+          <text y="40" text-anchor="middle" class="jp heavy" font-size="11" fill="#FFFFFF">つぎ</text>
+          <rect x="-23" y="-53" width="46" height="24" rx="12" fill="#0EA5E9"/>
+          <text y="-37" text-anchor="middle" class="jp heavy" font-size="12" fill="#FFFFFF">つぎ</text>
+        </g>
+        <g transform="translate(179 74)">
+          <circle r="31" fill="#FFFFFF" stroke="#7DD3FC" stroke-width="3"/>
+          <text y="8" text-anchor="middle" class="jp heavy" font-size="22" fill="#075985">2</text>
+          <rect x="-23" y="25" width="46" height="22" rx="11" fill="#E0F7FF" stroke="#BAE6FD" stroke-width="2"/>
+          <text y="40" text-anchor="middle" class="jp heavy" font-size="11" fill="#075985">まだ</text>
+        </g>
+        <g transform="translate(300 58)">
+          <circle r="31" fill="#FFFFFF" stroke="#7DD3FC" stroke-width="3"/>
+          <text y="8" text-anchor="middle" class="jp heavy" font-size="22" fill="#075985">3</text>
+          <rect x="-23" y="25" width="46" height="22" rx="11" fill="#E0F7FF" stroke="#BAE6FD" stroke-width="2"/>
+          <text y="40" text-anchor="middle" class="jp heavy" font-size="11" fill="#075985">まだ</text>
+        </g>
+        <g transform="translate(300 166)">
+          <circle r="31" fill="#FFFFFF" stroke="#7DD3FC" stroke-width="3"/>
+          <text y="8" text-anchor="middle" class="jp heavy" font-size="22" fill="#075985">4</text>
+          <rect x="-23" y="25" width="46" height="22" rx="11" fill="#E0F7FF" stroke="#BAE6FD" stroke-width="2"/>
+          <text y="40" text-anchor="middle" class="jp heavy" font-size="11" fill="#075985">まだ</text>
+        </g>
+        <g transform="translate(179 148)">
+          <circle r="31" fill="#8DEBD8" stroke="#24AFA3" stroke-width="3"/>
+          <text y="8" text-anchor="middle" class="jp heavy" font-size="22" fill="#075985">5</text>
+          <rect x="-25" y="25" width="50" height="22" rx="11" fill="#8DEBD8"/>
+          <text y="40" text-anchor="middle" class="jp heavy" font-size="11" fill="#075985">できた</text>
+        </g>
+      </g>
+    </g>
+  </g>
+
+  <!-- Game Frame -->
+  <g id="Game_almost_merge" transform="translate(470 86)">
+    <rect width="390" height="844" rx="32" fill="#EAFBFF" stroke="#BAE6FD" stroke-width="2"/>
+    <g transform="translate(24 24)">
+      <rect width="38" height="38" rx="16" fill="#FFFFFF" stroke="#BAE6FD" stroke-width="3" filter="url(#softShadow)"/>
+      <text x="19" y="28" text-anchor="middle" class="jp heavy" font-size="30" fill="#075985">‹</text>
+      <text x="52" y="16" class="jp bold" font-size="13" fill="#0284C7">たしざんのしま / 10のとう / ステージ 1</text>
+      <text x="52" y="49" class="jp heavy" font-size="28" fill="#12334A">10にまとめよう</text>
+    </g>
+
+    <g transform="translate(28 106)">
+      <rect x="0" y="8" width="79" height="48" rx="15" fill="#FFFFFF" fill-opacity="0.62"/>
+      <rect x="0" y="60" width="79" height="4" rx="2" fill="#0EA5E9"/>
+      <text x="39.5" y="32" text-anchor="middle" class="jp heavy" font-size="24" fill="#075985">+</text>
+      <text x="39.5" y="48" text-anchor="middle" class="jp heavy" font-size="10" fill="#075985">たす</text>
+      <g transform="translate(85 0)" opacity="0.72">
+        <rect x="0" y="16" width="79" height="48" rx="15" fill="#FFFFFF" fill-opacity="0.58"/>
+        <text x="39.5" y="40" text-anchor="middle" class="jp heavy" font-size="24" fill="#7DD3FC">-</text>
+        <text x="39.5" y="56" text-anchor="middle" class="jp heavy" font-size="10" fill="#7DD3FC">ひく</text>
+      </g>
+      <g transform="translate(170 0)" opacity="0.72">
+        <rect x="0" y="16" width="79" height="48" rx="15" fill="#FFFFFF" fill-opacity="0.58"/>
+        <text x="39.5" y="40" text-anchor="middle" class="jp heavy" font-size="24" fill="#7DD3FC">×</text>
+        <text x="39.5" y="56" text-anchor="middle" class="jp heavy" font-size="10" fill="#7DD3FC">かける</text>
+      </g>
+      <g transform="translate(255 0)" opacity="0.72">
+        <rect x="0" y="16" width="79" height="48" rx="15" fill="#FFFFFF" fill-opacity="0.58"/>
+        <text x="39.5" y="40" text-anchor="middle" class="jp heavy" font-size="24" fill="#7DD3FC">÷</text>
+        <text x="39.5" y="56" text-anchor="middle" class="jp heavy" font-size="10" fill="#7DD3FC">わる</text>
+      </g>
+    </g>
+
+    <g transform="translate(28 170)">
+      <rect width="334" height="520" rx="20" fill="#EAFBFF"/>
+      <circle cx="312" cy="52" r="54" fill="#FFFFFF" fill-opacity="0.42" stroke="#7DD3FC" stroke-opacity="0.48" stroke-width="3"/>
+      <circle cx="50" cy="452" r="31" fill="#FFFFFF" fill-opacity="0.42" stroke="#7DD3FC" stroke-opacity="0.48" stroke-width="3"/>
+      <circle cx="244" cy="412" r="15" fill="#E0F7FF" fill-opacity="0.42" stroke="#BAE6FD" stroke-opacity="0.72" stroke-width="3"/>
+      <path d="M26 410 C55 505 279 505 308 410" stroke="#7DD3FC" stroke-opacity="0.84" stroke-width="5" stroke-linecap="round"/>
+      <path d="M42 422 C75 472 258 472 292 422" stroke="#FFFFFF" stroke-opacity="0.52" stroke-width="2" stroke-linecap="round"/>
+
+      <g transform="translate(83 56)">
+        <circle r="28" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="3"/>
+        <circle cx="-7" cy="-8" r="8" fill="#FFF7C7"/>
+      </g>
+      <g transform="translate(167 56)" filter="url(#softShadow)">
+        <circle r="45" fill="#D7F6FF" fill-opacity="0.38" stroke="#8ED8EF" stroke-width="3"/>
+        <circle cx="-13" cy="-12" r="13" fill="#FFFFFF" fill-opacity="0.82"/>
+        <circle cx="-10" cy="-2" r="12" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="2"/>
+        <circle cx="13" cy="-1" r="12" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="2"/>
+        <circle cx="0" cy="20" r="12" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="2"/>
+        <rect x="15" y="20" width="32" height="25" rx="12" fill="#FFFFFF" stroke="#BAE6FD" stroke-width="2"/>
+        <text x="31" y="38" text-anchor="middle" class="jp heavy" font-size="15" fill="#12334A">3</text>
+      </g>
+      <g transform="translate(252 56)" filter="url(#softShadow)">
+        <circle r="38" fill="#D7F6FF" fill-opacity="0.38" stroke="#8ED8EF" stroke-width="3"/>
+        <circle cx="-10" cy="-11" r="11" fill="#FFFFFF" fill-opacity="0.82"/>
+        <circle cx="-8" cy="0" r="13" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="2"/>
+        <circle cx="12" cy="7" r="13" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="2"/>
+        <rect x="10" y="17" width="31" height="24" rx="12" fill="#FFFFFF" stroke="#BAE6FD" stroke-width="2"/>
+        <text x="25.5" y="35" text-anchor="middle" class="jp heavy" font-size="15" fill="#12334A">2</text>
+      </g>
+
+      <g id="almost_merge_cluster" filter="url(#beadGlow)">
+        <circle cx="122" cy="338" r="31" fill="#7DD3FC" fill-opacity="0.12" stroke="#7DD3FC" stroke-opacity="0.58" stroke-width="4"/>
+        <circle cx="154" cy="335" r="31" fill="#7DD3FC" fill-opacity="0.12" stroke="#7DD3FC" stroke-opacity="0.58" stroke-width="4"/>
+        <circle cx="185" cy="340" r="31" fill="#7DD3FC" fill-opacity="0.12" stroke="#7DD3FC" stroke-opacity="0.58" stroke-width="4"/>
+        <circle cx="136" cy="366" r="31" fill="#7DD3FC" fill-opacity="0.12" stroke="#7DD3FC" stroke-opacity="0.58" stroke-width="4"/>
+        <circle cx="170" cy="368" r="31" fill="#7DD3FC" fill-opacity="0.12" stroke="#7DD3FC" stroke-opacity="0.58" stroke-width="4"/>
+        <circle cx="205" cy="369" r="31" fill="#7DD3FC" fill-opacity="0.12" stroke="#7DD3FC" stroke-opacity="0.58" stroke-width="4"/>
+        <circle cx="151" cy="397" r="31" fill="#7DD3FC" fill-opacity="0.12" stroke="#7DD3FC" stroke-opacity="0.58" stroke-width="4"/>
+        <circle cx="184" cy="399" r="31" fill="#7DD3FC" fill-opacity="0.12" stroke="#7DD3FC" stroke-opacity="0.58" stroke-width="4"/>
+
+        <circle cx="122" cy="338" r="14" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="2"/>
+        <circle cx="154" cy="335" r="14" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="2"/>
+        <circle cx="185" cy="340" r="14" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="2"/>
+        <circle cx="136" cy="366" r="14" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="2"/>
+        <circle cx="170" cy="368" r="14" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="2"/>
+        <circle cx="205" cy="369" r="14" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="2"/>
+        <circle cx="151" cy="397" r="14" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="2"/>
+        <circle cx="184" cy="399" r="14" fill="#FDE68ACC" stroke="#CFA83A" stroke-width="2"/>
+        <circle cx="117" cy="333" r="5" fill="#FFF7C7"/>
+        <circle cx="149" cy="330" r="5" fill="#FFF7C7"/>
+        <circle cx="180" cy="335" r="5" fill="#FFF7C7"/>
+      </g>
+
+      <g transform="translate(246 394)">
+        <circle r="20" fill="#8DEBD8" fill-opacity="0.86" stroke="#24AFA3" stroke-width="3"/>
+        <circle cx="-6" cy="-7" r="7" fill="#D9FFF6"/>
+        <text x="0" y="6" text-anchor="middle" class="jp heavy" font-size="13" fill="#075985">10</text>
+      </g>
+    </g>
+
+    <g transform="translate(28 706)">
+      <rect width="334" height="34" rx="16" fill="#FFFFFF" fill-opacity="0.72"/>
+      <text x="167" y="23" text-anchor="middle" class="jp heavy" font-size="15" fill="#075985">ぎゅっと まとまるよ</text>
+      <g transform="translate(0 46)">
+        <rect width="202" height="48" rx="18" fill="#FFFFFF" stroke="#BAE6FD" stroke-width="3"/>
+        <text x="18" y="30" class="jp heavy" font-size="18" fill="#12334A">1 + 3 + 2 + ...</text>
+        <rect x="218" width="116" height="48" rx="18" fill="#FFFFFF" stroke="#38BDF8" stroke-width="3"/>
+        <text x="276" y="30" text-anchor="middle" class="jp heavy" font-size="16" fill="#075985">やりなおす</text>
+      </g>
+    </g>
+  </g>
+</svg>
