@@ -17,6 +17,9 @@ test('moves through the depth path into the existing game', async ({ page }) => 
   await expect(page.getByTestId('launch-tada')).toBeVisible();
   await expect(page.getByTestId('world-select')).toHaveCount(0);
   await expect(page.getByTestId('world-select')).toBeVisible();
+  await expect(page.locator('[data-testid^="depth-background-bubble-"]')).toHaveCount(12);
+  await expect(page.locator('[data-testid^="depth-fish-"]')).toHaveCount(5);
+  await expect(page.getByTestId('depth-shade')).toBeVisible();
   await expect(page.getByLabel('mixed-3', { exact: true })).toBeVisible();
   await expect(page.getByLabel('mixed-4', { exact: true })).toBeVisible();
   await expect(page.getByLabel('×', { exact: true })).toBeVisible();
@@ -31,6 +34,9 @@ test('moves through the depth path into the existing game', async ({ page }) => 
 
   await page.getByLabel('+', { exact: true }).click();
   await expect(page.getByTestId('stage-addition-10-ones')).toBeVisible();
+  await expect(page.locator('[data-testid^="depth-background-bubble-"]')).toHaveCount(12);
+  await expect(page.locator('[data-testid^="depth-fish-"]')).toHaveCount(5);
+  await expect(page.getByTestId('depth-shade')).toBeVisible();
   await expect(page.getByTestId('stage-addition-10-six-four')).toBeDisabled();
   await page.screenshot({ path: 'test-results/app-stages.png' });
 

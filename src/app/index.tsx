@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,9 +8,29 @@ import { Stage } from '@/game/types';
 
 type AppScreen = 'launch' | 'world' | 'stage' | 'game';
 type StageStatus = 'done' | 'open' | 'locked';
+type DepthBubbleSpec = {
+  id: string;
+  xRatio: number;
+  size: number;
+  speed: number;
+  delay: number;
+  drift: number;
+};
+type DepthFishSpec = {
+  id: string;
+  depth: number;
+  yRatio: number;
+  size: number;
+  speed: number;
+  delay: number;
+  direction: 1 | -1;
+  tint: string;
+};
+
+const DEPTH_BUBBLE_TICK_MS = 90;
 
 export default function IndexScreen() {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const [screen, setScreen] = useState<AppScreen>('launch');
   const [selectedIslandId, setSelectedIslandId] = useState<Stage['islandId']>('addition');
   const [playingStageIndex, setPlayingStageIndex] = useState(0);
@@ -52,6 +72,8 @@ export default function IndexScreen() {
         stages={selectedStages}
         completedStageIds={completedStageIds}
         mapWidth={mapWidth}
+        viewportWidth={width}
+        viewportHeight={height}
         onBack={() => setScreen('world')}
         onStartStage={startStage}
       />
@@ -62,6 +84,8 @@ export default function IndexScreen() {
     <WorldSelect
       completedStageIds={completedStageIds}
       mapWidth={mapWidth}
+      viewportWidth={width}
+      viewportHeight={height}
       onSelectIsland={(islandId) => {
         setSelectedIslandId(islandId);
         setScreen('stage');
@@ -73,28 +97,30 @@ export default function IndexScreen() {
 function WorldSelect({
   completedStageIds,
   mapWidth,
+  viewportWidth,
+  viewportHeight,
   onSelectIsland,
 }: {
   completedStageIds: Set<string>;
   mapWidth: number;
+  viewportWidth: number;
+  viewportHeight: number;
   onSelectIsland: (islandId: Stage['islandId']) => void;
 }) {
+  const [scrollDepth, setScrollDepth] = useState(0);
   const completedByIsland = (islandId: Stage['islandId']) => STAGES.filter((stage) => stage.islandId === islandId && completedStageIds.has(stage.id)).length;
   const layouts = getWorldNodeLayouts(mapWidth);
 
   return (
     <SafeAreaView style={styles.screen}>
       <View testID="world-select" style={styles.depthScene}>
-        <View pointerEvents="none" style={styles.depthBackdrop}>
-          <View style={[styles.bigBubble, styles.bigBubbleTop]} />
-          <View style={[styles.bigBubble, styles.bigBubbleRight]} />
-          <View style={[styles.softPatch, styles.softPatchLeft]} />
-          <View style={[styles.softPatch, styles.softPatchBottom]} />
-        </View>
+        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} />
         <ScrollView
           style={styles.worldScroll}
           contentContainerStyle={styles.worldScrollContent}
           showsVerticalScrollIndicator={false}
+          onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
+          scrollEventThrottle={16}
         >
           <View style={styles.routeLayer}>
             {layouts.slice(0, -1).map((layout, index) => (
@@ -147,6 +173,113 @@ function WorldSelect({
         </ScrollView>
       </View>
     </SafeAreaView>
+  );
+}
+
+function DepthBackdrop({ width, height, scrollDepth }: { width: number; height: number; scrollDepth: number }) {
+  const [tick, setTick] = useState(() => Date.now());
+  const bubbles = useMemo(() => getDepthBubbleSpecs(width), [width]);
+  const fish = useMemo(() => getDepthFishSpecs(), []);
+  const shadeOpacity = Math.min(0.44, Math.max(0, scrollDepth / 1500) * 0.44);
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick(Date.now()), DEPTH_BUBBLE_TICK_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <View pointerEvents="none" style={styles.depthBackdrop}>
+      <View style={[styles.softPatch, styles.softPatchLeft]} />
+      <View style={[styles.softPatch, styles.softPatchBottom]} />
+      {bubbles.map((bubble) => {
+        const elapsedSeconds = Math.max(0, (tick - bubble.delay) / 1000);
+        const travel = height + bubble.size * 3;
+        const cycle = (elapsedSeconds * bubble.speed) % travel;
+        const y = height + bubble.size - cycle - scrollDepth * 0.34;
+        const drift = Math.sin(elapsedSeconds * 0.58 + bubble.delay * 0.001) * bubble.drift;
+        const x = bubble.xRatio * width + drift - bubble.size / 2;
+        const opacity = elapsedSeconds < 0.24 ? elapsedSeconds / 0.24 : 1;
+
+        return (
+          <View
+            key={bubble.id}
+            testID={`depth-background-bubble-${bubble.id}`}
+            style={[
+              styles.depthBackgroundBubble,
+              {
+                left: x,
+                top: y,
+                width: bubble.size,
+                height: bubble.size,
+                borderRadius: bubble.size / 2,
+                opacity: opacity * 0.74,
+              },
+            ]}
+          >
+            <View style={styles.depthBackgroundBubbleShine} />
+          </View>
+        );
+      })}
+      {fish.map((spec) => (
+        <DepthFish key={spec.id} spec={spec} width={width} height={height} tick={tick} scrollDepth={scrollDepth} />
+      ))}
+      <View testID="depth-shade" style={[styles.depthShade, { opacity: shadeOpacity }]} />
+    </View>
+  );
+}
+
+function DepthFish({
+  spec,
+  width,
+  height,
+  tick,
+  scrollDepth,
+}: {
+  spec: DepthFishSpec;
+  width: number;
+  height: number;
+  tick: number;
+  scrollDepth: number;
+}) {
+  const elapsedSeconds = Math.max(0, (tick - spec.delay) / 1000);
+  const travel = width + spec.size * 5;
+  const cycle = (elapsedSeconds * spec.speed) % travel;
+  const x = spec.direction > 0 ? cycle - spec.size * 2 : width - cycle + spec.size;
+  const y = height * spec.yRatio + Math.sin(elapsedSeconds * 0.55 + spec.depth * 0.01) * 8;
+  const depthDistance = Math.abs(scrollDepth - spec.depth);
+  const depthOpacity = Math.max(0, 1 - depthDistance / 520);
+  const baseOpacity = spec.depth === 0 ? 0.26 : 0.36;
+
+  return (
+    <View
+      pointerEvents="none"
+      testID={`depth-fish-${spec.id}`}
+      style={[
+        styles.depthFish,
+        {
+          left: x,
+          top: y,
+          width: spec.size,
+          height: spec.size * 0.42,
+          opacity: Math.min(0.46, baseOpacity + depthOpacity * 0.34),
+          transform: [{ scaleX: spec.direction }],
+        },
+      ]}
+    >
+      <View style={[styles.depthFishBody, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
+      <View
+        style={[
+          styles.depthFishTail,
+          {
+            borderTopWidth: spec.size * 0.17,
+            borderBottomWidth: spec.size * 0.17,
+            borderRightWidth: spec.size * 0.24,
+            borderRightColor: spec.tint,
+            right: -spec.size * 0.08,
+          },
+        ]}
+      />
+    </View>
   );
 }
 
@@ -242,6 +375,8 @@ function StageSelect({
   stages,
   completedStageIds,
   mapWidth,
+  viewportWidth,
+  viewportHeight,
   onBack,
   onStartStage,
 }: {
@@ -249,9 +384,12 @@ function StageSelect({
   stages: Stage[];
   completedStageIds: Set<string>;
   mapWidth: number;
+  viewportWidth: number;
+  viewportHeight: number;
   onBack: () => void;
   onStartStage: (stage: Stage) => void;
 }) {
+  const [scrollDepth, setScrollDepth] = useState(0);
   const openStageCount = Math.min(stages.length, Math.max(3, completedStageIds.size + 2));
   const layouts = stages.map((_stage, index) => getStageNodeLayout(index, mapWidth));
   const mapHeight = Math.max(620, getStageMapHeight(stages.length));
@@ -259,11 +397,7 @@ function StageSelect({
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.depthScene}>
-        <View pointerEvents="none" style={styles.depthBackdrop}>
-          <View style={[styles.bigBubble, styles.bigBubbleTop]} />
-          <View style={[styles.bigBubble, styles.bigBubbleRight]} />
-          <View style={[styles.softPatch, styles.softPatchBottom]} />
-        </View>
+        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} />
         <Pressable accessibilityLabel="Back" accessibilityRole="button" onPress={onBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
           <Text style={styles.backText}>‹</Text>
         </Pressable>
@@ -271,6 +405,8 @@ function StageSelect({
           style={styles.stageScroll}
           contentContainerStyle={[styles.stageScrollContent, { height: mapHeight }]}
           showsVerticalScrollIndicator={false}
+          onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
+          scrollEventThrottle={16}
         >
           <View style={[styles.stageMap, { height: mapHeight }]}>
             {layouts.slice(0, -1).map((layout, index) => (
@@ -396,6 +532,34 @@ function getWorldNodeLayouts(mapWidth: number): MapNodeLayout[] {
   }));
 }
 
+function getDepthBubbleSpecs(width: number): DepthBubbleSpec[] {
+  const wideOffset = width > 520 ? 0.04 : 0;
+  return [
+    { id: 'large-right', xRatio: 0.94 - wideOffset, size: 116, speed: 15, delay: 0, drift: 9 },
+    { id: 'small-left', xRatio: 0.12 + wideOffset, size: 60, speed: 21, delay: 900, drift: 7 },
+    { id: 'tiny-right', xRatio: 0.78, size: 30, speed: 18, delay: 1600, drift: 5 },
+    { id: 'medium-left', xRatio: 0.22, size: 42, speed: 13, delay: 2400, drift: 10 },
+    { id: 'tiny-center', xRatio: 0.52, size: 18, speed: 24, delay: 3200, drift: 4 },
+    { id: 'medium-right', xRatio: 0.84, size: 54, speed: 12, delay: 4100, drift: 8 },
+    { id: 'soft-low-left', xRatio: 0.05 + wideOffset, size: 92, speed: 10, delay: 1700, drift: 7 },
+    { id: 'soft-top-left', xRatio: 0.28, size: 26, speed: 17, delay: 5200, drift: 6 },
+    { id: 'soft-center-right', xRatio: 0.66, size: 36, speed: 14, delay: 6100, drift: 9 },
+    { id: 'tiny-far-left', xRatio: 0.02 + wideOffset, size: 22, speed: 20, delay: 6800, drift: 5 },
+    { id: 'wide-center', xRatio: 0.44, size: 72, speed: 11, delay: 7600, drift: 11 },
+    { id: 'tiny-far-right', xRatio: 0.98 - wideOffset, size: 24, speed: 19, delay: 8300, drift: 5 },
+  ];
+}
+
+function getDepthFishSpecs(): DepthFishSpec[] {
+  return [
+    { id: 'shallow-small', depth: 0, yRatio: 0.22, size: 34, speed: 8, delay: 0, direction: 1, tint: 'rgba(14, 165, 233, 0.52)' },
+    { id: 'shallow-pair', depth: 260, yRatio: 0.38, size: 24, speed: 6, delay: 2200, direction: -1, tint: 'rgba(2, 132, 199, 0.48)' },
+    { id: 'middle-blue', depth: 620, yRatio: 0.28, size: 44, speed: 7, delay: 1200, direction: -1, tint: 'rgba(3, 105, 161, 0.48)' },
+    { id: 'middle-small', depth: 840, yRatio: 0.52, size: 28, speed: 5, delay: 4300, direction: 1, tint: 'rgba(7, 89, 133, 0.46)' },
+    { id: 'deep-slow', depth: 1180, yRatio: 0.34, size: 52, speed: 4, delay: 3100, direction: 1, tint: 'rgba(12, 74, 110, 0.44)' },
+  ];
+}
+
 function getStageMapHeight(stageCount: number) {
   return 180 + Math.max(0, stageCount - 1) * 118;
 }
@@ -409,29 +573,52 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
     backgroundColor: '#EAFBFF',
+    position: 'relative',
   },
   depthBackdrop: {
     ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
   },
-  bigBubble: {
+  depthBackgroundBubble: {
     position: 'absolute',
-    borderWidth: 5,
+    borderWidth: 4,
     borderColor: 'rgba(125, 211, 252, 0.42)',
-    backgroundColor: 'rgba(255, 255, 255, 0.34)',
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+    shadowColor: '#7DD3FC',
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
   },
-  bigBubbleTop: {
-    width: 156,
-    height: 156,
-    borderRadius: 78,
-    top: -72,
-    right: -44,
+  depthBackgroundBubbleShine: {
+    position: 'absolute',
+    left: '22%',
+    top: '18%',
+    width: '26%',
+    height: '26%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.58)',
   },
-  bigBubbleRight: {
-    width: 164,
-    height: 164,
-    borderRadius: 82,
-    top: 292,
-    right: -92,
+  depthShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#082F49',
+  },
+  depthFish: {
+    position: 'absolute',
+  },
+  depthFishBody: {
+    position: 'absolute',
+    left: 0,
+    top: '16%',
+    width: '76%',
+    height: '68%',
+  },
+  depthFishTail: {
+    position: 'absolute',
+    top: '16%',
+    width: 0,
+    height: 0,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
   },
   softPatch: {
     position: 'absolute',
@@ -453,6 +640,7 @@ const styles = StyleSheet.create({
   },
   worldScroll: {
     flex: 1,
+    zIndex: 1,
   },
   worldScrollContent: {
     minHeight: 1460,
@@ -572,6 +760,7 @@ const styles = StyleSheet.create({
   },
   stageScroll: {
     flex: 1,
+    zIndex: 1,
   },
   stageScrollContent: {
     paddingTop: 76,
