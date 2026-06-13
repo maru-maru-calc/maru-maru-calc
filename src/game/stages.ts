@@ -52,9 +52,9 @@ export const STAGE_ISLANDS: StageIsland[] = [
   },
   {
     id: 'mixed3Free',
-    title: '3つのあわ free',
+    title: '3つのあわ ∞',
     description: '3つのあわを、きごうの回数制限なしでとく',
-    stageSetTitles: ['3つのあわ free'],
+    stageSetTitles: ['3つのあわ ∞'],
   },
   {
     id: 'mixed4Free',
@@ -299,7 +299,7 @@ export const STAGES: Stage[] = [
     islandId: 'addition',
     islandTitle: 'たしざんのしま',
     setTitle: 'おおきなかずのひろば',
-    bubbleCounts: [6, 4, 5],
+    bubbleCounts: [20, 15, 15],
   },
   {
     id: 'addition-100-times',
@@ -309,7 +309,7 @@ export const STAGES: Stage[] = [
     islandId: 'addition',
     islandTitle: 'たしざんのしま',
     setTitle: 'おおきなかずのひろば',
-    bubbleCounts: [6, 4, 10],
+    bubbleCounts: [40, 30, 30],
   },
   {
     id: 'addition-120-times',
@@ -319,7 +319,7 @@ export const STAGES: Stage[] = [
     islandId: 'addition',
     islandTitle: 'たしざんのしま',
     setTitle: 'おおきなかずのひろば',
-    bubbleCounts: [6, 4, 3, 4],
+    bubbleCounts: [50, 40, 30],
   },
   ...createSubtractionStages(),
   ...createMultiplicationStages(),
@@ -593,8 +593,8 @@ function freeMixedStageGroup(
     target,
     allowedValues: [1],
     islandId,
-    islandTitle: `${bubbleCount}つのあわ free`,
-    setTitle: `${bubbleCount}つのあわ free`,
+    islandTitle: `${bubbleCount}つのあわ ∞`,
+    setTitle: `${bubbleCount}つのあわ ∞`,
     bubbleCounts,
   }));
 }

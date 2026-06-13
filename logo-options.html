@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Marumaru Logo Options</title>
+    <style>
+      :root {
+        --water: #c6e8f4;
+        --ink: #12334a;
+        --sky: #7dd3fc;
+        --sky-deep: #0ea5e9;
+        --gold: #f6df78;
+        --gold-rim: #d2b84b;
+        --white: rgba(255, 255, 255, 0.78);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--water);
+        color: var(--ink);
+        font-family: ui-rounded, "Hiragino Maru Gothic ProN", "Yu Gothic", system-ui, sans-serif;
+      }
+
+      main {
+        width: min(1120px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 32px 0 48px;
+      }
+
+      h1 {
+        margin: 0 0 20px;
+        font-size: 24px;
+        letter-spacing: 0;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 18px;
+      }
+
+      .option {
+        background: rgba(255, 255, 255, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.34);
+        border-radius: 8px;
+        padding: 18px;
+      }
+
+      .stage {
+        position: relative;
+        display: grid;
+        place-items: center;
+        height: 180px;
+        overflow: hidden;
+        border-radius: 8px;
+        background: rgba(186, 230, 253, 0.36);
+      }
+
+      .label {
+        margin: 12px 0 0;
+        font-size: 14px;
+        font-weight: 800;
+      }
+
+      .note {
+        margin: 4px 0 0;
+        color: rgba(18, 51, 74, 0.68);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .logo {
+        position: relative;
+        width: 220px;
+        height: 112px;
+      }
+
+      .bubble,
+      .coin,
+      .unit {
+        position: absolute;
+        border-radius: 999px;
+      }
+
+      .coin {
+        width: 42px;
+        height: 42px;
+        border: 3px solid var(--gold-rim);
+        background: rgba(246, 223, 120, 0.72);
+        box-shadow: inset 0 0 0 5px rgba(255, 255, 255, 0.36), 0 7px 14px rgba(2, 132, 199, 0.16);
+      }
+
+      .coin::before {
+        content: "";
+        position: absolute;
+        left: 8px;
+        top: 7px;
+        width: 14px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--white);
+        transform: rotate(-22deg);
+      }
+
+      .bubble {
+        border: 4px solid rgba(125, 211, 252, 0.58);
+        background: rgba(255, 255, 255, 0.2);
+        box-shadow: 0 9px 18px rgba(2, 132, 199, 0.12);
+      }
+
+      .bubble::before {
+        content: "";
+        position: absolute;
+        left: 22%;
+        top: 18%;
+        width: 28%;
+        height: 20%;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.7);
+        transform: rotate(-24deg);
+      }
+
+      .unit {
+        width: 14px;
+        height: 14px;
+        border: 2px solid var(--gold-rim);
+        background: rgba(246, 223, 120, 0.62);
+      }
+
+      .symbol {
+        position: absolute;
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.42);
+        border: 3px solid rgba(125, 211, 252, 0.52);
+        color: var(--sky-deep);
+        font-size: 28px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      .flow {
+        position: absolute;
+        height: 5px;
+        border-radius: 999px;
+        background: rgba(14, 165, 233, 0.46);
+      }
+
+      .flow::after {
+        content: "";
+        position: absolute;
+        right: -9px;
+        top: -7px;
+        width: 0;
+        height: 0;
+        border-top: 9px solid transparent;
+        border-bottom: 9px solid transparent;
+        border-left: 13px solid rgba(14, 165, 233, 0.46);
+      }
+
+      .spark {
+        position: absolute;
+        color: #f4c430;
+        font-size: 24px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      .tap-ring {
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(14, 165, 233, 0.42);
+        border-radius: 999px;
+      }
+
+      .tap-ring::after {
+        content: "";
+        position: absolute;
+        left: 12px;
+        top: 12px;
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.72);
+      }
+
+      .option-1 .coin:nth-child(1) {
+        left: 18px;
+        top: 34px;
+      }
+
+      .option-1 .coin:nth-child(2) {
+        left: 62px;
+        top: 34px;
+      }
+
+      .option-1 .symbol.plus {
+        left: 124px;
+        top: 12px;
+      }
+
+      .option-1 .symbol.minus {
+        left: 172px;
+        top: 12px;
+      }
+
+      .option-1 .symbol.times {
+        left: 124px;
+        top: 60px;
+      }
+
+      .option-1 .symbol.divide {
+        left: 172px;
+        top: 60px;
+      }
+
+      .option-2 .unit:nth-child(1) { left: 15px; top: 24px; }
+      .option-2 .unit:nth-child(2) { left: 35px; top: 18px; }
+      .option-2 .unit:nth-child(3) { left: 56px; top: 24px; }
+      .option-2 .unit:nth-child(4) { left: 25px; top: 43px; }
+      .option-2 .unit:nth-child(5) { left: 47px; top: 43px; }
+      .option-2 .unit:nth-child(6) { left: 15px; top: 63px; }
+      .option-2 .unit:nth-child(7) { left: 35px; top: 67px; }
+      .option-2 .unit:nth-child(8) { left: 56px; top: 63px; }
+      .option-2 .unit:nth-child(9) { left: 75px; top: 43px; }
+      .option-2 .unit:nth-child(10) { left: 76px; top: 23px; }
+
+      .option-2 .flow {
+        left: 98px;
+        top: 54px;
+        width: 42px;
+      }
+
+      .option-2 .bubble {
+        left: 150px;
+        top: 22px;
+        width: 64px;
+        height: 64px;
+      }
+
+      .option-2 .coin {
+        left: 161px;
+        top: 33px;
+      }
+
+      .option-3 .bubble {
+        left: 55px;
+        top: 12px;
+        width: 110px;
+        height: 88px;
+        border-width: 5px;
+      }
+
+      .option-3 .unit:nth-child(2) { left: 83px; top: 39px; }
+      .option-3 .unit:nth-child(3) { left: 104px; top: 31px; }
+      .option-3 .unit:nth-child(4) { left: 125px; top: 39px; }
+      .option-3 .unit:nth-child(5) { left: 94px; top: 58px; }
+      .option-3 .unit:nth-child(6) { left: 115px; top: 58px; }
+
+      .option-4 .symbol.plus { left: 24px; top: 15px; }
+      .option-4 .symbol.minus { left: 76px; top: 15px; }
+      .option-4 .symbol.times { left: 128px; top: 15px; }
+      .option-4 .symbol.divide { left: 180px; top: 15px; }
+      .option-4 .coin:nth-child(5) { left: 68px; top: 68px; width: 36px; height: 36px; }
+      .option-4 .coin:nth-child(6) { left: 112px; top: 68px; width: 36px; height: 36px; }
+
+      .option-5 .tap-ring {
+        left: 12px;
+        top: 18px;
+      }
+
+      .option-5 .bubble {
+        left: 70px;
+        top: 18px;
+        width: 70px;
+        height: 70px;
+      }
+
+      .option-5 .spark:nth-child(3) {
+        left: 132px;
+        top: 12px;
+      }
+
+      .option-5 .spark:nth-child(4) {
+        left: 64px;
+        top: 72px;
+        font-size: 18px;
+      }
+
+      .option-5 .coin:nth-child(5) {
+        left: 146px;
+        top: 46px;
+      }
+
+      .option-5 .unit:nth-child(6) { left: 142px; top: 29px; }
+      .option-5 .unit:nth-child(7) { left: 180px; top: 36px; }
+      .option-5 .unit:nth-child(8) { left: 132px; top: 79px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>非言語ロゴ案</h1>
+      <div class="grid">
+        <section class="option">
+          <div class="stage">
+            <div class="logo option-1">
+              <div class="coin"></div>
+              <div class="coin"></div>
+              <div class="symbol plus">+</div>
+              <div class="symbol minus">−</div>
+              <div class="symbol times">×</div>
+              <div class="symbol divide">÷</div>
+            </div>
+          </div>
+          <p class="label">1. まる + 四則演算泡</p>
+          <p class="note">文字を外し、計算記号を泡として見せる案。</p>
+        </section>
+
+        <section class="option">
+          <div class="stage">
+            <div class="logo option-2">
+              <div class="unit"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+              <div class="flow"></div>
+              <div class="bubble"></div>
+              <div class="coin"></div>
+            </div>
+          </div>
+          <p class="label">2. 小さいまるが大きいまるになる</p>
+          <p class="note">「10個がまとまる」をロゴ化する案。</p>
+        </section>
+
+        <section class="option">
+          <div class="stage">
+            <div class="logo option-3">
+              <div class="bubble"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+            </div>
+          </div>
+          <p class="label">3. 泡の中に粒のまとまり</p>
+          <p class="note">数字も記号も使わず、操作対象を見せる案。</p>
+        </section>
+
+        <section class="option">
+          <div class="stage">
+            <div class="logo option-4">
+              <div class="symbol plus">+</div>
+              <div class="symbol minus">−</div>
+              <div class="symbol times">×</div>
+              <div class="symbol divide">÷</div>
+              <div class="coin"></div>
+              <div class="coin"></div>
+            </div>
+          </div>
+          <p class="label">4. 四則演算泡 + まる</p>
+          <p class="note">電卓らしさを一番残す案。</p>
+        </section>
+
+        <section class="option">
+          <div class="stage">
+            <div class="logo option-5">
+              <div class="tap-ring"></div>
+              <div class="bubble"></div>
+              <div class="spark">✦</div>
+              <div class="spark">✦</div>
+              <div class="coin"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+              <div class="unit"></div>
+            </div>
+          </div>
+          <p class="label">5. 泡が割れてまるが出る</p>
+          <p class="note">遊び方をそのままマーク化する案。</p>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

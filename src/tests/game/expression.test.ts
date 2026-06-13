@@ -40,4 +40,14 @@ describe('expression driven wrapped display', () => {
 
     expect(evaluateExpressionOnEquals([...pendingTokens, '2'])).toEqual(['(2 ÷ 2 + 2)', '×', '2', '=', '6']);
   });
+
+  it('does not wrap multiplication and division chains that are equivalent without parentheses', () => {
+    expect(replaceTrailingOperator(['6', '×', '4', '=', '24'], '÷')).toEqual(['6', '×', '4', '÷']);
+    expect(evaluateExpressionOnEquals(['6', '×', '4', '÷', '3'])).toEqual(['6', '×', '4', '÷', '3', '=', '8']);
+  });
+
+  it('keeps parentheses when a low-priority expression is multiplied or divided as one group', () => {
+    expect(replaceTrailingOperator(['6', '+', '4', '=', '10'], '×')).toEqual(['(6 + 4)', '×']);
+    expect(evaluateExpressionOnEquals(['(6 + 4)', '×', '3'])).toEqual(['(6 + 4)', '×', '3', '=', '30']);
+  });
 });

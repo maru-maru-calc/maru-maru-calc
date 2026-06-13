@@ -59,6 +59,30 @@ test('stage routes can scroll to later mixed problems', async ({ page }) => {
   await expect(page.getByTestId('stage-mixed3-10')).toBeVisible();
 });
 
+test('going back from an uncleared next stage does not mark it complete', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByLabel('bubble-2').click();
+  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
+  await page.getByLabel('next stage').click();
+  await expect(page.getByTestId('world-select')).toBeVisible();
+  await page.getByLabel('+', { exact: true }).click();
+  await page.getByTestId('stage-addition-10-twos').click();
+
+  for (let index = 0; index < 5; index += 1) {
+    await page.getByLabel('bubble-2').first().click();
+  }
+
+  await expect(page.getByTestId('current-total-value')).toHaveText('10');
+  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
+  await page.getByLabel('next stage').click();
+  await expect(page.getByTestId('operator-+')).toBeVisible();
+
+  await page.getByLabel('Back', { exact: true }).click();
+  await expect(page.getByTestId('stage-addition-10-twos').getByText('★')).toBeVisible();
+  await expect(page.getByTestId('stage-addition-10-five-five').getByText('★')).toHaveCount(0);
+});
+
 test('back button position is consistent between stage select and game', async ({ page }) => {
   await page.goto('/');
 

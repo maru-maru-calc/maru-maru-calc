@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useBgmControl } from '@/audio/bgm-control';
+import { SFX } from '@/audio/sfx';
+import { useOneShotAudio } from '@/audio/use-one-shot-audio';
 import { MarumaruGame } from '@/components/MarumaruGame';
+import { NavImageIcon } from '@/components/NavImageIcon';
 import { getStageIndexById, STAGE_ISLANDS, STAGES } from '@/game/stages';
 import { Stage } from '@/game/types';
 
@@ -25,9 +29,12 @@ type DepthFishSpec = {
   delay: number;
   direction: 1 | -1;
   tint: string;
+  kind: 'fish' | 'clownfish' | 'blueTang' | 'puffer' | 'seahorse' | 'squid' | 'ray' | 'turtle' | 'tuna' | 'shark' | 'whale' | 'flatfish' | 'jelly' | 'angler';
 };
 
 const DEPTH_BUBBLE_TICK_MS = 90;
+const DEPTH_CREATURE_REACTION_MS = 920;
+const PLAYFUL_FONT_FAMILY = 'KiwiMaru';
 
 export default function IndexScreen() {
   const { width, height } = useWindowDimensions();
@@ -108,13 +115,16 @@ function WorldSelect({
   onSelectIsland: (islandId: Stage['islandId']) => void;
 }) {
   const [scrollDepth, setScrollDepth] = useState(0);
+  const { isVocalEnabled, toggleVocal } = useBgmControl();
+  const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
+  const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
   const completedByIsland = (islandId: Stage['islandId']) => STAGES.filter((stage) => stage.islandId === islandId && completedStageIds.has(stage.id)).length;
   const layouts = getWorldNodeLayouts(mapWidth);
 
   return (
     <SafeAreaView style={styles.screen}>
       <View testID="world-select" style={styles.depthScene}>
-        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} />
+        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
         <ScrollView
           style={styles.worldScroll}
           contentContainerStyle={styles.worldScrollContent}
@@ -124,7 +134,7 @@ function WorldSelect({
         >
           <View style={styles.routeLayer}>
             {layouts.slice(0, -1).map((layout, index) => (
-              <RouteSegment key={`world-route-${index}`} from={layout} to={layouts[index + 1]} />
+              <BubbleRoute key={`world-route-${index}`} from={layout} to={layouts[index + 1]} />
             ))}
             <WorldNode
               label="+"
@@ -133,8 +143,10 @@ function WorldSelect({
               total={STAGES.filter((stage) => stage.islandId === 'addition').length}
               x={layouts[0].x}
               y={layouts[0].y}
-              active
-              onPress={() => onSelectIsland('addition')}
+              onPress={() => {
+                playActionSfx();
+                onSelectIsland('addition');
+              }}
             />
             <WorldNode
               label="-"
@@ -143,7 +155,10 @@ function WorldSelect({
               total={STAGES.filter((stage) => stage.islandId === 'subtraction').length}
               x={layouts[1].x}
               y={layouts[1].y}
-              onPress={() => onSelectIsland('subtraction')}
+              onPress={() => {
+                playActionSfx();
+                onSelectIsland('subtraction');
+              }}
             />
             <WorldNode
               label="×"
@@ -152,7 +167,10 @@ function WorldSelect({
               total={STAGES.filter((stage) => stage.islandId === 'multiplication').length}
               x={layouts[2].x}
               y={layouts[2].y}
-              onPress={() => onSelectIsland('multiplication')}
+              onPress={() => {
+                playActionSfx();
+                onSelectIsland('multiplication');
+              }}
             />
             <WorldNode
               label="÷"
@@ -161,14 +179,18 @@ function WorldSelect({
               total={STAGES.filter((stage) => stage.islandId === 'division').length}
               x={layouts[3].x}
               y={layouts[3].y}
-              onPress={() => onSelectIsland('division')}
+              onPress={() => {
+                playActionSfx();
+                onSelectIsland('division');
+              }}
             />
-            <MixedWorldNode label="mixed-3" count={3} x={layouts[4].x} y={layouts[4].y} onPress={() => onSelectIsland('mixed3')} />
-            <MixedWorldNode label="mixed-4" count={4} x={layouts[5].x} y={layouts[5].y} onPress={() => onSelectIsland('mixed4')} />
-            <MixedWorldNode label="mixed-5" count={5} x={layouts[6].x} y={layouts[6].y} onPress={() => onSelectIsland('mixed5')} />
-            <MixedWorldNode label="mixed-3-free" count={3} x={layouts[7].x} y={layouts[7].y} free onPress={() => onSelectIsland('mixed3Free')} />
-            <MixedWorldNode label="mixed-4-free" count={4} x={layouts[8].x} y={layouts[8].y} free onPress={() => onSelectIsland('mixed4Free')} />
-            <MixedWorldNode label="mixed-5-free" count={5} x={layouts[9].x} y={layouts[9].y} free onPress={() => onSelectIsland('mixed5Free')} />
+            <MixedWorldNode label="mixed-3" count={3} x={layouts[4].x} y={layouts[4].y} onPress={() => { playActionSfx(); onSelectIsland('mixed3'); }} />
+            <MixedWorldNode label="mixed-3-free" count={3} x={layouts[5].x} y={layouts[5].y} free onPress={() => { playActionSfx(); onSelectIsland('mixed3Free'); }} />
+            <MixedWorldNode label="mixed-4" count={4} x={layouts[6].x} y={layouts[6].y} onPress={() => { playActionSfx(); onSelectIsland('mixed4'); }} />
+            <MixedWorldNode label="mixed-4-free" count={4} x={layouts[7].x} y={layouts[7].y} free onPress={() => { playActionSfx(); onSelectIsland('mixed4Free'); }} />
+            <MixedWorldNode label="mixed-5" count={5} x={layouts[8].x} y={layouts[8].y} onPress={() => { playActionSfx(); onSelectIsland('mixed5'); }} />
+            <MixedWorldNode label="mixed-5-free" count={5} x={layouts[9].x} y={layouts[9].y} free onPress={() => { playActionSfx(); onSelectIsland('mixed5Free'); }} />
+            <SingingMermaid isVocalEnabled={isVocalEnabled} mapWidth={mapWidth} onPress={toggleVocal} />
           </View>
         </ScrollView>
       </View>
@@ -176,8 +198,22 @@ function WorldSelect({
   );
 }
 
-function DepthBackdrop({ width, height, scrollDepth }: { width: number; height: number; scrollDepth: number }) {
+function DepthBackdrop({
+  width,
+  height,
+  scrollDepth,
+  onBubblePop,
+  onCreaturePress,
+}: {
+  width: number;
+  height: number;
+  scrollDepth: number;
+  onBubblePop?: () => void;
+  onCreaturePress?: () => void;
+}) {
   const [tick, setTick] = useState(() => Date.now());
+  const [bubbleStarts, setBubbleStarts] = useState<Record<string, number>>({});
+  const [creatureStarts, setCreatureStarts] = useState<Record<string, number>>({});
   const bubbles = useMemo(() => getDepthBubbleSpecs(width), [width]);
   const fish = useMemo(() => getDepthFishSpecs(), []);
   const shadeOpacity = Math.min(0.44, Math.max(0, scrollDepth / 1500) * 0.44);
@@ -188,22 +224,29 @@ function DepthBackdrop({ width, height, scrollDepth }: { width: number; height: 
   }, []);
 
   return (
-    <View pointerEvents="none" style={styles.depthBackdrop}>
-      <View style={[styles.softPatch, styles.softPatchLeft]} />
-      <View style={[styles.softPatch, styles.softPatchBottom]} />
+    <View pointerEvents="box-none" style={styles.depthBackdrop}>
+      <View pointerEvents="none" style={[styles.softPatch, styles.softPatchLeft]} />
+      <View pointerEvents="none" style={[styles.softPatch, styles.softPatchBottom]} />
       {bubbles.map((bubble) => {
-        const elapsedSeconds = Math.max(0, (tick - bubble.delay) / 1000);
-        const travel = height + bubble.size * 3;
-        const cycle = (elapsedSeconds * bubble.speed) % travel;
-        const y = height + bubble.size - cycle - scrollDepth * 0.34;
+        const startAt = bubbleStarts[bubble.id] ?? 0;
+        const elapsedSeconds = Math.max(0, (tick - startAt - bubble.delay) / 1000);
+        const travel = height + bubble.size * 5;
+        const cycle = (elapsedSeconds * bubble.speed + scrollDepth * 0.58) % travel;
+        const y = height + bubble.size - cycle;
         const drift = Math.sin(elapsedSeconds * 0.58 + bubble.delay * 0.001) * bubble.drift;
         const x = bubble.xRatio * width + drift - bubble.size / 2;
         const opacity = elapsedSeconds < 0.24 ? elapsedSeconds / 0.24 : 1;
 
         return (
-          <View
+          <Pressable
             key={bubble.id}
+            accessibilityLabel="decorative bubble"
+            accessibilityRole="button"
             testID={`depth-background-bubble-${bubble.id}`}
+            onPress={() => {
+              onBubblePop?.();
+              setBubbleStarts((current) => ({ ...current, [bubble.id]: Date.now() }));
+            }}
             style={[
               styles.depthBackgroundBubble,
               {
@@ -216,70 +259,222 @@ function DepthBackdrop({ width, height, scrollDepth }: { width: number; height: 
               },
             ]}
           >
-            <View style={styles.depthBackgroundBubbleShine} />
-          </View>
+            <View pointerEvents="none" style={styles.depthBackgroundBubbleShine} />
+          </Pressable>
         );
       })}
-      {fish.map((spec) => (
-        <DepthFish key={spec.id} spec={spec} width={width} height={height} tick={tick} scrollDepth={scrollDepth} />
-      ))}
-      <View testID="depth-shade" style={[styles.depthShade, { opacity: shadeOpacity }]} />
+      {fish.map((spec) => {
+        const depthDistance = Math.abs(scrollDepth - spec.depth);
+        if (depthDistance > 620 && spec.depth !== 0) {
+          return null;
+        }
+        return (
+          <DepthCreature
+            key={spec.id}
+            spec={spec}
+            width={width}
+            height={height}
+            tick={tick}
+            scrollDepth={scrollDepth}
+            reactedAt={creatureStarts[spec.id]}
+            onPress={() => {
+              onCreaturePress?.();
+              setCreatureStarts((current) => ({ ...current, [spec.id]: Date.now() }));
+            }}
+          />
+        );
+      })}
+      <View pointerEvents="none" testID="depth-shade" style={[styles.depthShade, { opacity: shadeOpacity }]} />
     </View>
   );
 }
 
-function DepthFish({
+function DepthCreature({
   spec,
   width,
   height,
   tick,
   scrollDepth,
+  reactedAt,
+  onPress,
 }: {
   spec: DepthFishSpec;
   width: number;
   height: number;
   tick: number;
   scrollDepth: number;
+  reactedAt?: number;
+  onPress: () => void;
 }) {
   const elapsedSeconds = Math.max(0, (tick - spec.delay) / 1000);
-  const travel = width + spec.size * 5;
-  const cycle = (elapsedSeconds * spec.speed) % travel;
-  const x = spec.direction > 0 ? cycle - spec.size * 2 : width - cycle + spec.size;
-  const y = height * spec.yRatio + Math.sin(elapsedSeconds * 0.55 + spec.depth * 0.01) * 8;
+  const travelX = width + spec.size * 5;
+  const travelY = height + spec.size * 4;
+  const cycleX = (elapsedSeconds * spec.speed) % travelX;
+  const cycleY = (elapsedSeconds * (spec.speed * 0.42) + scrollDepth * 0.48) % travelY;
+  const x = spec.direction > 0 ? cycleX - spec.size * 2 : width - cycleX + spec.size;
+  const y = height + spec.size - cycleY + Math.sin(elapsedSeconds * 0.7 + spec.depth * 0.01) * 10;
   const depthDistance = Math.abs(scrollDepth - spec.depth);
   const depthOpacity = Math.max(0, 1 - depthDistance / 520);
   const baseOpacity = spec.depth === 0 ? 0.26 : 0.36;
+  const isAngler = spec.kind === 'angler';
+  const isJelly = spec.kind === 'jelly';
+  const isWhale = spec.kind === 'whale';
+  const isFlatfish = spec.kind === 'flatfish';
+  const isTall = spec.kind === 'seahorse' || spec.kind === 'squid' || spec.kind === 'turtle';
+  const creatureHeight = isJelly ? spec.size * 0.9 : isWhale ? spec.size * 0.54 : isFlatfish ? spec.size * 0.62 : isTall ? spec.size * 0.86 : spec.size * 0.42;
+  const reaction = getDepthCreatureReaction(spec, tick, reactedAt);
 
   return (
-    <View
-      pointerEvents="none"
+    <Pressable
+      accessibilityLabel={`sea creature ${spec.kind}`}
+      accessibilityRole="button"
+      hitSlop={18}
+      onPress={onPress}
       testID={`depth-fish-${spec.id}`}
       style={[
         styles.depthFish,
+        reaction.isReacting && styles.depthFishReacting,
         {
           left: x,
           top: y,
           width: spec.size,
-          height: spec.size * 0.42,
-          opacity: Math.min(0.46, baseOpacity + depthOpacity * 0.34),
-          transform: [{ scaleX: spec.direction }],
+          height: creatureHeight,
+          opacity: Math.min(isAngler ? 0.9 : 0.76, baseOpacity + depthOpacity * 0.56),
+          transform: [
+            { translateX: reaction.translateX },
+            { translateY: reaction.translateY },
+            { scaleX: (spec.direction > 0 ? -1 : 1) * reaction.flipScale },
+            { scale: reaction.scale },
+            { rotate: reaction.rotate },
+          ],
         },
       ]}
     >
-      <View style={[styles.depthFishBody, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
-      <View
-        style={[
-          styles.depthFishTail,
-          {
-            borderTopWidth: spec.size * 0.17,
-            borderBottomWidth: spec.size * 0.17,
-            borderRightWidth: spec.size * 0.24,
-            borderRightColor: spec.tint,
-            right: -spec.size * 0.08,
-          },
-        ]}
-      />
-    </View>
+      {isAngler ? <View style={[styles.anglerGlow, { width: spec.size * 1.45, height: spec.size * 1.45, borderRadius: spec.size, right: -spec.size * 0.9, top: -spec.size * 0.52 }]} /> : null}
+      {isJelly ? (
+        <>
+          <View style={[styles.jellyBell, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
+          <View style={[styles.jellyTentacle, { left: '30%', height: spec.size * 0.44, backgroundColor: spec.tint }]} />
+          <View style={[styles.jellyTentacle, { left: '50%', height: spec.size * 0.54, backgroundColor: spec.tint }]} />
+          <View style={[styles.jellyTentacle, { left: '70%', height: spec.size * 0.4, backgroundColor: spec.tint }]} />
+        </>
+      ) : spec.kind === 'shark' ? (
+        <>
+          <View style={[styles.sharkBody, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
+          <View style={styles.creatureEye} />
+          <View style={[styles.sharkNose, { borderLeftColor: spec.tint, borderTopWidth: spec.size * 0.11, borderBottomWidth: spec.size * 0.11, borderLeftWidth: spec.size * 0.18 }]} />
+          <View style={[styles.sharkTail, { borderTopWidth: spec.size * 0.18, borderBottomWidth: spec.size * 0.18, borderRightWidth: spec.size * 0.22, borderRightColor: spec.tint }]} />
+          <View style={[styles.sharkFin, { borderLeftWidth: spec.size * 0.16, borderRightWidth: spec.size * 0.16, borderBottomWidth: spec.size * 0.28, borderBottomColor: spec.tint }]} />
+          <View style={[styles.sharkGill, { backgroundColor: 'rgba(224, 247, 255, 0.48)' }]} />
+        </>
+      ) : spec.kind === 'whale' ? (
+        <>
+          <View style={[styles.whaleBody, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
+          <View style={styles.whaleBelly} />
+          <View style={[styles.whaleTailTop, { borderTopWidth: spec.size * 0.16, borderBottomWidth: spec.size * 0.08, borderRightWidth: spec.size * 0.24, borderRightColor: spec.tint }]} />
+          <View style={[styles.whaleTailBottom, { borderTopWidth: spec.size * 0.08, borderBottomWidth: spec.size * 0.16, borderRightWidth: spec.size * 0.24, borderRightColor: spec.tint }]} />
+          <View style={styles.whaleEye} />
+        </>
+      ) : spec.kind === 'flatfish' ? (
+        <>
+          <View style={[styles.flatfishBody, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
+          <View style={[styles.flatfishTail, { borderTopWidth: spec.size * 0.14, borderBottomWidth: spec.size * 0.14, borderRightWidth: spec.size * 0.18, borderRightColor: spec.tint }]} />
+          <View style={styles.flatfishEyeOne} />
+          <View style={styles.flatfishEyeTwo} />
+          <View style={styles.flatfishSpotOne} />
+          <View style={styles.flatfishSpotTwo} />
+        </>
+      ) : spec.kind === 'clownfish' ? (
+        <>
+          <View style={styles.clownfishBody} />
+          <View style={[styles.clownfishStripe, { left: '20%' }]} />
+          <View style={[styles.clownfishStripe, { left: '49%' }]} />
+          <View style={styles.clownfishTail} />
+          <View style={styles.clownfishFin} />
+          <View style={styles.creatureEye} />
+        </>
+      ) : spec.kind === 'blueTang' ? (
+        <>
+          <View style={styles.blueTangBody} />
+          <View style={styles.blueTangBlackMark} />
+          <View style={styles.blueTangTail} />
+          <View style={styles.blueTangFin} />
+          <View style={styles.creatureEye} />
+        </>
+      ) : spec.kind === 'puffer' ? (
+        <>
+          <View style={styles.pufferBody} />
+          <View style={styles.pufferMouth} />
+          <View style={styles.pufferTail} />
+          <View style={styles.pufferSpotOne} />
+          <View style={styles.pufferSpotTwo} />
+          <View style={styles.creatureEye} />
+        </>
+      ) : spec.kind === 'seahorse' ? (
+        <>
+          <View style={styles.seahorseBody} />
+          <View style={styles.seahorseHead} />
+          <View style={styles.seahorseSnout} />
+          <View style={styles.seahorseTail} />
+          <View style={styles.seahorseFin} />
+          <View style={styles.seahorseEye} />
+        </>
+      ) : spec.kind === 'squid' ? (
+        <>
+          <View style={styles.squidHead} />
+          <View style={styles.squidFinLeft} />
+          <View style={styles.squidFinRight} />
+          <View style={[styles.squidTentacle, { left: '27%' }]} />
+          <View style={[styles.squidTentacle, { left: '43%' }]} />
+          <View style={[styles.squidTentacle, { left: '59%' }]} />
+          <View style={styles.squidEyeLeft} />
+          <View style={styles.squidEyeRight} />
+        </>
+      ) : spec.kind === 'ray' ? (
+        <>
+          <View style={styles.rayBody} />
+          <View style={styles.rayWingLeft} />
+          <View style={styles.rayWingRight} />
+          <View style={styles.rayTail} />
+          <View style={styles.rayEyeLeft} />
+          <View style={styles.rayEyeRight} />
+        </>
+      ) : spec.kind === 'turtle' ? (
+        <>
+          <View style={styles.turtleShell} />
+          <View style={styles.turtleShellPattern} />
+          <View style={styles.turtleHead} />
+          <View style={styles.turtleFlipperFront} />
+          <View style={styles.turtleFlipperBack} />
+          <View style={styles.creatureEye} />
+        </>
+      ) : spec.kind === 'tuna' ? (
+        <>
+          <View style={[styles.tunaBody, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
+          <View style={styles.tunaLine} />
+          <View style={[styles.tunaTail, { borderTopWidth: spec.size * 0.18, borderBottomWidth: spec.size * 0.18, borderRightWidth: spec.size * 0.24, borderRightColor: spec.tint }]} />
+          <View style={[styles.tunaFin, { borderLeftWidth: spec.size * 0.12, borderRightWidth: spec.size * 0.12, borderBottomWidth: spec.size * 0.18, borderBottomColor: spec.tint }]} />
+          <View style={styles.creatureEye} />
+        </>
+      ) : (
+        <>
+          <View style={[styles.depthFishBody, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
+          <View
+            style={[
+              styles.depthFishTail,
+              {
+                borderTopWidth: spec.size * 0.17,
+                borderBottomWidth: spec.size * 0.17,
+                borderRightWidth: spec.size * 0.24,
+                borderRightColor: spec.tint,
+                right: -spec.size * 0.08,
+              },
+            ]}
+          />
+          {isAngler ? <View style={[styles.anglerLight, { right: -spec.size * 0.46, top: -spec.size * 0.06 }]} /> : null}
+        </>
+      )}
+    </Pressable>
   );
 }
 
@@ -308,6 +503,7 @@ function WorldNode({
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [
+        styles.bubbleNode,
         styles.worldNode,
         active && styles.worldNodeActive,
         {
@@ -317,6 +513,8 @@ function WorldNode({
         pressed && styles.pressed,
       ]}
     >
+      <View pointerEvents="none" style={styles.nodeBubbleInnerGlow} />
+      <View pointerEvents="none" style={styles.nodeBubbleShine} />
       <Text style={[styles.worldSymbol, active && styles.worldSymbolActive]}>{title}</Text>
       <Text style={[styles.worldProgress, active && styles.worldProgressActive]}>
         {progress}/{total}
@@ -346,9 +544,9 @@ function MixedWorldNode({
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [
+        styles.bubbleNode,
         styles.worldNode,
         styles.mixedWorldNode,
-        free && styles.freeMixedWorldNode,
         {
           left: x - 45,
           top: y - 45,
@@ -356,6 +554,8 @@ function MixedWorldNode({
         pressed && styles.pressed,
       ]}
     >
+      <View pointerEvents="none" style={styles.nodeBubbleInnerGlow} />
+      <View pointerEvents="none" style={styles.nodeBubbleShine} />
       <Text style={styles.mixedWorldSymbols}>+ −</Text>
       <Text style={styles.mixedWorldSymbols}>× ÷</Text>
       <View style={styles.mixedCountBadge}>
@@ -390,16 +590,28 @@ function StageSelect({
   onStartStage: (stage: Stage) => void;
 }) {
   const [scrollDepth, setScrollDepth] = useState(0);
-  const openStageCount = Math.min(stages.length, Math.max(3, completedStageIds.size + 2));
+  const { isVocalEnabled, toggleVocal } = useBgmControl();
+  const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
+  const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
+  const completedStageCountInIsland = stages.filter((stage) => completedStageIds.has(stage.id)).length;
+  const openStageCount = Math.min(stages.length, Math.max(3, completedStageCountInIsland + 2));
   const layouts = stages.map((_stage, index) => getStageNodeLayout(index, mapWidth));
   const mapHeight = Math.max(620, getStageMapHeight(stages.length));
 
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.depthScene}>
-        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} />
-        <Pressable accessibilityLabel="Back" accessibilityRole="button" onPress={onBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-          <Text style={styles.backText}>‹</Text>
+        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <Pressable
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+          onPress={() => {
+            playActionSfx();
+            onBack();
+          }}
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+        >
+          <NavImageIcon kind="back" size={29} />
         </Pressable>
         <ScrollView
           style={styles.stageScroll}
@@ -409,8 +621,9 @@ function StageSelect({
           scrollEventThrottle={16}
         >
           <View style={[styles.stageMap, { height: mapHeight }]}>
+            <SingingMermaid isVocalEnabled={isVocalEnabled} mapWidth={mapWidth} onPress={toggleVocal} />
             {layouts.slice(0, -1).map((layout, index) => (
-              <RouteSegment key={`route-${stages[index].id}`} from={layout} to={layouts[index + 1]} />
+              <BubbleRoute key={`route-${stages[index].id}`} from={layout} to={layouts[index + 1]} />
             ))}
             {stages.map((stage, index) => {
               const status: StageStatus = completedStageIds.has(stage.id) ? 'done' : index < openStageCount ? 'open' : 'locked';
@@ -421,7 +634,10 @@ function StageSelect({
                   number={index + 1}
                   layout={layouts[index]}
                   status={status}
-                  onPress={() => onStartStage(stage)}
+                  onPress={() => {
+                    playActionSfx();
+                    onStartStage(stage);
+                  }}
                 />
               );
             })}
@@ -456,6 +672,7 @@ function StageNode({
       testID={`stage-${stage.id}`}
       onPress={onPress}
       style={({ pressed }) => [
+        styles.bubbleNode,
         styles.stageNode,
         {
           left: layout.x - 40,
@@ -466,6 +683,8 @@ function StageNode({
         pressed && styles.pressed,
       ]}
     >
+      <View pointerEvents="none" style={styles.nodeBubbleInnerGlow} />
+      <View pointerEvents="none" style={styles.nodeBubbleShine} />
       <Text style={[styles.stageNumber, isLocked && styles.stageNumberLocked]}>#{number}</Text>
       <Text style={[styles.stageTarget, isLocked && styles.stageNumberLocked]}>{stage.target}</Text>
       {isDone ? <Text style={styles.stageDoneStar}>★</Text> : null}
@@ -478,58 +697,158 @@ type MapNodeLayout = {
   y: number;
 };
 
-function RouteSegment({ from, to }: { from: MapNodeLayout; to: MapNodeLayout }) {
+function BubbleRoute({ from, to }: { from: MapNodeLayout; to: MapNodeLayout }) {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const length = Math.sqrt(dx * dx + dy * dy);
   const angle = Math.atan2(dy, dx);
+  const bubbleCount = Math.max(5, Math.floor(length / 18));
 
   return (
-    <View
-      pointerEvents="none"
-      style={[
-        styles.stageRoute,
-        {
-          left: (from.x + to.x) / 2 - length / 2,
-          top: (from.y + to.y) / 2 - 3,
-          width: length,
-          transform: [{ rotate: `${angle}rad` }],
-        },
-      ]}
-    />
+    <>
+      {Array.from({ length: bubbleCount }).map((_, index) => {
+        const progress = (index + 1) / (bubbleCount + 1);
+        const wave = Math.sin(progress * Math.PI * 2 + angle) * 9;
+        const x = from.x + dx * progress + Math.cos(angle + Math.PI / 2) * wave;
+        const y = from.y + dy * progress + Math.sin(angle + Math.PI / 2) * wave;
+        const size = 8 + (index % 3) * 3;
+        return (
+          <View
+            key={`route-bubble-${index}`}
+            pointerEvents="none"
+            style={[
+              styles.routeBubble,
+              { left: x - size / 2, top: y - size / 2, width: size, height: size, borderRadius: size / 2 },
+            ]}
+          />
+        );
+      })}
+    </>
   );
+}
+
+function SingingMermaid({ isVocalEnabled, mapWidth, onPress }: { isVocalEnabled: boolean; mapWidth: number; onPress: () => void }) {
+  const left = Math.min(Math.max(16, mapWidth * 0.08), 46);
+
+  return (
+    <Pressable
+      accessibilityLabel={isVocalEnabled ? 'turn off mermaid song' : 'turn on mermaid song'}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: isVocalEnabled }}
+      onPress={onPress}
+      testID="singing-mermaid"
+      style={({ pressed }) => [styles.singingMermaid, isVocalEnabled && styles.singingMermaidActive, { left }, pressed && styles.pressed]}
+    >
+      <View style={styles.mermaidSongBubbleOne} />
+      <View style={styles.mermaidSongBubbleTwo} />
+      <Text style={[styles.mermaidSongNote, isVocalEnabled && styles.mermaidSongNoteActive]}>♪</Text>
+      <View style={styles.mermaidRockBack} />
+      <View style={styles.mermaidRockLeft} />
+      <View style={styles.mermaidRockRight} />
+      <View style={styles.mermaidTailFin} />
+      <View style={styles.mermaidTail} />
+      <View style={styles.mermaidBody} />
+      <View style={styles.mermaidArmBack} />
+      <View style={styles.mermaidArmFront} />
+      <View style={styles.mermaidHairBack} />
+      <View style={styles.mermaidLongHair} />
+      <View style={styles.mermaidHead} />
+      <View style={styles.mermaidHairFront} />
+      <View style={styles.mermaidEye} />
+      <View style={styles.mermaidMouth} />
+      <View style={styles.mermaidHairShine} />
+    </Pressable>
+  );
+}
+
+function getDepthCreatureReaction(spec: DepthFishSpec, tick: number, reactedAt?: number) {
+  if (!reactedAt) {
+    return {
+      flipScale: 1,
+      isReacting: false,
+      rotate: '0deg',
+      scale: 1,
+      translateX: 0,
+      translateY: 0,
+    };
+  }
+
+  const progress = clamp((tick - reactedAt) / DEPTH_CREATURE_REACTION_MS, 0, 1);
+  const easeOut = 1 - Math.pow(1 - progress, 3);
+  const fadeBack = 1 - progress;
+  const fleeDirection = spec.direction > 0 ? 1 : -1;
+  const isPuff = spec.kind === 'puffer' || spec.kind === 'whale';
+  const isDart = spec.kind === 'shark' || spec.kind === 'tuna' || spec.kind === 'clownfish' || spec.kind === 'blueTang' || spec.kind === 'fish';
+  const isBob = spec.kind === 'seahorse' || spec.kind === 'squid' || spec.kind === 'jelly';
+  const isDive = spec.kind === 'ray' || spec.kind === 'flatfish' || spec.kind === 'turtle' || spec.kind === 'angler';
+
+  if (isPuff) {
+    return {
+      flipScale: 1,
+      isReacting: progress < 1,
+      rotate: `${Math.sin(progress * Math.PI * 4) * 4 * fadeBack}deg`,
+      scale: 1 + Math.sin(progress * Math.PI) * 0.28,
+      translateX: fleeDirection * easeOut * 10,
+      translateY: -Math.sin(progress * Math.PI) * 6,
+    };
+  }
+
+  if (isBob) {
+    return {
+      flipScale: 1,
+      isReacting: progress < 1,
+      rotate: `${Math.sin(progress * Math.PI * 5) * 8 * fadeBack}deg`,
+      scale: 1 - Math.sin(progress * Math.PI) * 0.08,
+      translateX: fleeDirection * Math.sin(progress * Math.PI) * 8,
+      translateY: -Math.sin(progress * Math.PI) * 34,
+    };
+  }
+
+  if (isDive) {
+    return {
+      flipScale: 1,
+      isReacting: progress < 1,
+      rotate: `${fleeDirection * Math.sin(progress * Math.PI) * -11}deg`,
+      scale: 1 - Math.sin(progress * Math.PI) * 0.1,
+      translateX: fleeDirection * easeOut * 20,
+      translateY: easeOut * 42,
+    };
+  }
+
+  return {
+    flipScale: isDart && progress < 0.32 ? -1 : 1,
+    isReacting: progress < 1,
+    rotate: `${fleeDirection * Math.sin(progress * Math.PI) * 8 * fadeBack}deg`,
+    scale: 1,
+    translateX: fleeDirection * easeOut * 92,
+    translateY: Math.sin(progress * Math.PI * 2) * 10 * fadeBack,
+  };
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
 }
 
 function getStageNodeLayout(index: number, mapWidth: number): MapNodeLayout {
   const centerX = mapWidth / 2;
-  const swing = Math.min(92, mapWidth * 0.24);
-  const side = index % 2 === 0 ? -1 : 1;
+  const spiral = index * 0.82 - Math.PI / 2;
+  const radius = Math.min(112, 26 + index * 9, mapWidth * 0.31);
   return {
-    x: centerX + side * swing * (index === 0 ? 0 : 1),
-    y: 96 + index * 118,
+    x: centerX + Math.cos(spiral) * radius,
+    y: 96 + index * 104,
   };
 }
 
 function getWorldNodeLayouts(mapWidth: number): MapNodeLayout[] {
   const centerX = mapWidth / 2;
-  const swing = Math.min(84, mapWidth * 0.22);
-  const xs = [
-    centerX,
-    centerX + swing * 0.72,
-    centerX - swing,
-    centerX + swing * 0.9,
-    centerX - swing * 0.78,
-    centerX + swing * 0.86,
-    centerX - swing * 0.86,
-    centerX + swing * 0.78,
-    centerX - swing * 0.72,
-    centerX + swing * 0.72,
-  ];
-
-  return xs.map((x, index) => ({
-    x,
-    y: 104 + index * 130,
-  }));
+  return Array.from({ length: 10 }, (_, index) => {
+    const spiral = index * 0.9 - Math.PI / 2;
+    const radius = Math.min(118, 24 + index * 16, mapWidth * 0.32);
+    return {
+      x: centerX + Math.cos(spiral) * radius,
+      y: 104 + index * 132,
+    };
+  });
 }
 
 function getDepthBubbleSpecs(width: number): DepthBubbleSpec[] {
@@ -552,11 +871,19 @@ function getDepthBubbleSpecs(width: number): DepthBubbleSpec[] {
 
 function getDepthFishSpecs(): DepthFishSpec[] {
   return [
-    { id: 'shallow-small', depth: 0, yRatio: 0.22, size: 34, speed: 8, delay: 0, direction: 1, tint: 'rgba(14, 165, 233, 0.52)' },
-    { id: 'shallow-pair', depth: 260, yRatio: 0.38, size: 24, speed: 6, delay: 2200, direction: -1, tint: 'rgba(2, 132, 199, 0.48)' },
-    { id: 'middle-blue', depth: 620, yRatio: 0.28, size: 44, speed: 7, delay: 1200, direction: -1, tint: 'rgba(3, 105, 161, 0.48)' },
-    { id: 'middle-small', depth: 840, yRatio: 0.52, size: 28, speed: 5, delay: 4300, direction: 1, tint: 'rgba(7, 89, 133, 0.46)' },
-    { id: 'deep-slow', depth: 1180, yRatio: 0.34, size: 52, speed: 4, delay: 3100, direction: 1, tint: 'rgba(12, 74, 110, 0.44)' },
+    { id: 'shallow-clownfish', depth: 0, yRatio: 0.2, size: 42, speed: 8, delay: 0, direction: 1, tint: 'rgba(251, 146, 60, 0.58)', kind: 'clownfish' },
+    { id: 'shallow-blue-tang', depth: 160, yRatio: 0.38, size: 46, speed: 7, delay: 1800, direction: -1, tint: 'rgba(96, 165, 250, 0.56)', kind: 'blueTang' },
+    { id: 'shallow-puffer', depth: 300, yRatio: 0.24, size: 42, speed: 5, delay: 3200, direction: 1, tint: 'rgba(250, 204, 21, 0.56)', kind: 'puffer' },
+    { id: 'shallow-turtle', depth: 430, yRatio: 0.43, size: 50, speed: 4, delay: 4700, direction: -1, tint: 'rgba(74, 222, 128, 0.5)', kind: 'turtle' },
+    { id: 'middle-tuna', depth: 560, yRatio: 0.18, size: 50, speed: 10, delay: 3600, direction: 1, tint: 'rgba(56, 189, 248, 0.5)', kind: 'tuna' },
+    { id: 'middle-flatfish', depth: 700, yRatio: 0.4, size: 42, speed: 5, delay: 2200, direction: -1, tint: 'rgba(94, 234, 212, 0.45)', kind: 'flatfish' },
+    { id: 'middle-squid', depth: 840, yRatio: 0.5, size: 44, speed: 5, delay: 6200, direction: 1, tint: 'rgba(244, 114, 182, 0.48)', kind: 'squid' },
+    { id: 'middle-shark', depth: 980, yRatio: 0.25, size: 62, speed: 7, delay: 1200, direction: -1, tint: 'rgba(125, 211, 252, 0.5)', kind: 'shark' },
+    { id: 'deep-ray', depth: 1120, yRatio: 0.44, size: 60, speed: 4, delay: 7600, direction: 1, tint: 'rgba(196, 181, 253, 0.42)', kind: 'ray' },
+    { id: 'deep-seahorse', depth: 1260, yRatio: 0.24, size: 42, speed: 3, delay: 6900, direction: -1, tint: 'rgba(253, 186, 116, 0.52)', kind: 'seahorse' },
+    { id: 'deep-jelly', depth: 1400, yRatio: 0.5, size: 46, speed: 5, delay: 3400, direction: 1, tint: 'rgba(103, 232, 249, 0.42)', kind: 'jelly' },
+    { id: 'deep-whale', depth: 1540, yRatio: 0.28, size: 82, speed: 3, delay: 5200, direction: 1, tint: 'rgba(125, 211, 252, 0.44)', kind: 'whale' },
+    { id: 'deep-angler', depth: 1680, yRatio: 0.34, size: 54, speed: 4, delay: 3100, direction: -1, tint: 'rgba(94, 234, 212, 0.46)', kind: 'angler' },
   ];
 }
 
@@ -567,17 +894,19 @@ function getStageMapHeight(stageCount: number) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#EAFBFF',
+    backgroundColor: '#C6E8F4',
+    fontFamily: PLAYFUL_FONT_FAMILY,
   },
   depthScene: {
     flex: 1,
     overflow: 'hidden',
-    backgroundColor: '#EAFBFF',
+    backgroundColor: '#C6E8F4',
     position: 'relative',
   },
   depthBackdrop: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
+    zIndex: 2,
   },
   depthBackgroundBubble: {
     position: 'absolute',
@@ -588,6 +917,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
+    zIndex: 2,
   },
   depthBackgroundBubbleShine: {
     position: 'absolute',
@@ -604,6 +934,10 @@ const styles = StyleSheet.create({
   },
   depthFish: {
     position: 'absolute',
+    zIndex: 3,
+  },
+  depthFishReacting: {
+    zIndex: 4,
   },
   depthFishBody: {
     position: 'absolute',
@@ -619,6 +953,589 @@ const styles = StyleSheet.create({
     height: 0,
     borderTopColor: 'transparent',
     borderBottomColor: 'transparent',
+  },
+  creatureEye: {
+    position: 'absolute',
+    left: '17%',
+    top: '31%',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+  },
+  clownfishBody: {
+    position: 'absolute',
+    left: '4%',
+    top: '15%',
+    width: '72%',
+    height: '70%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(251, 146, 60, 0.56)',
+    borderWidth: 1,
+    borderColor: 'rgba(251, 191, 36, 0.38)',
+    transform: [{ scaleY: 0.78 }],
+  },
+  clownfishStripe: {
+    position: 'absolute',
+    top: '16%',
+    width: '12%',
+    height: '68%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.62)',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.18)',
+  },
+  clownfishTail: {
+    position: 'absolute',
+    right: '1%',
+    top: '20%',
+    width: 0,
+    height: 0,
+    borderTopWidth: 8,
+    borderBottomWidth: 8,
+    borderRightWidth: 13,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderRightColor: 'rgba(251, 146, 60, 0.56)',
+  },
+  clownfishFin: {
+    position: 'absolute',
+    left: '42%',
+    bottom: '-2%',
+    width: 10,
+    height: 7,
+    borderRadius: 8,
+    backgroundColor: 'rgba(253, 186, 116, 0.5)',
+    transform: [{ rotate: '-18deg' }],
+  },
+  blueTangBody: {
+    position: 'absolute',
+    left: '3%',
+    top: '13%',
+    width: '72%',
+    height: '72%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(96, 165, 250, 0.54)',
+    transform: [{ scaleY: 0.78 }],
+  },
+  blueTangBlackMark: {
+    position: 'absolute',
+    left: '24%',
+    top: '25%',
+    width: '44%',
+    height: '28%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(15, 23, 42, 0.26)',
+    transform: [{ rotate: '-9deg' }],
+  },
+  blueTangTail: {
+    position: 'absolute',
+    right: '1%',
+    top: '19%',
+    width: 0,
+    height: 0,
+    borderTopWidth: 9,
+    borderBottomWidth: 9,
+    borderRightWidth: 15,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderRightColor: 'rgba(253, 224, 71, 0.58)',
+  },
+  blueTangFin: {
+    position: 'absolute',
+    left: '39%',
+    bottom: '-3%',
+    width: 12,
+    height: 7,
+    borderRadius: 8,
+    backgroundColor: 'rgba(147, 197, 253, 0.42)',
+    transform: [{ rotate: '-14deg' }],
+  },
+  pufferBody: {
+    position: 'absolute',
+    left: '8%',
+    top: '3%',
+    width: '68%',
+    height: '94%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(253, 224, 71, 0.56)',
+    borderWidth: 1,
+    borderColor: 'rgba(234, 179, 8, 0.34)',
+  },
+  pufferMouth: {
+    position: 'absolute',
+    left: '13%',
+    top: '44%',
+    width: 6,
+    height: 4,
+    borderRadius: 3,
+    backgroundColor: 'rgba(120, 53, 15, 0.28)',
+  },
+  pufferTail: {
+    position: 'absolute',
+    right: '3%',
+    top: '28%',
+    width: 0,
+    height: 0,
+    borderTopWidth: 8,
+    borderBottomWidth: 8,
+    borderRightWidth: 12,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderRightColor: 'rgba(250, 204, 21, 0.54)',
+  },
+  pufferSpotOne: {
+    position: 'absolute',
+    left: '38%',
+    top: '25%',
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(120, 113, 108, 0.28)',
+  },
+  pufferSpotTwo: {
+    position: 'absolute',
+    left: '51%',
+    top: '56%',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(120, 113, 108, 0.24)',
+  },
+  seahorseBody: {
+    position: 'absolute',
+    left: '28%',
+    top: '26%',
+    width: '36%',
+    height: '52%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(253, 186, 116, 0.5)',
+    transform: [{ rotate: '14deg' }],
+  },
+  seahorseHead: {
+    position: 'absolute',
+    left: '19%',
+    top: '9%',
+    width: '42%',
+    height: '33%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(253, 186, 116, 0.54)',
+  },
+  seahorseSnout: {
+    position: 'absolute',
+    left: '5%',
+    top: '21%',
+    width: '24%',
+    height: '9%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(253, 186, 116, 0.54)',
+  },
+  seahorseTail: {
+    position: 'absolute',
+    left: '44%',
+    bottom: '1%',
+    width: '30%',
+    height: '28%',
+    borderRadius: 999,
+    borderWidth: 4,
+    borderLeftColor: 'rgba(253, 186, 116, 0.5)',
+    borderBottomColor: 'rgba(253, 186, 116, 0.5)',
+    borderRightColor: 'transparent',
+    borderTopColor: 'transparent',
+  },
+  seahorseFin: {
+    position: 'absolute',
+    right: '21%',
+    top: '43%',
+    width: 9,
+    height: 11,
+    borderRadius: 8,
+    backgroundColor: 'rgba(254, 215, 170, 0.42)',
+  },
+  seahorseEye: {
+    position: 'absolute',
+    left: '28%',
+    top: '16%',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.86)',
+  },
+  squidHead: {
+    position: 'absolute',
+    left: '24%',
+    top: '3%',
+    width: '52%',
+    height: '50%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(244, 114, 182, 0.46)',
+    transform: [{ scaleY: 1.16 }],
+  },
+  squidFinLeft: {
+    position: 'absolute',
+    left: '17%',
+    top: '17%',
+    width: 10,
+    height: 16,
+    borderRadius: 10,
+    backgroundColor: 'rgba(251, 207, 232, 0.36)',
+    transform: [{ rotate: '26deg' }],
+  },
+  squidFinRight: {
+    position: 'absolute',
+    right: '17%',
+    top: '17%',
+    width: 10,
+    height: 16,
+    borderRadius: 10,
+    backgroundColor: 'rgba(251, 207, 232, 0.36)',
+    transform: [{ rotate: '-26deg' }],
+  },
+  squidTentacle: {
+    position: 'absolute',
+    top: '54%',
+    width: 4,
+    height: '36%',
+    borderRadius: 4,
+    backgroundColor: 'rgba(244, 114, 182, 0.42)',
+  },
+  squidEyeLeft: {
+    position: 'absolute',
+    left: '39%',
+    top: '30%',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.86)',
+  },
+  squidEyeRight: {
+    position: 'absolute',
+    left: '55%',
+    top: '30%',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.86)',
+  },
+  rayBody: {
+    position: 'absolute',
+    left: '18%',
+    top: '20%',
+    width: '64%',
+    height: '48%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(196, 181, 253, 0.38)',
+    transform: [{ scaleY: 0.72 }],
+  },
+  rayWingLeft: {
+    position: 'absolute',
+    left: '1%',
+    top: '25%',
+    width: '42%',
+    height: '36%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(221, 214, 254, 0.32)',
+    transform: [{ rotate: '-12deg' }],
+  },
+  rayWingRight: {
+    position: 'absolute',
+    right: '1%',
+    top: '25%',
+    width: '42%',
+    height: '36%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(221, 214, 254, 0.32)',
+    transform: [{ rotate: '12deg' }],
+  },
+  rayTail: {
+    position: 'absolute',
+    left: '48%',
+    top: '63%',
+    width: 3,
+    height: '36%',
+    borderRadius: 3,
+    backgroundColor: 'rgba(196, 181, 253, 0.36)',
+  },
+  rayEyeLeft: {
+    position: 'absolute',
+    left: '39%',
+    top: '33%',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+  },
+  rayEyeRight: {
+    position: 'absolute',
+    left: '55%',
+    top: '33%',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+  },
+  turtleShell: {
+    position: 'absolute',
+    left: '21%',
+    top: '22%',
+    width: '52%',
+    height: '45%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(74, 222, 128, 0.48)',
+    borderWidth: 2,
+    borderColor: 'rgba(21, 128, 61, 0.24)',
+  },
+  turtleShellPattern: {
+    position: 'absolute',
+    left: '36%',
+    top: '28%',
+    width: '22%',
+    height: '30%',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(220, 252, 231, 0.52)',
+  },
+  turtleHead: {
+    position: 'absolute',
+    left: '5%',
+    top: '31%',
+    width: '22%',
+    height: '22%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(134, 239, 172, 0.44)',
+  },
+  turtleFlipperFront: {
+    position: 'absolute',
+    left: '28%',
+    top: '7%',
+    width: 13,
+    height: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(187, 247, 208, 0.34)',
+    transform: [{ rotate: '-20deg' }],
+  },
+  turtleFlipperBack: {
+    position: 'absolute',
+    left: '57%',
+    bottom: '16%',
+    width: 13,
+    height: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(187, 247, 208, 0.34)',
+    transform: [{ rotate: '22deg' }],
+  },
+  tunaBody: {
+    position: 'absolute',
+    left: 0,
+    top: '18%',
+    width: '78%',
+    height: '58%',
+    transform: [{ scaleY: 0.82 }],
+  },
+  tunaTail: {
+    position: 'absolute',
+    right: '-2%',
+    top: '14%',
+    width: 0,
+    height: 0,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  tunaFin: {
+    position: 'absolute',
+    left: '42%',
+    top: '-10%',
+    width: 0,
+    height: 0,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+  tunaLine: {
+    position: 'absolute',
+    left: '18%',
+    right: '20%',
+    top: '47%',
+    height: 2,
+    borderRadius: 2,
+    backgroundColor: 'rgba(224, 247, 255, 0.48)',
+  },
+  sharkBody: {
+    position: 'absolute',
+    left: '4%',
+    top: '18%',
+    width: '72%',
+    height: '58%',
+    transform: [{ scaleY: 0.72 }],
+  },
+  sharkNose: {
+    position: 'absolute',
+    left: '-4%',
+    top: '31%',
+    width: 0,
+    height: 0,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  sharkTail: {
+    position: 'absolute',
+    right: '-3%',
+    top: '13%',
+    width: 0,
+    height: 0,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  sharkFin: {
+    position: 'absolute',
+    left: '36%',
+    top: '-16%',
+    width: 0,
+    height: 0,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+  },
+  sharkGill: {
+    position: 'absolute',
+    left: '25%',
+    top: '33%',
+    width: 2,
+    height: 11,
+    borderRadius: 2,
+    transform: [{ rotate: '12deg' }],
+  },
+  whaleBody: {
+    position: 'absolute',
+    left: 0,
+    top: '10%',
+    width: '78%',
+    height: '74%',
+  },
+  whaleBelly: {
+    position: 'absolute',
+    left: '13%',
+    right: '24%',
+    bottom: '13%',
+    height: '20%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(224, 247, 255, 0.22)',
+  },
+  whaleTailTop: {
+    position: 'absolute',
+    right: '-2%',
+    top: '20%',
+    width: 0,
+    height: 0,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    transform: [{ rotate: '-18deg' }],
+  },
+  whaleTailBottom: {
+    position: 'absolute',
+    right: '-2%',
+    bottom: '16%',
+    width: 0,
+    height: 0,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    transform: [{ rotate: '18deg' }],
+  },
+  whaleEye: {
+    position: 'absolute',
+    left: '17%',
+    top: '34%',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+  },
+  flatfishBody: {
+    position: 'absolute',
+    left: '6%',
+    top: 0,
+    width: '72%',
+    height: '100%',
+    transform: [{ scaleY: 0.78 }],
+  },
+  flatfishTail: {
+    position: 'absolute',
+    right: '2%',
+    top: '27%',
+    width: 0,
+    height: 0,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+  },
+  flatfishEyeOne: {
+    position: 'absolute',
+    left: '28%',
+    top: '28%',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+  },
+  flatfishEyeTwo: {
+    position: 'absolute',
+    left: '39%',
+    top: '24%',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+  },
+  flatfishSpotOne: {
+    position: 'absolute',
+    left: '26%',
+    top: '56%',
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(224, 247, 255, 0.26)',
+  },
+  flatfishSpotTwo: {
+    position: 'absolute',
+    left: '52%',
+    top: '38%',
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(224, 247, 255, 0.24)',
+  },
+  jellyBell: {
+    position: 'absolute',
+    left: '10%',
+    top: 0,
+    width: '80%',
+    height: '48%',
+    borderWidth: 2,
+    borderColor: 'rgba(224, 247, 255, 0.42)',
+  },
+  jellyTentacle: {
+    position: 'absolute',
+    top: '42%',
+    width: 3,
+    borderRadius: 3,
+    opacity: 0.62,
+  },
+  anglerGlow: {
+    position: 'absolute',
+    backgroundColor: 'rgba(250, 204, 21, 0.2)',
+    shadowColor: '#FDE68A',
+    shadowOpacity: 0.52,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  anglerLight: {
+    position: 'absolute',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FDE68A',
+    shadowColor: '#FDE68A',
+    shadowOpacity: 0.86,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 0 },
   },
   softPatch: {
     position: 'absolute',
@@ -643,28 +1560,417 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   worldScrollContent: {
-    minHeight: 1460,
+    minHeight: 1580,
     paddingTop: 76,
     paddingBottom: 90,
   },
   routeLayer: {
     position: 'relative',
-    minHeight: 1460,
+    minHeight: 1580,
+  },
+  singingMermaid: {
+    position: 'absolute',
+    bottom: 14,
+    width: 176,
+    height: 138,
+    opacity: 0.76,
+  },
+  singingMermaidActive: {
+    opacity: 0.92,
+  },
+  mermaidSongBubbleOne: {
+    position: 'absolute',
+    right: 30,
+    top: 14,
+    width: 15,
+    height: 15,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(125, 211, 252, 0.56)',
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
+  },
+  mermaidSongBubbleTwo: {
+    position: 'absolute',
+    right: 14,
+    top: 34,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: 'rgba(125, 211, 252, 0.44)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  mermaidSongNote: {
+    position: 'absolute',
+    right: 46,
+    top: 0,
+    color: 'rgba(2, 132, 199, 0.5)',
+    fontSize: 22,
+    lineHeight: 24,
+    fontWeight: '900',
+    fontFamily: PLAYFUL_FONT_FAMILY,
+  },
+  mermaidSongNoteActive: {
+    color: 'rgba(236, 72, 153, 0.72)',
+    textShadowColor: 'rgba(255, 255, 255, 0.56)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  mermaidRockBack: {
+    position: 'absolute',
+    left: 18,
+    bottom: 2,
+    width: 138,
+    height: 38,
+    borderRadius: 24,
+    backgroundColor: 'rgba(56, 189, 248, 0.22)',
+    borderWidth: 2,
+    borderColor: 'rgba(224, 247, 255, 0.28)',
+  },
+  mermaidRockHighlight: {
+    position: 'absolute',
+    left: 36,
+    bottom: 27,
+    width: 48,
+    height: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(224, 247, 255, 0.18)',
+    transform: [{ rotate: '-6deg' }],
+  },
+  mermaidRockLeft: {
+    position: 'absolute',
+    left: 8,
+    bottom: 4,
+    width: 76,
+    height: 34,
+    borderRadius: 22,
+    backgroundColor: 'rgba(14, 165, 233, 0.24)',
+    transform: [{ rotate: '-7deg' }],
+  },
+  mermaidRockRight: {
+    position: 'absolute',
+    right: 8,
+    bottom: 0,
+    width: 78,
+    height: 42,
+    borderRadius: 26,
+    backgroundColor: 'rgba(6, 182, 212, 0.2)',
+    transform: [{ rotate: '8deg' }],
+  },
+  mermaidTail: {
+    position: 'absolute',
+    left: 70,
+    bottom: 35,
+    width: 58,
+    height: 24,
+    borderRadius: 20,
+    backgroundColor: 'rgba(45, 212, 191, 0.48)',
+    borderWidth: 2,
+    borderColor: 'rgba(153, 246, 228, 0.5)',
+    transform: [{ rotate: '15deg' }, { scaleY: 0.72 }],
+  },
+  mermaidTailScaleOne: {
+    position: 'absolute',
+    left: 84,
+    bottom: 45,
+    width: 12,
+    height: 7,
+    borderRadius: 7,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(236, 253, 245, 0.42)',
+    transform: [{ rotate: '17deg' }],
+  },
+  mermaidTailScaleTwo: {
+    position: 'absolute',
+    left: 100,
+    bottom: 49,
+    width: 12,
+    height: 7,
+    borderRadius: 7,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(236, 253, 245, 0.36)',
+    transform: [{ rotate: '15deg' }],
+  },
+  mermaidTailScaleThree: {
+    position: 'absolute',
+    left: 111,
+    bottom: 41,
+    width: 11,
+    height: 6,
+    borderRadius: 6,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(236, 253, 245, 0.34)',
+    transform: [{ rotate: '13deg' }],
+  },
+  mermaidTailFin: {
+    position: 'absolute',
+    right: 23,
+    bottom: 42,
+    width: 0,
+    height: 0,
+    borderTopWidth: 13,
+    borderBottomWidth: 13,
+    borderLeftWidth: 24,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: 'rgba(45, 212, 191, 0.46)',
+    transform: [{ rotate: '14deg' }],
+  },
+  mermaidTailFinSplit: {
+    position: 'absolute',
+    right: 33,
+    bottom: 42,
+    width: 20,
+    height: 2,
+    borderRadius: 2,
+    backgroundColor: 'rgba(236, 253, 245, 0.3)',
+    transform: [{ rotate: '15deg' }],
+  },
+  mermaidBody: {
+    position: 'absolute',
+    left: 67,
+    bottom: 58,
+    width: 30,
+    height: 38,
+    borderRadius: 16,
+    backgroundColor: 'rgba(244, 114, 182, 0.44)',
+    borderWidth: 2,
+    borderColor: 'rgba(251, 207, 232, 0.4)',
+    transform: [{ rotate: '-5deg' }],
+  },
+  mermaidShellLeft: {
+    position: 'absolute',
+    left: 70,
+    bottom: 82,
+    width: 13,
+    height: 9,
+    borderRadius: 8,
+    backgroundColor: 'rgba(216, 180, 254, 0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(250, 245, 255, 0.48)',
+    transform: [{ rotate: '-14deg' }],
+  },
+  mermaidShellRight: {
+    position: 'absolute',
+    left: 84,
+    bottom: 82,
+    width: 13,
+    height: 9,
+    borderRadius: 8,
+    backgroundColor: 'rgba(216, 180, 254, 0.68)',
+    borderWidth: 1,
+    borderColor: 'rgba(250, 245, 255, 0.46)',
+    transform: [{ rotate: '12deg' }],
+  },
+  mermaidArmBack: {
+    position: 'absolute',
+    left: 54,
+    bottom: 58,
+    width: 28,
+    height: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(253, 224, 197, 0.54)',
+    transform: [{ rotate: '22deg' }],
+  },
+  mermaidHandBack: {
+    position: 'absolute',
+    left: 49,
+    bottom: 63,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: 'rgba(253, 224, 197, 0.58)',
+  },
+  mermaidArmFront: {
+    position: 'absolute',
+    left: 88,
+    bottom: 61,
+    width: 31,
+    height: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(253, 224, 197, 0.58)',
+    transform: [{ rotate: '-18deg' }],
+  },
+  mermaidHandFront: {
+    position: 'absolute',
+    left: 115,
+    bottom: 64,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: 'rgba(253, 224, 197, 0.6)',
+  },
+  mermaidHairBack: {
+    position: 'absolute',
+    left: 54,
+    bottom: 80,
+    width: 52,
+    height: 47,
+    borderRadius: 28,
+    backgroundColor: 'rgba(250, 204, 21, 0.58)',
+    transform: [{ rotate: '-8deg' }],
+  },
+  mermaidLongHair: {
+    position: 'absolute',
+    left: 52,
+    bottom: 61,
+    width: 29,
+    height: 60,
+    borderRadius: 22,
+    backgroundColor: 'rgba(234, 179, 8, 0.48)',
+    transform: [{ rotate: '10deg' }],
+  },
+  mermaidHairCurlBack: {
+    position: 'absolute',
+    left: 47,
+    bottom: 72,
+    width: 28,
+    height: 36,
+    borderRadius: 20,
+    backgroundColor: 'rgba(220, 38, 38, 0.58)',
+    transform: [{ rotate: '10deg' }],
+  },
+  mermaidHead: {
+    position: 'absolute',
+    left: 68,
+    bottom: 87,
+    width: 31,
+    height: 31,
+    borderRadius: 16,
+    backgroundColor: 'rgba(253, 224, 197, 0.66)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.42)',
+  },
+  mermaidHairFront: {
+    position: 'absolute',
+    left: 56,
+    bottom: 89,
+    width: 34,
+    height: 26,
+    borderRadius: 18,
+    backgroundColor: 'rgba(253, 224, 71, 0.62)',
+    transform: [{ rotate: '-20deg' }],
+  },
+  mermaidHairSideLock: {
+    position: 'absolute',
+    left: 53,
+    bottom: 80,
+    width: 18,
+    height: 34,
+    borderRadius: 16,
+    backgroundColor: 'rgba(220, 38, 38, 0.62)',
+    transform: [{ rotate: '-18deg' }],
+  },
+  mermaidBangOne: {
+    position: 'absolute',
+    left: 72,
+    bottom: 108,
+    width: 26,
+    height: 11,
+    borderRadius: 11,
+    backgroundColor: 'rgba(254, 202, 202, 0.42)',
+    transform: [{ rotate: '-12deg' }],
+  },
+  mermaidBangTwo: {
+    position: 'absolute',
+    left: 60,
+    bottom: 96,
+    width: 16,
+    height: 24,
+    borderRadius: 14,
+    backgroundColor: 'rgba(248, 113, 113, 0.7)',
+    transform: [{ rotate: '28deg' }],
+  },
+  mermaidHairShine: {
+    position: 'absolute',
+    left: 62,
+    bottom: 105,
+    width: 14,
+    height: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(254, 240, 138, 0.42)',
+    transform: [{ rotate: '-22deg' }],
+  },
+  mermaidEye: {
+    position: 'absolute',
+    left: 91,
+    bottom: 103,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(7, 89, 133, 0.52)',
+  },
+  mermaidEyeShine: {
+    position: 'absolute',
+    left: 92,
+    bottom: 106,
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.86)',
+  },
+  mermaidCheek: {
+    position: 'absolute',
+    left: 83,
+    bottom: 96,
+    width: 8,
+    height: 5,
+    borderRadius: 5,
+    backgroundColor: 'rgba(244, 114, 182, 0.42)',
+  },
+  mermaidMouth: {
+    position: 'absolute',
+    left: 94,
+    bottom: 95,
+    width: 9,
+    height: 5,
+    borderRadius: 6,
+    borderBottomWidth: 2,
+    borderBottomColor: 'rgba(236, 72, 153, 0.5)',
+  },
+  routeBubble: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: 'rgba(125, 211, 252, 0.42)',
+    backgroundColor: 'rgba(255, 255, 255, 0.32)',
+  },
+  bubbleNode: {
+    borderColor: 'rgba(56, 189, 248, 0.46)',
+    backgroundColor: 'rgba(255, 255, 255, 0.34)',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.16,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  nodeBubbleInnerGlow: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    top: 8,
+    bottom: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.58)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  nodeBubbleShine: {
+    position: 'absolute',
+    left: 15,
+    top: 12,
+    width: 28,
+    height: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    transform: [{ rotate: '-26deg' }],
   },
   worldNode: {
     position: 'absolute',
     width: 90,
     height: 90,
     borderRadius: 45,
-    borderWidth: 5,
-    borderColor: 'rgba(125, 211, 252, 0.7)',
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+    borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0284C7',
-    shadowOpacity: 0.13,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
     elevation: 5,
   },
   worldNodeActive: {
@@ -674,15 +1980,12 @@ const styles = StyleSheet.create({
   mixedWorldNode: {
     gap: 0,
   },
-  freeMixedWorldNode: {
-    borderColor: '#FACC15',
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-  },
   worldSymbol: {
     color: '#075985',
     fontSize: 36,
     lineHeight: 40,
     fontWeight: '900',
+    fontFamily: PLAYFUL_FONT_FAMILY,
   },
   worldSymbolActive: {
     color: '#0EA5E9',
@@ -691,6 +1994,7 @@ const styles = StyleSheet.create({
     color: '#0284C7',
     fontSize: 11,
     fontWeight: '900',
+    fontFamily: PLAYFUL_FONT_FAMILY,
   },
   worldProgressActive: {
     color: '#075985',
@@ -700,6 +2004,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 22,
     fontWeight: '900',
+    fontFamily: PLAYFUL_FONT_FAMILY,
   },
   mixedCountBadge: {
     position: 'absolute',
@@ -718,6 +2023,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
+    fontFamily: PLAYFUL_FONT_FAMILY,
   },
   freeBadge: {
     position: 'absolute',
@@ -737,26 +2043,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 18,
     fontWeight: '900',
+    fontFamily: PLAYFUL_FONT_FAMILY,
   },
   backButton: {
     position: 'absolute',
     left: 22,
-    top: 42,
+    top: 40,
     zIndex: 3,
     width: 42,
     height: 42,
-    borderRadius: 17,
-    borderWidth: 3,
-    borderColor: '#BAE6FD',
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.26)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backText: {
-    color: '#075985',
-    fontSize: 34,
-    lineHeight: 36,
-    fontWeight: '900',
   },
   stageScroll: {
     flex: 1,
@@ -769,26 +2068,14 @@ const styles = StyleSheet.create({
   stageMap: {
     position: 'relative',
   },
-  stageRoute: {
-    position: 'absolute',
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(125, 211, 252, 0.42)',
-  },
   stageNode: {
     position: 'absolute',
     width: 80,
     height: 80,
     borderRadius: 40,
-    borderWidth: 5,
-    borderColor: '#7DD3FC',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0284C7',
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
     elevation: 4,
   },
   stageNodeLocked: {
@@ -803,12 +2090,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 16,
     fontWeight: '900',
+    fontFamily: PLAYFUL_FONT_FAMILY,
   },
   stageTarget: {
     color: '#12334A',
     fontSize: 24,
     lineHeight: 28,
     fontWeight: '900',
+    fontFamily: PLAYFUL_FONT_FAMILY,
   },
   stageNumberLocked: {
     color: '#7DD3FC',
@@ -817,13 +2106,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: -4,
     top: -7,
-    color: '#FACC15',
-    fontSize: 22,
+    color: '#EAB308',
+    fontSize: 20,
     lineHeight: 24,
     fontWeight: '900',
-    textShadowColor: 'rgba(255, 255, 255, 0.95)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 0,
+    fontFamily: PLAYFUL_FONT_FAMILY,
+    opacity: 0.82,
+    textShadowColor: 'rgba(255, 255, 255, 0.82)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   pressed: {
     opacity: 0.72,

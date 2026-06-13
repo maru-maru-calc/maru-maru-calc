@@ -168,7 +168,15 @@ function appendPriorityOperator(tokens: string[], operator: OperatorSymbol) {
   const normalizedExpressionTokens =
     expressionTokens.length === 1 ? (unwrapParenthesizedToken(expressionTokens[0]) ?? expressionTokens) : expressionTokens;
 
-  return [`(${normalizedExpressionTokens.join(' ')})`, operator];
+  if (needsParenthesesBeforePriorityOperator(normalizedExpressionTokens)) {
+    return [`(${normalizedExpressionTokens.join(' ')})`, operator];
+  }
+
+  return [...normalizedExpressionTokens, operator];
+}
+
+function needsParenthesesBeforePriorityOperator(tokens: string[]) {
+  return tokens.some((token) => token === '+' || token === '-');
 }
 
 function unwrapPendingPriorityExpression(tokens: string[]) {
