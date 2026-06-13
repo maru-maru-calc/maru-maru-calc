@@ -5,7 +5,7 @@ test.use({ viewport: { width: 390, height: 844 } });
 test('moves through the depth path into the existing game', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByLabel('●● calc. logo')).toBeVisible();
+  await expect(page.getByLabel('maru logo')).toBeVisible();
   await expect(page.getByLabel('bubble-2')).toBeVisible();
   await expect(page.getByLabel('bead-normal-1')).toHaveCount(8);
   await expect(page.getByTestId('current-total-value')).toHaveText('8');

@@ -1,0 +1,1499 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MARU Logo Options</title>
+    <style>
+      :root {
+        --water: #c6e8f4;
+        --water-light: #e6f8fe;
+        --ink: #12334a;
+        --blue: #0ea5e9;
+        --blue-soft: #7dd3fc;
+        --teal: #14b8a6;
+        --gold: #f6df78;
+        --gold-rim: #d2b84b;
+        --white: rgba(255, 255, 255, 0.8);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--water);
+        color: var(--ink);
+        font-family: ui-rounded, "Hiragino Maru Gothic ProN", "Yu Gothic", system-ui, sans-serif;
+      }
+
+      main {
+        width: min(1240px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 32px 0 56px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 25px;
+        letter-spacing: 0;
+      }
+
+      .lead {
+        margin: 0 0 22px;
+        color: rgba(18, 51, 74, 0.68);
+        font-size: 14px;
+        line-height: 1.7;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(278px, 1fr));
+        gap: 18px;
+      }
+
+      .option {
+        border-radius: 8px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.34);
+      }
+
+      .stage {
+        position: relative;
+        display: grid;
+        place-items: center;
+        height: 172px;
+        overflow: hidden;
+        border-radius: 8px;
+        background: rgba(230, 248, 254, 0.58);
+      }
+
+      .stage.deep {
+        background: #b8e0ee;
+      }
+
+      .caption {
+        margin: 12px 0 0;
+        font-size: 14px;
+        font-weight: 900;
+      }
+
+      .note {
+        margin: 4px 0 0;
+        color: rgba(18, 51, 74, 0.66);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .logo {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        min-width: 210px;
+        min-height: 92px;
+      }
+
+      .word {
+        color: var(--ink);
+        font-size: 52px;
+        line-height: 1;
+        font-weight: 950;
+        letter-spacing: 0;
+      }
+
+      .word.small {
+        font-size: 42px;
+      }
+
+      .word.soft {
+        color: #075985;
+      }
+
+      .word.white {
+        color: rgba(255, 255, 255, 0.92);
+        text-shadow: 0 2px 0 rgba(7, 89, 133, 0.18);
+      }
+
+      .bubble,
+      .pearl,
+      .gold,
+      .ring {
+        position: relative;
+        flex: 0 0 auto;
+        border-radius: 999px;
+      }
+
+      .bubble {
+        width: 48px;
+        height: 48px;
+        border: 4px solid rgba(125, 211, 252, 0.72);
+        background: rgba(255, 255, 255, 0.24);
+        box-shadow: 0 10px 18px rgba(2, 132, 199, 0.16);
+      }
+
+      .bubble::before,
+      .pearl::before,
+      .gold::before {
+        content: "";
+        position: absolute;
+        left: 18%;
+        top: 18%;
+        width: 36%;
+        height: 28%;
+        border-radius: 999px;
+        background: var(--white);
+        transform: rotate(-24deg);
+      }
+
+      .pearl {
+        width: 48px;
+        height: 48px;
+        border: 3px solid var(--teal);
+        background: rgba(125, 231, 220, 0.72);
+        box-shadow: inset 0 0 0 5px rgba(255, 255, 255, 0.28), 0 8px 16px rgba(20, 184, 166, 0.2);
+      }
+
+      .gold {
+        width: 48px;
+        height: 48px;
+        border: 3px solid var(--gold-rim);
+        background: rgba(246, 223, 120, 0.72);
+        box-shadow: inset 0 0 0 5px rgba(255, 255, 255, 0.28), 0 8px 16px rgba(210, 184, 75, 0.18);
+      }
+
+      .ring {
+        width: 54px;
+        height: 54px;
+        border: 8px solid var(--blue);
+        border-right-color: rgba(14, 165, 233, 0.28);
+      }
+
+      .tiny-bubble {
+        position: absolute;
+        width: 13px;
+        height: 13px;
+        border-radius: 999px;
+        border: 3px solid rgba(125, 211, 252, 0.5);
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .wave {
+        position: absolute;
+        left: 50%;
+        bottom: 31px;
+        width: 162px;
+        height: 28px;
+        border-bottom: 6px solid rgba(14, 165, 233, 0.56);
+        border-radius: 0 0 999px 999px;
+        transform: translateX(-50%);
+      }
+
+      .orbital {
+        position: absolute;
+        width: 168px;
+        height: 76px;
+        border: 4px solid rgba(125, 211, 252, 0.54);
+        border-left-color: transparent;
+        border-right-color: transparent;
+        border-radius: 50%;
+        transform: rotate(-8deg);
+      }
+
+      .stack {
+        display: flex;
+        align-items: flex-end;
+        gap: 4px;
+      }
+
+      .stack .bubble,
+      .stack .pearl,
+      .stack .gold {
+        width: 34px;
+        height: 34px;
+        border-width: 3px;
+      }
+
+      .mark {
+        position: relative;
+        width: 86px;
+        height: 74px;
+      }
+
+      .mark .bubble,
+      .mark .pearl,
+      .mark .gold {
+        position: absolute;
+      }
+
+      .mark .a {
+        left: 8px;
+        top: 14px;
+      }
+
+      .mark .b {
+        left: 36px;
+        top: 8px;
+      }
+
+      .mark .c {
+        left: 25px;
+        top: 34px;
+      }
+
+      .badge {
+        padding: 16px 22px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.36);
+        border: 3px solid rgba(125, 211, 252, 0.5);
+      }
+
+      .vertical {
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .vertical .word {
+        font-size: 40px;
+      }
+
+      .letter-bubbles {
+        display: flex;
+        gap: 4px;
+      }
+
+      .letter-bubbles span {
+        display: grid;
+        place-items: center;
+        width: 48px;
+        height: 48px;
+        border-radius: 999px;
+        border: 3px solid rgba(125, 211, 252, 0.78);
+        background: rgba(255, 255, 255, 0.34);
+        color: var(--ink);
+        font-size: 25px;
+        font-weight: 950;
+      }
+
+      .sub {
+        margin-top: 4px;
+        color: rgba(7, 89, 133, 0.82);
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: 0;
+      }
+
+      .shadow-word {
+        text-shadow: 0 4px 0 rgba(255, 255, 255, 0.62), 0 8px 18px rgba(2, 132, 199, 0.18);
+      }
+
+      .outline-word {
+        color: rgba(255, 255, 255, 0.82);
+        -webkit-text-stroke: 3px #075985;
+        paint-order: stroke fill;
+      }
+
+      .minimal {
+        gap: 4px;
+      }
+
+      .minimal .word {
+        font-size: 48px;
+        font-weight: 900;
+      }
+
+      .minimal .bubble {
+        width: 32px;
+        height: 32px;
+        border-width: 3px;
+        transform: translateY(3px);
+      }
+
+      .ocean-lower {
+        --dot-size: 48px;
+        --word-size: 52px;
+        --dot-gap: 5px;
+        --logo-gap: 9px;
+        --dot-y: 0px;
+        --word-y: 0px;
+        --dot-scale-a: 1;
+        --dot-scale-b: 1;
+        --dot-scale-c: 1;
+        gap: var(--logo-gap);
+      }
+
+      .ocean-lower .stack {
+        gap: var(--dot-gap);
+        align-items: center;
+        transform: translateY(var(--dot-y));
+      }
+
+      .ocean-lower .stack .bubble,
+      .ocean-lower .stack .pearl,
+      .ocean-lower .stack .gold {
+        width: var(--dot-size);
+        height: var(--dot-size);
+      }
+
+      .ocean-lower .stack > :nth-child(1) {
+        transform: scale(var(--dot-scale-a));
+      }
+
+      .ocean-lower .stack > :nth-child(2) {
+        transform: scale(var(--dot-scale-b));
+      }
+
+      .ocean-lower .stack > :nth-child(3) {
+        transform: scale(var(--dot-scale-c));
+      }
+
+      .ocean-lower .word {
+        font-size: var(--word-size);
+        transform: translateY(var(--word-y));
+      }
+
+      .ocean-lower.tight {
+        --dot-gap: -4px;
+      }
+
+      .ocean-lower.wide {
+        --dot-gap: 12px;
+      }
+
+      .ocean-lower.small-dots {
+        --dot-size: 40px;
+        --word-size: 56px;
+      }
+
+      .ocean-lower.big-dots {
+        --dot-size: 56px;
+        --word-size: 48px;
+      }
+
+      .ocean-lower.high-dots {
+        --dot-y: -8px;
+        --logo-gap: 4px;
+      }
+
+      .ocean-lower.low-dots {
+        --dot-y: 7px;
+        --logo-gap: 4px;
+      }
+
+      .ocean-lower.word-up {
+        --word-y: -5px;
+      }
+
+      .ocean-lower.word-down {
+        --word-y: 5px;
+      }
+
+      .ocean-lower.arc .stack > :nth-child(1) {
+        transform: translateY(8px) scale(var(--dot-scale-a));
+      }
+
+      .ocean-lower.arc .stack > :nth-child(2) {
+        transform: translateY(-4px) scale(var(--dot-scale-b));
+      }
+
+      .ocean-lower.arc .stack > :nth-child(3) {
+        transform: translateY(8px) scale(var(--dot-scale-c));
+      }
+
+      .ocean-lower.slope .stack > :nth-child(1) {
+        transform: translateY(8px) scale(var(--dot-scale-a));
+      }
+
+      .ocean-lower.slope .stack > :nth-child(2) {
+        transform: translateY(0) scale(var(--dot-scale-b));
+      }
+
+      .ocean-lower.slope .stack > :nth-child(3) {
+        transform: translateY(-8px) scale(var(--dot-scale-c));
+      }
+
+      .ocean-lower.center-large {
+        --dot-scale-b: 1.18;
+      }
+
+      .ocean-lower.side-large {
+        --dot-scale-a: 1.12;
+        --dot-scale-c: 1.12;
+        --dot-scale-b: 0.92;
+      }
+
+      .ocean-lower.offset-left .stack {
+        transform: translate(-12px, var(--dot-y));
+      }
+
+      .ocean-lower.offset-right .stack {
+        transform: translate(12px, var(--dot-y));
+      }
+
+      .ocean-lower.bubble-behind .stack {
+        margin-bottom: -10px;
+        z-index: 0;
+      }
+
+      .ocean-lower.bubble-behind .word {
+        position: relative;
+        z-index: 1;
+      }
+
+      .embedded-word {
+        position: relative;
+        display: inline-block;
+        color: rgba(255, 255, 255, 0.94);
+        font-size: 58px;
+        line-height: 1;
+        font-weight: 950;
+        letter-spacing: 0;
+        text-shadow: 0 3px 0 rgba(7, 89, 133, 0.18);
+      }
+
+      .embedded-word .letter {
+        position: relative;
+        z-index: 2;
+      }
+
+      .embedded-word .inside {
+        position: absolute;
+        z-index: 1;
+        border-radius: 999px;
+        opacity: 0.86;
+      }
+
+      .inside.bubble {
+        width: 34px;
+        height: 34px;
+      }
+
+      .inside.pearl,
+      .inside.gold {
+        width: 34px;
+        height: 34px;
+      }
+
+      .embedded-word.masked {
+        color: rgba(255, 255, 255, 0.72);
+        -webkit-text-stroke: 1px rgba(255, 255, 255, 0.5);
+      }
+
+      .embedded-word.outline {
+        color: rgba(255, 255, 255, 0.28);
+        -webkit-text-stroke: 4px rgba(255, 255, 255, 0.92);
+        text-shadow: none;
+      }
+
+      .embedded-word.dark {
+        color: #12334a;
+        text-shadow: 0 3px 0 rgba(255, 255, 255, 0.56);
+      }
+
+      .embedded-word.dark .inside {
+        opacity: 0.72;
+      }
+
+      .letter-cut {
+        position: relative;
+        display: flex;
+        align-items: flex-end;
+        gap: 0;
+      }
+
+      .letter-cut span {
+        position: relative;
+        display: inline-block;
+        color: rgba(255, 255, 255, 0.92);
+        font-size: 58px;
+        line-height: 0.92;
+        font-weight: 950;
+        text-shadow: 0 3px 0 rgba(7, 89, 133, 0.18);
+      }
+
+      .letter-cut .cut-dot {
+        position: absolute;
+        z-index: 3;
+        border-radius: 999px;
+        box-shadow: 0 0 0 4px #b8e0ee;
+      }
+
+      .letter-cut .cut-dot.pearl,
+      .letter-cut .cut-dot.gold,
+      .letter-cut .cut-dot.bubble {
+        width: 25px;
+        height: 25px;
+      }
+
+      .a-fit-logo {
+        position: relative;
+        display: inline-flex;
+        align-items: baseline;
+        color: rgba(255, 255, 255, 0.94);
+        font-size: 62px;
+        line-height: 0.92;
+        font-weight: 950;
+        letter-spacing: 0;
+        text-shadow: 0 3px 0 rgba(7, 89, 133, 0.18);
+      }
+
+      .a-fit-logo .a-wrap {
+        position: relative;
+        display: inline-block;
+      }
+
+      .a-fit-logo .a-hole {
+        position: absolute;
+        z-index: 2;
+        left: 15px;
+        top: 25px;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+      }
+
+      .a-fit-logo .a-hole.small {
+        left: 17px;
+        top: 28px;
+        width: 19px;
+        height: 19px;
+      }
+
+      .a-fit-logo .a-hole.large {
+        left: 12px;
+        top: 22px;
+        width: 30px;
+        height: 30px;
+      }
+
+      .a-fit-logo .a-hole.low {
+        top: 31px;
+      }
+
+      .a-fit-logo .a-hole.high {
+        top: 19px;
+      }
+
+      .a-fit-logo.rounder {
+        font-family: ui-rounded, "Arial Rounded MT Bold", "Hiragino Maru Gothic ProN", system-ui, sans-serif;
+      }
+
+      .a-fit-logo.dark {
+        color: #12334a;
+        text-shadow: 0 3px 0 rgba(255, 255, 255, 0.54);
+      }
+
+      .a-fit-logo.outline {
+        color: rgba(255, 255, 255, 0.3);
+        -webkit-text-stroke: 4px rgba(255, 255, 255, 0.94);
+        text-shadow: none;
+      }
+
+      .a-fit-logo.tight {
+        letter-spacing: -2px;
+      }
+
+      .a-fit-logo .a-hole::after {
+        content: "";
+        position: absolute;
+        inset: -5px;
+        border-radius: 999px;
+        border: 3px solid rgba(184, 224, 238, 0.78);
+      }
+
+      .hidden-variant .embedded-word {
+        --word-size: 58px;
+        --word-alpha: 0.94;
+        --hidden-alpha: 0.86;
+        font-size: var(--word-size);
+        color: rgba(255, 255, 255, var(--word-alpha));
+      }
+
+      .hidden-variant .inside {
+        opacity: var(--hidden-alpha);
+      }
+
+      .hidden-variant.big-word .embedded-word {
+        --word-size: 66px;
+      }
+
+      .hidden-variant.small-word .embedded-word {
+        --word-size: 50px;
+      }
+
+      .hidden-variant.faint .embedded-word {
+        --word-alpha: 0.82;
+        --hidden-alpha: 0.64;
+      }
+
+      .hidden-variant.strong .embedded-word {
+        --word-alpha: 1;
+        --hidden-alpha: 1;
+      }
+
+      .hidden-variant.dark-word .embedded-word {
+        color: #12334a;
+        text-shadow: 0 3px 0 rgba(255, 255, 255, 0.58);
+      }
+
+      .hidden-variant.blue-word .embedded-word {
+        color: #075985;
+        text-shadow: 0 3px 0 rgba(255, 255, 255, 0.54);
+      }
+
+      .hidden-variant.low .embedded-word {
+        transform: translateY(8px);
+      }
+
+      .hidden-variant.high .embedded-word {
+        transform: translateY(-8px);
+      }
+
+      .hidden-variant .inside.behind {
+        z-index: 0;
+      }
+
+      .hidden-variant .inside.front {
+        z-index: 3;
+      }
+
+      .hidden-variant .letter {
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>MARU logo options</h1>
+      <p class="lead">「MARU」を中心に、まる・泡・数の手触りを残したロゴ案です。アプリ内ヘッダー、起動画面、アイコン化を想定して方向性を分けています。</p>
+
+      <section class="grid">
+        <article class="option">
+          <div class="stage">
+            <div class="logo">
+              <div class="pearl"></div>
+              <div class="word">MARU</div>
+            </div>
+          </div>
+          <p class="caption">01. Pearl M</p>
+          <p class="note">今のまる表現を残しつつ、いちばん素直にブランド化する案。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo">
+              <div class="word">M</div>
+              <div class="pearl"></div>
+              <div class="word">RU</div>
+            </div>
+          </div>
+          <p class="caption">02. A as Maru</p>
+          <p class="note">Aをまるに置き換える。読める範囲で非言語要素が強い。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo minimal">
+              <div class="word">MARU</div>
+              <div class="bubble"></div>
+            </div>
+          </div>
+          <p class="caption">03. MARU dot</p>
+          <p class="note">小さなアプリヘッダー向き。ロゴとして一番扱いやすい。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo">
+              <div class="mark">
+                <div class="pearl a"></div>
+                <div class="gold b"></div>
+                <div class="pearl c"></div>
+              </div>
+              <div class="word">MARU</div>
+            </div>
+          </div>
+          <p class="caption">04. Three Maru Mark</p>
+          <p class="note">計算でまるが増減する雰囲気。アプリアイコン展開しやすい。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo badge">
+              <div class="word small">MARU</div>
+            </div>
+          </div>
+          <p class="caption">05. Bubble Badge</p>
+          <p class="note">泡のボタン感をロゴにした案。タイトル画面に置きやすい。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo">
+              <div class="orbital"></div>
+              <div class="word shadow-word">MARU</div>
+            </div>
+          </div>
+          <p class="caption">06. Orbit</p>
+          <p class="note">まるが動く、まとまる、めぐる感じを出す案。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo vertical">
+              <div class="stack">
+                <div class="pearl"></div>
+                <div class="gold"></div>
+                <div class="pearl"></div>
+              </div>
+              <div class="word">MARU</div>
+            </div>
+          </div>
+          <p class="caption">07. Stacked Maru</p>
+          <p class="note">上にまる、下に名前。起動画面向き。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo">
+              <div class="letter-bubbles">
+                <span>M</span>
+                <span>A</span>
+                <span>R</span>
+                <span>U</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">08. Letter Bubbles</p>
+          <p class="note">各文字を泡に入れる。子ども向け感が強い。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="word white">MARU</div>
+              <div class="tiny-bubble" style="right: 18px; top: 18px"></div>
+              <div class="tiny-bubble" style="left: 30px; bottom: 14px"></div>
+            </div>
+          </div>
+          <p class="caption">09. Deep Water</p>
+          <p class="note">水中世界を前面に出す案。白文字で軽く見せる。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo">
+              <div class="ring"></div>
+              <div class="word">MARU</div>
+            </div>
+          </div>
+          <p class="caption">10. Open Circle</p>
+          <p class="note">C字のまるで動きと余白を作る。少し大人っぽい。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo">
+              <div class="word outline-word">MARU</div>
+            </div>
+          </div>
+          <p class="caption">11. Thick Outline</p>
+          <p class="note">ゲームロゴ感。背景が濃くなっても読みやすい。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo">
+              <div class="word soft">MA</div>
+              <div class="gold"></div>
+              <div class="word soft">U</div>
+            </div>
+          </div>
+          <p class="caption">12. R as Gold Maru</p>
+          <p class="note">文字の途中に黄色いまるを挟む。今の数の粒と相性が良い。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo vertical">
+              <div class="word small">MARU</div>
+              <div class="sub">○ + ○ = ○○</div>
+            </div>
+          </div>
+          <p class="caption">13. With Equation</p>
+          <p class="note">ストア画像や説明画面向き。アプリ内ロゴには少し説明的。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo">
+              <div class="wave"></div>
+              <div class="word">MARU</div>
+            </div>
+          </div>
+          <p class="caption">14. Wave Underline</p>
+          <p class="note">海の世界観を薄く添える。文字の強さを保てる。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo">
+              <div class="word">M</div>
+              <div class="stack">
+                <div class="pearl"></div>
+                <div class="pearl"></div>
+              </div>
+              <div class="word">RU</div>
+            </div>
+          </div>
+          <p class="caption">15. Double A</p>
+          <p class="note">まるまる感を残す。MARUでも元の名前との接続がある。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo">
+              <div class="word small">maru</div>
+            </div>
+          </div>
+          <p class="caption">16. lowercase</p>
+          <p class="note">やわらかい。学習アプリより玩具・体験アプリの印象。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo">
+              <div class="word small">MARU</div>
+              <div class="sub">○ ○ ○</div>
+            </div>
+          </div>
+          <p class="caption">17. Three Dots</p>
+          <p class="note">記号を下に添える案。ロゴタイプは崩さない。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo badge">
+              <div class="mark" style="width: 72px">
+                <div class="pearl a"></div>
+                <div class="gold b"></div>
+                <div class="pearl c"></div>
+              </div>
+            </div>
+          </div>
+          <p class="caption">18. Symbol Only</p>
+          <p class="note">アプリアイコン候補。タイトル文字とは別に使える。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage">
+            <div class="logo">
+              <div class="word small">M</div>
+              <div class="pearl"></div>
+              <div class="gold"></div>
+              <div class="word small">U</div>
+            </div>
+          </div>
+          <p class="caption">19. Two Maru Center</p>
+          <p class="note">中心にまるを置き、MARUの名前とまるまる感を両立。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical">
+              <div class="stack">
+                <div class="bubble"></div>
+                <div class="pearl"></div>
+                <div class="gold"></div>
+              </div>
+              <div class="word white small">MARU</div>
+            </div>
+          </div>
+          <p class="caption">20. Ocean Toy</p>
+          <p class="note">世界観が最も強い案。起動画面やストア画像向き。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical">
+              <div class="stack">
+                <div class="bubble"></div>
+                <div class="pearl"></div>
+                <div class="gold"></div>
+              </div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">21. Ocean Toy lowercase</p>
+          <p class="note">20の小文字版。よりやわらかく、子ども向けの玩具感が強い。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower small-dots">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">22. Small dots</p>
+          <p class="note">文字を主役にして、まるは軽く添える。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower big-dots">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">23. Big dots</p>
+          <p class="note">まるの存在感を強くした案。アイコン寄り。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower tight">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">24. Overlap dots</p>
+          <p class="note">3つのまるを少し重ねて、まとまり感を強める。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower wide">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">25. Wide dots</p>
+          <p class="note">まるを独立して見せる。落ち着いた印象。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower high-dots">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">26. Higher dots</p>
+          <p class="note">まるを上に置いて、ロゴ全体をすっきり見せる。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower low-dots">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">27. Lower dots</p>
+          <p class="note">まると文字を近づけて、一体感を出す。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower arc">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">28. Arc dots</p>
+          <p class="note">中央のまるを少し上げて、泡が浮く感じにする。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower slope">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">29. Rising dots</p>
+          <p class="note">右上がりにして、動きと成長感を出す。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower center-large">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">30. Center focus</p>
+          <p class="note">中央のまるを主役にする。ロゴマーク感が強い。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower side-large">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">31. Side focus</p>
+          <p class="note">左右のまるを強くして、横幅の安定感を作る。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower offset-left">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">32. Dots left</p>
+          <p class="note">まるを少し左に寄せて、手作り感を出す。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower offset-right">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">33. Dots right</p>
+          <p class="note">右寄せにして、少し動きのあるバランスにする。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower bubble-behind tight">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">34. Dots tucked</p>
+          <p class="note">まるを文字に少し潜らせて、一体型ロゴにする。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower word-up">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">35. Word up</p>
+          <p class="note">文字をまるに近づけて、縦の余白を詰める。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo vertical ocean-lower word-down">
+              <div class="stack"><div class="bubble"></div><div class="pearl"></div><div class="gold"></div></div>
+              <div class="word white small">maru</div>
+            </div>
+          </div>
+          <p class="caption">36. Word down</p>
+          <p class="note">文字を少し下げて、上のまるを独立させる。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl" style="left: 42px; top: 7px"></span>
+                <span class="inside bubble" style="left: 92px; top: 24px"></span>
+                <span class="inside gold" style="left: 139px; top: 4px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">37. Hidden maru</p>
+          <p class="note">文字の背面にまるが潜っている案。読みやすさを保ちやすい。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word masked">
+                <span class="inside bubble" style="left: 15px; top: 18px"></span>
+                <span class="inside pearl" style="left: 80px; top: 5px"></span>
+                <span class="inside gold" style="left: 122px; top: 25px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">38. Soft embedded</p>
+          <p class="note">文字を少し透かして、内部の泡を見せる案。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word outline">
+                <span class="inside pearl" style="left: 49px; top: 8px"></span>
+                <span class="inside gold" style="left: 110px; top: 12px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">39. Outline window</p>
+          <p class="note">白い文字の輪郭を窓にして、まるが中に見える案。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="letter-cut">
+                <span>m</span>
+                <span>a</span>
+                <span>r</span>
+                <span>u</span>
+                <span class="cut-dot pearl" style="left: 47px; top: 19px"></span>
+                <span class="cut-dot bubble" style="left: 99px; top: 6px"></span>
+                <span class="cut-dot gold" style="left: 132px; top: 30px"></span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">40. Letter cutouts</p>
+          <p class="note">文字の一部がまるで欠けているように見せる案。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word dark">
+                <span class="inside bubble" style="left: 26px; top: 10px"></span>
+                <span class="inside pearl" style="left: 73px; top: 25px"></span>
+                <span class="inside gold" style="left: 137px; top: 9px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">41. Dark letters hidden</p>
+          <p class="note">濃い文字の中に淡い泡を入れる。小さくしても読ませやすい。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl" style="left: 55px; top: 14px; width: 45px; height: 45px"></span>
+                <span class="inside gold" style="left: 107px; top: 2px; width: 29px; height: 29px"></span>
+                <span class="inside bubble" style="left: 145px; top: 28px; width: 23px; height: 23px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">42. Big hidden center</p>
+          <p class="note">大きなまるを文字の中心に隠す。ロゴマーク感が強い。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="a-fit-logo">
+                <span>m</span><span class="a-wrap">a<span class="a-hole pearl"></span></span><span>ru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">43. A hole pearl</p>
+          <p class="note">小文字aの中の丸い穴に、まるが嵌っている案。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="a-fit-logo">
+                <span>m</span><span class="a-wrap">a<span class="a-hole gold"></span></span><span>ru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">44. A hole gold</p>
+          <p class="note">aの穴に黄色いまるを入れて、数の粒らしさを強める。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="a-fit-logo">
+                <span>m</span><span class="a-wrap">a<span class="a-hole bubble small"></span></span><span>ru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">45. A hole small bubble</p>
+          <p class="note">穴の中に小さめの泡。文字の読みやすさを優先。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="a-fit-logo">
+                <span>m</span><span class="a-wrap">a<span class="a-hole pearl large"></span></span><span>ru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">46. A hole full</p>
+          <p class="note">aの穴をまるでしっかり満たす。ロゴとして印象が強い。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="a-fit-logo dark">
+                <span>m</span><span class="a-wrap">a<span class="a-hole pearl"></span></span><span>ru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">47. Dark a hole</p>
+          <p class="note">濃い文字で読みやすくし、aの中だけにまるを嵌める。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="a-fit-logo outline">
+                <span>m</span><span class="a-wrap">a<span class="a-hole gold"></span></span><span>ru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">48. Outline a hole</p>
+          <p class="note">白い輪郭文字の穴にまるを入れる。アイコン的な案。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="a-fit-logo tight">
+                <span>m</span><span class="a-wrap">a<span class="a-hole pearl high"></span></span><span>ru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">49. A hole high</p>
+          <p class="note">まるを少し上に嵌める。aの顔のようなかわいさが出る。</p>
+        </article>
+
+        <article class="option">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="a-fit-logo tight">
+                <span>m</span><span class="a-wrap">a<span class="a-hole gold low"></span></span><span>ru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">50. A hole low</p>
+          <p class="note">まるを少し下に嵌めて、安定感を出す。</p>
+        </article>
+
+        <article class="option hidden-variant">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl" style="left: 49px; top: 2px; width: 42px; height: 42px"></span>
+                <span class="inside bubble" style="left: 116px; top: 24px; width: 38px; height: 38px"></span>
+                <span class="inside gold" style="left: 173px; top: 5px; width: 45px; height: 45px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">51. Hidden balanced</p>
+          <p class="note">37を少し整えた案。まるが文字の隙間に自然に潜る。</p>
+        </article>
+
+        <article class="option hidden-variant big-word">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl" style="left: 54px; top: 8px; width: 48px; height: 48px"></span>
+                <span class="inside bubble" style="left: 128px; top: 30px; width: 40px; height: 40px"></span>
+                <span class="inside gold" style="left: 192px; top: 9px; width: 48px; height: 48px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">52. Big word hidden</p>
+          <p class="note">文字を大きくして、まるがより奥に隠れている感じにする。</p>
+        </article>
+
+        <article class="option hidden-variant small-word">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl" style="left: 38px; top: 1px; width: 40px; height: 40px"></span>
+                <span class="inside bubble" style="left: 87px; top: 22px; width: 35px; height: 35px"></span>
+                <span class="inside gold" style="left: 145px; top: 2px; width: 43px; height: 43px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">53. Compact hidden</p>
+          <p class="note">小さめのロゴでも成立する密度を確認する案。</p>
+        </article>
+
+        <article class="option hidden-variant faint">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl" style="left: 44px; top: 8px; width: 42px; height: 42px"></span>
+                <span class="inside bubble" style="left: 105px; top: 19px; width: 36px; height: 36px"></span>
+                <span class="inside gold" style="left: 160px; top: 11px; width: 42px; height: 42px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">54. Faint hidden</p>
+          <p class="note">まるを控えめにして、文字の読みやすさを優先。</p>
+        </article>
+
+        <article class="option hidden-variant strong">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl front" style="left: 48px; top: 5px; width: 44px; height: 44px"></span>
+                <span class="inside bubble" style="left: 112px; top: 27px; width: 38px; height: 38px"></span>
+                <span class="inside gold front" style="left: 168px; top: 7px; width: 46px; height: 46px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">55. Strong peeking</p>
+          <p class="note">一部のまるを前に出して、覗いている感じを強める。</p>
+        </article>
+
+        <article class="option hidden-variant dark-word">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl" style="left: 44px; top: 5px; width: 42px; height: 42px"></span>
+                <span class="inside bubble" style="left: 104px; top: 24px; width: 36px; height: 36px"></span>
+                <span class="inside gold" style="left: 159px; top: 6px; width: 44px; height: 44px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">56. Dark readable</p>
+          <p class="note">濃い文字で読みやすくして、背面のまるを控えめに見せる。</p>
+        </article>
+
+        <article class="option hidden-variant blue-word">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside bubble" style="left: 28px; top: 4px; width: 36px; height: 36px"></span>
+                <span class="inside pearl" style="left: 80px; top: 25px; width: 42px; height: 42px"></span>
+                <span class="inside gold" style="left: 145px; top: 4px; width: 42px; height: 42px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">57. Blue readable</p>
+          <p class="note">アプリ内の青文字に寄せる案。ヘッダーにも転用しやすい。</p>
+        </article>
+
+        <article class="option hidden-variant">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl" style="left: 59px; top: -2px; width: 48px; height: 48px"></span>
+                <span class="inside gold" style="left: 118px; top: 23px; width: 36px; height: 36px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">58. Two hidden</p>
+          <p class="note">まるの数を減らして、記憶に残る形に寄せる。</p>
+        </article>
+
+        <article class="option hidden-variant">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl" style="left: 40px; top: 2px; width: 36px; height: 36px"></span>
+                <span class="inside bubble" style="left: 80px; top: 24px; width: 28px; height: 28px"></span>
+                <span class="inside pearl" style="left: 115px; top: 8px; width: 32px; height: 32px"></span>
+                <span class="inside gold" style="left: 158px; top: 3px; width: 40px; height: 40px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">59. Many hidden</p>
+          <p class="note">泡が文字の中を漂う感じ。世界観は強いが少し賑やか。</p>
+        </article>
+
+        <article class="option hidden-variant high">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl" style="left: 50px; top: 0; width: 40px; height: 40px"></span>
+                <span class="inside bubble" style="left: 110px; top: 18px; width: 34px; height: 34px"></span>
+                <span class="inside gold" style="left: 166px; top: 0; width: 42px; height: 42px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">60. Floating hidden</p>
+          <p class="note">全体を少し上げて、泡が浮いている印象にする。</p>
+        </article>
+
+        <article class="option hidden-variant low">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl" style="left: 45px; top: 13px; width: 42px; height: 42px"></span>
+                <span class="inside bubble" style="left: 111px; top: 31px; width: 34px; height: 34px"></span>
+                <span class="inside gold" style="left: 166px; top: 12px; width: 44px; height: 44px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">61. Settled hidden</p>
+          <p class="note">少し下げて、安定したロゴマークにする。</p>
+        </article>
+
+        <article class="option hidden-variant">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl behind" style="left: 24px; top: 11px; width: 62px; height: 62px"></span>
+                <span class="inside gold" style="left: 151px; top: 8px; width: 44px; height: 44px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">62. Big behind m</p>
+          <p class="note">大きなまるをmの背面に沈める。象徴性が強い。</p>
+        </article>
+
+        <article class="option hidden-variant">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl" style="left: 45px; top: 8px; width: 40px; height: 40px"></span>
+                <span class="inside bubble behind" style="left: 88px; top: 18px; width: 76px; height: 76px"></span>
+                <span class="inside gold" style="left: 166px; top: 6px; width: 40px; height: 40px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">63. Big behind ar</p>
+          <p class="note">中央に大きい泡を隠す。水中感が強い。</p>
+        </article>
+
+        <article class="option hidden-variant">
+          <div class="stage deep">
+            <div class="logo">
+              <div class="embedded-word">
+                <span class="inside pearl" style="left: 47px; top: 8px; width: 38px; height: 38px"></span>
+                <span class="inside gold" style="left: 116px; top: 25px; width: 34px; height: 34px"></span>
+                <span class="inside bubble" style="left: 174px; top: 13px; width: 30px; height: 30px"></span>
+                <span class="letter">maru</span>
+              </div>
+            </div>
+          </div>
+          <p class="caption">64. Small trail</p>
+          <p class="note">右へ小さくなっていく配置。泡の流れを感じる。</p>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

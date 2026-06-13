@@ -1353,13 +1353,15 @@ export function MarumaruGame({
               style={({ pressed }) => [
                 styles.headerRetryButton,
                 isClear && styles.headerNextButton,
+                mode === 'launch' && isClear && styles.headerLaunchNextButton,
                 isFailed && styles.headerRetryButtonFailed,
-                isClear && { transform: [{ scale: clearActionPulse }] },
                 isFailed && { transform: [{ scale: failedActionPulse }], shadowOpacity: 0.18 + failedProgress * 0.46, shadowRadius: 8 + failedProgress * 16 },
                 pressed && styles.pressedButton,
               ]}
             >
-              <NavImageIcon kind={isClear ? 'next' : 'retry'} size={isClear ? 31 : 29} />
+              <View pointerEvents="none" style={isClear ? { transform: [{ scale: clearActionPulse }] } : undefined}>
+                <NavImageIcon kind={isClear ? 'next' : 'retry'} size={isClear ? 31 : 29} />
+              </View>
             </Pressable>
           ) : null}
           {mode === 'launch' ? (
@@ -1461,24 +1463,23 @@ export function MarumaruGame({
 
 function LaunchLogo({ variant = 'header' }: { variant?: 'header' | 'tada' }) {
   return (
-    <View accessibilityLabel="●● calc. logo" style={[styles.launchLogo, variant === 'tada' && styles.launchLogoTada]}>
-      <View style={styles.launchLogoMark}>
-        <LogoDot />
-        <LogoDot raised />
-      </View>
-      <Text style={styles.launchLogoWord}>calc.</Text>
+    <View accessibilityLabel="maru logo" style={[styles.launchLogo, variant === 'tada' && styles.launchLogoTada]}>
+      <LogoGameBead value={10} x={103} y={27} />
+      <LogoGameBubble style={styles.launchLogoBubbleU} />
+      <LogoGameBead value={1} x={201} y={34} />
+      <Text style={styles.launchLogoWord}>maru</Text>
     </View>
   );
 }
 
-function LogoDot({ raised = false }: { raised?: boolean }) {
+function LogoGameBead({ value, x, y }: { value: PlaceValue; x: number; y: number }) {
+  return <BeadView value={value} count={1} sign={1} x={x} y={y} />;
+}
+
+function LogoGameBubble({ style }: { style: object }) {
   return (
-    <View style={[styles.launchLogoDot, raised && styles.launchLogoDotSecond]}>
-      <View style={styles.launchLogoBubbleMembrane} />
-      <View style={styles.launchLogoDotRing} />
-      <View style={styles.launchLogoDotShine} />
-      <View style={styles.launchLogoDotTinyBubble} />
-      <View style={styles.launchLogoDotLowerBubble} />
+    <View pointerEvents="none" style={[styles.backgroundBubble, styles.launchLogoGameBubble, style]}>
+      <View style={styles.backgroundBubbleShine} />
     </View>
   );
 }
@@ -1486,16 +1487,16 @@ function LogoDot({ raised = false }: { raised?: boolean }) {
 function StageGoalTitle({ stageNumber, target, maxWidth }: { stageNumber: number; target: number; maxWidth: number }) {
   return (
     <View testID="stage-goal-title" style={[styles.stageGameTitle, { maxWidth }]}>
+      <HeaderGoalParts target={target} maxWidth={Math.max(54, maxWidth - 118)} />
       <View style={styles.stageGameTextSlot}>
-        <Text style={styles.stageGameNumber}>#{stageNumber}</Text>
+        <Text testID="stage-goal-equals" style={styles.stageGameEquals}>=</Text>
       </View>
       <View style={styles.stageGameTextSlot}>
         <Text testID="stage-goal-target" style={styles.stageGameTarget}>{target}</Text>
       </View>
       <View style={styles.stageGameTextSlot}>
-        <Text style={styles.stageGameEquals}>=</Text>
+        <Text testID="stage-goal-number" style={styles.stageGameNumber}>#{stageNumber}</Text>
       </View>
-      <HeaderGoalParts target={target} maxWidth={Math.max(54, maxWidth - 118)} />
     </View>
   );
 }
@@ -2672,7 +2673,7 @@ function isBurstableWrappedGroup(bead: Pick<BeadSnapshot, 'value' | 'count' | 'r
 function findAutoBurstFieldBubble(entities: BeadEntity[], fieldWidth: number, fieldHeight: number) {
   return entities
     .filter((entity) => {
-      if (!isBurstableWrappedGroup(entity)) {
+      if (!isBurstableWrappedGroup(entity) || entity.role === 'multiplicand') {
         return false;
       }
 
@@ -2773,7 +2774,10 @@ function findDecompositionPair(beads: BeadSnapshot[]) {
 
 function findProductBubbleCollision(entities: BeadEntity[], now: number) {
   const productGroups = entities.filter(
-    (entity) => isBurstableWrappedGroup(entity) && (entity.role !== 'product' || now - entity.createdAt >= PRODUCT_BUBBLE_BURST_DELAY_MS),
+    (entity) =>
+      isBurstableWrappedGroup(entity) &&
+      entity.role !== 'multiplicand' &&
+      (entity.role !== 'product' || now - entity.createdAt >= PRODUCT_BUBBLE_BURST_DELAY_MS),
   );
 
   for (const productGroup of productGroups) {
@@ -3677,6 +3681,9 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 0 },
   },
+  headerLaunchNextButton: {
+    top: 19,
+  },
   headerRetryButtonFailed: {
     backgroundColor: 'rgba(255, 255, 255, 0.82)',
     shadowColor: '#BAE6FD',
@@ -3748,7 +3755,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 5,
     paddingBottom: 0,
-    transform: [{ translateY: 2 }],
+    transform: [{ translateY: -2 }],
   },
   headerGoalBead: {
     position: 'relative',
@@ -3821,98 +3828,38 @@ const styles = StyleSheet.create({
     fontFamily: PLAYFUL_FONT_FAMILY,
   },
   launchLogo: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    width: 220,
+    height: 76,
+    position: 'relative',
   },
   launchLogoTada: {
     transform: [{ scale: 1.03 }],
   },
-  launchLogoMark: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    transform: [{ translateY: 1 }],
-  },
-  launchLogoDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: 'rgba(14, 165, 233, 0.36)',
-    backgroundColor: 'rgba(253, 230, 138, 0.72)',
-    shadowColor: '#38BDF8',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  launchLogoDotSecond: {
-    transform: [{ translateY: 4 }, { rotate: '8deg' }],
-  },
-  launchLogoBubbleMembrane: {
-    position: 'absolute',
-    left: -4,
-    right: -4,
-    top: -4,
-    bottom: -4,
-    borderRadius: 999,
-    borderWidth: 2,
-    borderColor: 'rgba(125, 211, 252, 0.34)',
-    backgroundColor: 'rgba(224, 247, 255, 0.18)',
-  },
-  launchLogoDotRing: {
-    position: 'absolute',
-    left: 4,
-    right: 4,
-    top: 4,
-    bottom: 4,
-    borderRadius: 999,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  launchLogoDotShine: {
-    position: 'absolute',
-    left: 6,
-    top: 5,
-    width: 10,
-    height: 7,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    transform: [{ rotate: '-18deg' }],
-  },
-  launchLogoDotTinyBubble: {
-    position: 'absolute',
-    right: 4,
-    top: 6,
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.66)',
-    backgroundColor: 'rgba(224, 247, 255, 0.24)',
-  },
-  launchLogoDotLowerBubble: {
-    position: 'absolute',
-    right: 6,
-    bottom: 5,
-    width: 7,
-    height: 5,
-    borderRadius: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
-  },
   launchLogoWord: {
-    color: '#12334A',
-    fontSize: 36,
-    lineHeight: 40,
+    color: '#FFFFFF',
+    fontSize: 48,
+    lineHeight: 54,
     fontWeight: '900',
-    letterSpacing: -1.3,
-    textShadowColor: 'rgba(255, 255, 255, 0.72)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 0,
+    letterSpacing: 0,
     fontFamily: PLAYFUL_FONT_FAMILY,
+    textAlign: 'center',
+    zIndex: 2,
+    textShadowColor: 'rgba(56, 141, 182, 0.34)',
+    textShadowOffset: { width: 0, height: 5 },
+    textShadowRadius: 0,
+  },
+  launchLogoBubbleU: {
+    position: 'absolute',
+    left: 145,
+    top: 26,
+  },
+  launchLogoGameBubble: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    zIndex: 1,
   },
   hiddenMetric: {
     position: 'absolute',
