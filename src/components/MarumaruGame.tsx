@@ -2,6 +2,7 @@ import * as Matter from 'matter-js';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 
 import { SFX } from '@/audio/sfx';
 import { useOneShotAudio } from '@/audio/use-one-shot-audio';
@@ -137,7 +138,7 @@ const PREVIEW_Y = 38;
 const ATTRACTION_RADIUS = 220;
 const ATTRACTION_FORCE = 0.000095;
 const ANNIHILATION_ATTRACTION_RADIUS = 360;
-const ANNIHILATION_ATTRACTION_FORCE = 0.00042;
+const ANNIHILATION_ATTRACTION_FORCE = 0.00032;
 const SEPARATION_RADIUS = 92;
 const SEPARATION_FORCE = 0.000075;
 const BASIN_BODY_THICKNESS = 18;
@@ -156,7 +157,7 @@ const LAUNCH_INITIAL_TOTAL = 8;
 const LAUNCH_BUBBLE_COUNT = 5;
 const LAUNCH_TARGET = 13;
 const BUBBLE_BURST_ANIMATION_MS = 120;
-const ANNIHILATION_ANIMATION_MS = 180;
+const ANNIHILATION_ANIMATION_MS = 420;
 const DIVISION_SPLIT_ANIMATION_MS = 760;
 const DIVISION_FAILED_ANIMATION_MS = 980;
 const PRODUCT_BUBBLE_BURST_DELAY_MS = 950;
@@ -164,9 +165,15 @@ const BACKGROUND_BUBBLE_TICK_MS = 90;
 const FAILED_VEIL_FADE_IN_MS = 3200;
 const FIELD_BUBBLE_AUTO_BURST_IDLE_MS = 650;
 const FIELD_BUBBLE_AUTO_BURST_STEP_MS = 360;
+const BASIN_POINT_COUNT = 45;
+const BUBBLE_BURST_DROP_COUNT = 6;
+const BUBBLE_BURST_SHARD_COUNT = 3;
+const MERGE_POP_PARTICLE_COUNT = 4;
 const OPERATORS: OperatorButtonSymbol[] = ['+', '-', '×', '÷'];
 const PLAYFUL_FONT_FAMILY = 'KiwiMaru';
 const LATIN_FONT_FAMILY = 'Helvetica';
+const TEXT_BASE_COLOR = '#12334A';
+const TEXT_ACCENT_COLOR = '#0284C7';
 const GRID = 8;
 const RADIUS_SM = 8;
 const RADIUS_MD = 12;
@@ -1056,7 +1063,7 @@ export function MarumaruGame({
 
         const dx = annihilationAnimation.center.x - entity.body.position.x;
         const dy = annihilationAnimation.center.y - entity.body.position.y;
-        const pull = 0.58 + progress * 1.15;
+        const pull = 0.18 + progress * 0.42;
         Matter.Body.setVelocity(entity.body, {
           x: dx * pull,
           y: dy * pull,
@@ -1500,10 +1507,10 @@ export function MarumaruGame({
 function LaunchLogo({ variant = 'header' }: { variant?: 'header' | 'tada' }) {
   return (
     <View accessibilityLabel="maru logo" style={[styles.launchLogo, variant === 'tada' && styles.launchLogoTada]}>
-      <LogoGameBead value={10} x={103} y={27} />
+      <LogoGameBead value={10} x={70} y={24} />
       <LogoGameBubble style={styles.launchLogoBubbleU} />
-      <LogoGameBead value={1} x={201} y={34} />
-      <Text style={styles.launchLogoWord}>maru</Text>
+      <LogoGameBead value={1} x={302} y={32} />
+      <Text style={styles.launchLogoWord}>maru maru calc</Text>
     </View>
   );
 }
@@ -1523,15 +1530,15 @@ function LogoGameBubble({ style }: { style: object }) {
 function StageGoalTitle({ stageNumber, target, maxWidth }: { stageNumber: number; target: number; maxWidth: number }) {
   return (
     <View testID="stage-goal-title" style={[styles.stageGameTitle, { maxWidth }]}>
+      <View style={styles.stageGameNumberSlot}>
+        <Text testID="stage-goal-number" style={styles.stageGameNumber}>#{stageNumber}</Text>
+      </View>
       <HeaderGoalParts target={target} maxWidth={Math.max(54, maxWidth - 118)} />
-      <View style={styles.stageGameTextSlot}>
+      <View style={styles.stageGameEqualsSlot}>
         <Text testID="stage-goal-equals" style={styles.stageGameEquals}>=</Text>
       </View>
-      <View style={styles.stageGameTextSlot}>
+      <View style={styles.stageGameTargetSlot}>
         <Text testID="stage-goal-target" style={styles.stageGameTarget}>{target}</Text>
-      </View>
-      <View style={styles.stageGameTextSlot}>
-        <Text testID="stage-goal-number" style={styles.stageGameNumber}>#{stageNumber}</Text>
       </View>
     </View>
   );
@@ -1572,6 +1579,7 @@ function MiniGoalBead({ part, size }: { part: GoalPart; size: number }) {
 
   return (
     <View
+      testID="stage-goal-bead"
       style={[
         styles.headerGoalBead,
         isGroup && styles.headerGoalGroupBead,
@@ -1686,18 +1694,6 @@ function BeadView({
                 },
               ]}
             >
-              <View style={styles.containedBeadInnerGlass} />
-              <View
-                style={[
-                  styles.containedBeadShine,
-                  {
-                    width: Math.max(8, bead.radius * 0.42),
-                    height: Math.max(8, bead.radius * 0.42),
-                    borderRadius: bead.radius,
-                    backgroundColor: beadPalette.shineColor,
-                  },
-                ]}
-              />
             </View>
             );
           })}
@@ -1725,7 +1721,7 @@ function BeadView({
 
 function MergePulse({ animation }: { animation: MergeAnimation }) {
   const nextKind = getBeadKind(animation.nextValue);
-  const particles = Array.from({ length: 10 }, (_, index) => {
+  const particles = Array.from({ length: MERGE_POP_PARTICLE_COUNT }, (_, index) => {
     const angle = -Math.PI / 2 + (Math.PI * 2 * index) / 10;
     const distance = nextKind.radius + 22 + (index % 2) * 8;
     const size = index % 3 === 0 ? 9 : 6;
@@ -1819,8 +1815,8 @@ function BubbleBurst({ animation }: { animation: BubbleBurstAnimation }) {
   const ringRadius = animation.radius + 3 + progress * 8;
   const innerRingRadius = animation.radius * 0.58 + progress * 4;
   const isNegative = animation.sign < 0;
-  const drops = Array.from({ length: 12 }, (_, index) => {
-    const angle = -Math.PI / 2 + (Math.PI * 2 * index) / 12;
+  const drops = Array.from({ length: BUBBLE_BURST_DROP_COUNT }, (_, index) => {
+    const angle = -Math.PI / 2 + (Math.PI * 2 * index) / BUBBLE_BURST_DROP_COUNT;
     const distance = animation.radius + 7 + progress * (10 + (index % 3) * 3);
     const size = 4 + (index % 3);
     return {
@@ -1831,8 +1827,8 @@ function BubbleBurst({ animation }: { animation: BubbleBurstAnimation }) {
       opacity: fade * (index % 2 === 0 ? 0.58 : 0.34),
     };
   });
-  const shards = Array.from({ length: 7 }, (_, index) => {
-    const angle = -Math.PI / 2 + (Math.PI * 2 * (index + 0.35)) / 7;
+  const shards = Array.from({ length: BUBBLE_BURST_SHARD_COUNT }, (_, index) => {
+    const angle = -Math.PI / 2 + (Math.PI * 2 * (index + 0.35)) / BUBBLE_BURST_SHARD_COUNT;
     const distance = animation.radius * 0.72 + progress * 10;
     return {
       id: `shard-${index}`,
@@ -2193,37 +2189,6 @@ function getOperatorHelpMessage(operator: OperatorButtonSymbol, sign: BeadSign) 
   return sign < 0 ? 'まとまりを マイナスで わるよ' : 'まとまりを わるよ';
 }
 
-function GoalCup({ target, total }: { target: number; total: number }) {
-  const progress = target > 0 ? clamp(total / target, 0, 1) : 0;
-  const fillHeight = Math.round(progress * 44);
-  const remaining = target - total;
-  const statusText = remaining === 0 ? 'ぴったり' : remaining > 0 ? `あと ${remaining}` : `${Math.abs(remaining)} おおい`;
-
-  return (
-    <View style={styles.goalCupBox}>
-      <Text style={styles.goalCupLabel}>めあて {target}</Text>
-      <View style={styles.goalCup}>
-        <View style={[styles.goalCupFill, { height: fillHeight }]} />
-        <View style={styles.goalCupRim} />
-        <Text style={styles.goalCupValue}>{total}</Text>
-      </View>
-      <Text style={styles.goalCupStatus} numberOfLines={1} adjustsFontSizeToFit>
-        {statusText}
-      </Text>
-    </View>
-  );
-}
-
-function StatusMessage({ message }: { message: string }) {
-  return (
-    <View style={styles.statusMessageBox}>
-      <Text style={[styles.statusMessageText, !message && styles.statusMessagePlaceholder]} numberOfLines={1} adjustsFontSizeToFit>
-        {message || ' '}
-      </Text>
-    </View>
-  );
-}
-
 function ExpressionDisplay({ tokens }: { tokens: string[] }) {
   return (
     <View style={styles.expressionBox} testID="expression-display">
@@ -2285,9 +2250,7 @@ function BackgroundBubbleLayer({
                 opacity: opacity * 0.78,
               },
             ]}
-          >
-            <View style={styles.backgroundBubbleShine} />
-          </Pressable>
+          />
         );
       })}
     </View>
@@ -2298,11 +2261,9 @@ function ClearBubbleFireworks({ fieldWidth, fieldHeight, tick }: { fieldWidth: n
   const cycle = 2600;
   const baseTime = tick % cycle;
   const burstSpecs = [
-    { x: fieldWidth * 0.5, y: fieldHeight * 0.42, delay: 0, count: 24, spread: 92 },
-    { x: fieldWidth * 0.28, y: fieldHeight * 0.5, delay: 380, count: 18, spread: 72 },
-    { x: fieldWidth * 0.72, y: fieldHeight * 0.46, delay: 720, count: 18, spread: 78 },
-    { x: fieldWidth * 0.45, y: fieldHeight * 0.28, delay: 1080, count: 20, spread: 84 },
-    { x: fieldWidth * 0.62, y: fieldHeight * 0.58, delay: 1480, count: 16, spread: 68 },
+    { x: fieldWidth * 0.5, y: fieldHeight * 0.42, delay: 0, count: 10, spread: 92 },
+    { x: fieldWidth * 0.28, y: fieldHeight * 0.5, delay: 460, count: 8, spread: 72 },
+    { x: fieldWidth * 0.72, y: fieldHeight * 0.46, delay: 920, count: 8, spread: 78 },
   ];
   const colors = [
     'rgba(14, 165, 233, 0.88)',
@@ -2367,8 +2328,9 @@ function ClearBubbleFireworks({ fieldWidth, fieldHeight, tick }: { fieldWidth: n
         />
       ))}
       {starfish.map((item) => (
-        <Text
+        <RoundedStarfish
           key={item.id}
+          size={22}
           style={[
             styles.clearFireworkStarfish,
             {
@@ -2378,9 +2340,7 @@ function ClearBubbleFireworks({ fieldWidth, fieldHeight, tick }: { fieldWidth: n
               transform: [{ rotate: `${item.rotate}deg` }],
             },
           ]}
-        >
-          ★
-        </Text>
+        />
       ))}
     </View>
   );
@@ -2679,12 +2639,67 @@ function getResultEquationFontSize(equation: string) {
 function ResultStar() {
   return (
     <View accessibilityLabel="clear starfish" style={styles.resultStar}>
-      <Text style={styles.resultStarGlyph}>★</Text>
-      <View style={styles.resultStarfishCenter} />
-      <View style={[styles.resultStarfishDot, styles.resultStarfishDotTop]} />
-      <View style={[styles.resultStarfishDot, styles.resultStarfishDotRight]} />
-      <View style={[styles.resultStarfishDot, styles.resultStarfishDotBottom]} />
-      <View style={[styles.resultStarfishDot, styles.resultStarfishDotLeft]} />
+      <RoundedStarfish size={58} />
+    </View>
+  );
+}
+
+function RoundedStarfish({ size, style }: { size: number; style?: StyleProp<ViewStyle> }) {
+  const armWidth = size * 0.34;
+  const armHeight = size * 0.5;
+  const center = size / 2;
+  const armRadius = size * 0.23;
+  const dotSize = size * 0.12;
+
+  return (
+    <View style={[{ width: size, height: size }, style]}>
+      {[0, 1, 2, 3, 4].map((index) => {
+        const angle = -90 + index * 72;
+        const radians = (angle * Math.PI) / 180;
+        return (
+          <View
+            key={index}
+            style={[
+              styles.roundedStarfishArm,
+              {
+                width: armWidth,
+                height: armHeight,
+                borderRadius: armWidth,
+                left: center + Math.cos(radians) * armRadius - armWidth / 2,
+                top: center + Math.sin(radians) * armRadius - armHeight / 2,
+                transform: [{ rotate: `${angle + 90}deg` }],
+              },
+            ]}
+          />
+        );
+      })}
+      <View
+        style={[
+          styles.roundedStarfishCenter,
+          {
+            width: size * 0.42,
+            height: size * 0.42,
+            borderRadius: size * 0.21,
+            left: center - size * 0.21,
+            top: center - size * 0.21,
+          },
+        ]}
+      />
+      {[0, 1, 2].map((index) => (
+        <View
+          key={index}
+          style={[
+            styles.roundedStarfishDot,
+            {
+              width: dotSize,
+              height: dotSize,
+              borderRadius: dotSize / 2,
+              left: center + Math.cos((-72 + index * 72) * (Math.PI / 180)) * (size * 0.18) - dotSize / 2,
+              top: center + Math.sin((-72 + index * 72) * (Math.PI / 180)) * (size * 0.18) - dotSize / 2,
+            },
+          ]}
+        />
+      ))}
     </View>
   );
 }
@@ -2742,18 +2757,6 @@ function formatResultExpression(tokens: string[], target: number) {
   }
 
   return meaningfulTokens.join(' ');
-}
-
-function GameButton({ label, onPress, variant = 'primary' }: { label: string; onPress: () => void; variant?: 'primary' | 'secondary' }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.button, variant === 'secondary' && styles.secondaryButton, pressed && styles.pressedButton]}
-    >
-      <Text style={[styles.buttonText, variant === 'secondary' && styles.secondaryButtonText]}>{label}</Text>
-    </Pressable>
-  );
 }
 
 function toSnapshots(entities: BeadEntity[], bounds?: { width: number; height: number }): BeadSnapshot[] {
@@ -2927,7 +2930,7 @@ function findAnnihilationPair(beads: BeadSnapshot[]) {
       }
 
       const distance = getPointDistance(positive, negative);
-      const threshold = Math.max(160, getEntityRadius(positive.value, positive.count) + getEntityRadius(negative.value, negative.count) + 34);
+      const threshold = Math.max(104, getEntityRadius(positive.value, positive.count) + getEntityRadius(negative.value, negative.count) + 28);
       if (distance <= threshold) {
         candidates.push({
           beadIds: [positive.id, negative.id],
@@ -3283,15 +3286,9 @@ function getBackgroundBubbleSpecs(fieldWidth: number): BackgroundBubbleSpec[] {
     { id: 'large-right', xRatio: 0.94 - wideOffset, size: 116, speed: 15, delay: 0, drift: 9 },
     { id: 'small-left', xRatio: 0.12 + wideOffset, size: 60, speed: 21, delay: 900, drift: 7 },
     { id: 'tiny-right', xRatio: 0.78, size: 30, speed: 18, delay: 1600, drift: 5 },
-    { id: 'medium-left', xRatio: 0.22, size: 42, speed: 13, delay: 2400, drift: 10 },
-    { id: 'tiny-center', xRatio: 0.52, size: 18, speed: 24, delay: 3200, drift: 4 },
     { id: 'medium-right', xRatio: 0.84, size: 54, speed: 12, delay: 4100, drift: 8 },
     { id: 'soft-low-left', xRatio: 0.05 + wideOffset, size: 92, speed: 10, delay: 1700, drift: 7 },
-    { id: 'soft-top-left', xRatio: 0.28, size: 26, speed: 17, delay: 5200, drift: 6 },
     { id: 'soft-center-right', xRatio: 0.66, size: 36, speed: 14, delay: 6100, drift: 9 },
-    { id: 'tiny-far-left', xRatio: 0.02 + wideOffset, size: 22, speed: 20, delay: 6800, drift: 5 },
-    { id: 'wide-center', xRatio: 0.44, size: 72, speed: 11, delay: 7600, drift: 11 },
-    { id: 'tiny-far-right', xRatio: 0.98 - wideOffset, size: 24, speed: 19, delay: 8300, drift: 5 },
   ];
 }
 
@@ -3606,7 +3603,7 @@ function getBasinFrameSegments(fieldWidth: number, fieldHeight: number) {
 
 function getBasinPoints(fieldWidth: number, fieldHeight: number) {
   const curve = getBasinCurveMetrics(fieldWidth, fieldHeight);
-  const pointCount = 121;
+  const pointCount = BASIN_POINT_COUNT;
 
   return Array.from({ length: pointCount }, (_, index) => {
     const progress = index / (pointCount - 1);
@@ -3840,24 +3837,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     transform: [{ scale: 1.08 }],
   },
-  stageLabel: {
-    color: '#0284C7',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  title: {
-    marginTop: 4,
-    color: '#12334A',
-    fontSize: 28,
-    fontWeight: '900',
-  },
-  launchGameTitle: {
-    color: '#12334A',
-    fontSize: 36,
-    fontWeight: '900',
-    textAlign: 'center',
-    fontFamily: LATIN_FONT_FAMILY,
-  },
   stageGameTitle: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -3866,13 +3845,23 @@ const styles = StyleSheet.create({
     flexWrap: 'nowrap',
     minHeight: 46,
   },
-  stageGameTextSlot: {
+  stageGameNumberSlot: {
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stageGameEqualsSlot: {
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stageGameTargetSlot: {
     height: 42,
     alignItems: 'center',
     justifyContent: 'flex-end',
   },
   stageGameNumber: {
-    color: '#0284C7',
+    color: TEXT_ACCENT_COLOR,
     fontSize: 22,
     lineHeight: 28,
     fontWeight: '900',
@@ -3880,7 +3869,7 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   stageGameTarget: {
-    color: '#12334A',
+    color: TEXT_BASE_COLOR,
     fontSize: 34,
     lineHeight: 38,
     fontWeight: '900',
@@ -3888,7 +3877,7 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
   },
   stageGameEquals: {
-    color: '#075985',
+    color: TEXT_BASE_COLOR,
     fontSize: 24,
     lineHeight: 31,
     fontWeight: '900',
@@ -3903,7 +3892,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 5,
     paddingBottom: 0,
-    transform: [{ translateY: -2 }],
+    transform: [{ translateY: -4 }],
   },
   headerGoalBead: {
     position: 'relative',
@@ -3954,7 +3943,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerGoalBadgeText: {
-    color: '#075985',
+    color: TEXT_BASE_COLOR,
     fontSize: 10,
     lineHeight: 12,
     fontWeight: '900',
@@ -3969,7 +3958,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerGoalOverflowText: {
-    color: '#075985',
+    color: TEXT_BASE_COLOR,
     fontSize: 11,
     lineHeight: 13,
     fontWeight: '900',
@@ -3978,7 +3967,7 @@ const styles = StyleSheet.create({
   launchLogo: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 220,
+    width: 360,
     height: 76,
     position: 'relative',
   },
@@ -3987,8 +3976,8 @@ const styles = StyleSheet.create({
   },
   launchLogoWord: {
     color: '#FFFFFF',
-    fontSize: 48,
-    lineHeight: 54,
+    fontSize: 36,
+    lineHeight: 44,
     fontWeight: '900',
     letterSpacing: 0,
     fontFamily: LATIN_FONT_FAMILY,
@@ -4000,8 +3989,8 @@ const styles = StyleSheet.create({
   },
   launchLogoBubbleU: {
     position: 'absolute',
-    left: 145,
-    top: 26,
+    left: 160,
+    top: 23,
   },
   launchLogoGameBubble: {
     width: 48,
@@ -4017,105 +4006,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     fontFamily: LATIN_FONT_FAMILY,
   },
-  scoreShelf: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: 8,
-  },
-  goalCupBox: {
-    width: 96,
-    minHeight: 96,
-    paddingVertical: GRID,
-    paddingHorizontal: GRID,
-    borderRadius: RADIUS_LG,
-    backgroundColor: '#E0F7FF',
-    borderWidth: 3,
-    borderColor: '#38BDF8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#0284C7',
-    shadowOpacity: 0.16,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
-  },
-  goalCupLabel: {
-    color: '#075985',
-    fontSize: 12,
-    fontWeight: '900',
-    lineHeight: 14,
-  },
-  goalCup: {
-    width: 48,
-    height: 48,
-    marginTop: GRID / 2,
-    overflow: 'hidden',
-    borderRadius: RADIUS_MD,
-    borderWidth: 3,
-    borderTopWidth: 5,
-    borderColor: '#0284C7',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  goalCupFill: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#7DD3FC',
-  },
-  goalCupRim: {
-    position: 'absolute',
-    left: 7,
-    right: 7,
-    top: 6,
-    height: 5,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
-  },
-  goalCupValue: {
-    color: '#075985',
-    fontSize: 20,
-    fontWeight: '900',
-    lineHeight: 24,
-    fontFamily: LATIN_FONT_FAMILY,
-  },
-  goalCupStatus: {
-    marginTop: 3,
-    color: '#075985',
-    fontSize: 12,
-    fontWeight: '900',
-    lineHeight: 14,
-    maxWidth: 74,
-  },
-  totalBox: {
-    minWidth: 72,
-    paddingVertical: GRID,
-    paddingHorizontal: GRID,
-    borderRadius: RADIUS_LG,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 3,
-    borderColor: '#38BDF8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#0284C7',
-    shadowOpacity: 0.16,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
-  },
-  totalLabel: {
-    color: '#075985',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  totalValue: {
-    color: '#12334A',
-    fontSize: 28,
-    fontWeight: '900',
-    fontFamily: LATIN_FONT_FAMILY,
-  },
   playArea: {
     zIndex: 1,
     alignSelf: 'center',
@@ -4129,11 +4019,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 4,
     backgroundColor: 'rgba(3, 7, 18, 0.34)',
-  },
-  failedFieldVeil: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 5,
-    backgroundColor: 'rgba(3, 7, 18, 0.38)',
   },
   failedWaterOverlay: {
     zIndex: 5,
@@ -4208,14 +4093,6 @@ const styles = StyleSheet.create({
   },
   clearFireworkStarfish: {
     position: 'absolute',
-    color: '#EAB308',
-    fontSize: 18,
-    lineHeight: 20,
-    fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
-    textShadowColor: 'rgba(255, 255, 255, 0.68)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   backgroundBubbleLayer: {
     ...StyleSheet.absoluteFillObject,
@@ -4244,35 +4121,6 @@ const styles = StyleSheet.create({
     height: '26%',
     borderRadius: 999,
     backgroundColor: 'rgba(255, 255, 255, 0.58)',
-  },
-  fieldBubbleMark: {
-    position: 'absolute',
-    borderWidth: 3,
-    borderColor: 'rgba(125, 211, 252, 0.48)',
-    backgroundColor: 'rgba(255, 255, 255, 0.42)',
-  },
-  fieldBubbleMarkLarge: {
-    right: -32,
-    top: 24,
-    width: 108,
-    height: 108,
-    borderRadius: 54,
-  },
-  fieldBubbleMarkSmall: {
-    left: 18,
-    bottom: 38,
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-  },
-  fieldBubbleMarkTiny: {
-    right: 82,
-    bottom: 84,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderColor: 'rgba(186, 230, 253, 0.72)',
-    backgroundColor: 'rgba(224, 247, 255, 0.42)',
   },
   operatorRail: {
     zIndex: 1,
@@ -4348,7 +4196,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
   },
   operatorUsageBadgeText: {
-    color: '#FFFFFF',
+    color: TEXT_BASE_COLOR,
     fontSize: 12,
     lineHeight: 14,
     fontWeight: '900',
@@ -4679,7 +4527,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   bubbleNumberBadgeText: {
-    color: '#12334A',
+    color: TEXT_BASE_COLOR,
     fontSize: 16,
     fontWeight: '900',
     lineHeight: 18,
@@ -4692,43 +4540,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.22,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 3 },
-  },
-  containedBeadInnerGlass: {
-    position: 'absolute',
-    left: 4,
-    right: 4,
-    top: 4,
-    bottom: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.44)',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  containedBeadShine: {
-    marginTop: 4,
-    marginLeft: 5,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    opacity: 0.82,
-  },
-  clearPanel: {
-    position: 'absolute',
-    zIndex: 6,
-    left: GRID * 3,
-    right: GRID * 3,
-    top: '34%',
-    padding: GRID * 3,
-    borderRadius: RADIUS_XL,
-    borderWidth: 3,
-    borderColor: '#0EA5E9',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    shadowColor: '#0284C7',
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 6,
   },
   clearCelebrationLayer: {
     zIndex: 5,
@@ -4745,14 +4556,11 @@ const styles = StyleSheet.create({
   },
   clearSparkle: {
     position: 'absolute',
-    color: 'rgba(255, 255, 255, 0.94)',
+    color: TEXT_ACCENT_COLOR,
     fontWeight: '900',
     textShadowColor: 'rgba(2, 132, 199, 0.38)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 5,
-  },
-  failedPanel: {
-    borderColor: '#38BDF8',
   },
   resultPanel: {
     position: 'absolute',
@@ -4793,62 +4601,25 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 13 },
     elevation: 5,
   },
-  resultStarGlyph: {
-    color: '#FFFFFF',
-    fontSize: 43,
-    lineHeight: 48,
-    fontWeight: '900',
-  },
-  resultStarfishCenter: {
+  roundedStarfishArm: {
     position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 241, 166, 0.92)',
+    backgroundColor: '#EAB308',
     borderWidth: 2,
-    borderColor: 'rgba(202, 138, 4, 0.38)',
+    borderColor: 'rgba(202, 138, 4, 0.28)',
+    shadowColor: '#CA8A04',
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
   },
-  resultStarfishDot: {
+  roundedStarfishCenter: {
     position: 'absolute',
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: 'rgba(180, 120, 12, 0.34)',
-  },
-  resultStarfishDotTop: {
-    top: 22,
-    left: 37,
-  },
-  resultStarfishDotRight: {
-    top: 36,
-    right: 20,
-  },
-  resultStarfishDotBottom: {
-    bottom: 21,
-    left: 34,
-  },
-  resultStarfishDotLeft: {
-    top: 39,
-    left: 22,
-  },
-  resultPearlGlow: {
-    position: 'absolute',
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: 'rgba(125, 211, 252, 0.22)',
-  },
-  resultPearlCore: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    backgroundColor: '#FDE68A',
     borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.92)',
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
-    shadowColor: '#BAE6FD',
-    shadowOpacity: 0.8,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 0 },
+    borderColor: 'rgba(202, 138, 4, 0.34)',
+  },
+  roundedStarfishDot: {
+    position: 'absolute',
+    backgroundColor: 'rgba(180, 120, 12, 0.36)',
   },
   brokenMedal: {
     position: 'relative',
@@ -4894,7 +4665,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
   brokenMedalStar: {
-    color: '#FFFFFF',
+    color: TEXT_BASE_COLOR,
     fontSize: 43,
     lineHeight: 48,
     fontWeight: '900',
@@ -4920,7 +4691,7 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '-18deg' }],
   },
   resultEquation: {
-    color: '#12334A',
+    color: TEXT_BASE_COLOR,
     fontSize: 34,
     lineHeight: 42,
     fontWeight: '900',
@@ -4953,79 +4724,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.46)',
   },
-  homeIcon: {
-    position: 'relative',
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-  },
-  homeRoof: {
-    position: 'absolute',
-    top: 2,
-    width: 24,
-    height: 24,
-    borderLeftWidth: 5,
-    borderTopWidth: 5,
-    borderColor: '#075985',
-    transform: [{ rotate: '45deg' }],
-    borderRadius: 2,
-  },
-  homeBody: {
-    position: 'absolute',
-    bottom: 2,
-    width: 24,
-    height: 20,
-    borderWidth: 5,
-    borderTopWidth: 0,
-    borderColor: '#075985',
-    borderBottomLeftRadius: 4,
-    borderBottomRightRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  homeDoor: {
-    width: 7,
-    height: 10,
-    borderTopLeftRadius: 3,
-    borderTopRightRadius: 3,
-    backgroundColor: '#075985',
-  },
-  launchTadaPanel: {
-    top: '38%',
-    paddingVertical: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.86)',
-  },
-  launchTadaText: {
-    marginTop: 6,
-    color: '#0EA5E9',
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: 0.2,
-  },
-  launchTadaSubText: {
-    marginTop: 4,
-    color: '#075985',
-    fontSize: 15,
-    lineHeight: 19,
-    fontWeight: '900',
-  },
-  clearTitle: {
-    color: '#12334A',
-    fontSize: 34,
-    fontWeight: '900',
-  },
-  clearText: {
-    marginTop: 4,
-    color: '#0284C7',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  clearActions: {
-    marginTop: 14,
-    flexDirection: 'row',
-    gap: 10,
-  },
   footer: {
     zIndex: 1,
     minHeight: 96,
@@ -5035,54 +4733,11 @@ const styles = StyleSheet.create({
     paddingTop: GRID,
     paddingBottom: GRID * 2,
   },
-  statusMessageBox: {
-    minHeight: 32,
-    paddingHorizontal: GRID * 2,
-    borderRadius: RADIUS_LG,
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
-    justifyContent: 'center',
-  },
-  statusMessageText: {
-    color: '#075985',
-    fontSize: 15,
-    fontWeight: '900',
-    lineHeight: 19,
-    textAlign: 'center',
-  },
-  statusMessagePlaceholder: {
-    color: 'transparent',
-  },
   footerControls: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
     gap: 0,
-  },
-  launchPlayButton: {
-    width: 64,
-    height: 48,
-    borderRadius: RADIUS_LG,
-    backgroundColor: 'rgba(255, 255, 255, 0.32)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  launchPlayIcon: {
-    width: 0,
-    height: 0,
-    marginLeft: 4,
-    borderTopWidth: 10,
-    borderBottomWidth: 10,
-    borderLeftWidth: 16,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderLeftColor: '#075985',
-  },
-  retryIcon: {
-    color: '#075985',
-    fontSize: 30,
-    lineHeight: 32,
-    fontWeight: '900',
-    fontFamily: LATIN_FONT_FAMILY,
   },
   expressionBox: {
     width: '100%',
@@ -5096,7 +4751,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   expressionText: {
-    color: '#075985',
+    color: TEXT_BASE_COLOR,
     fontSize: 18,
     lineHeight: 30,
     fontWeight: '900',
@@ -5104,40 +4759,10 @@ const styles = StyleSheet.create({
     fontFamily: LATIN_FONT_FAMILY,
   },
   expressionPlaceholder: {
-    color: '#7DD3FC',
-  },
-  button: {
-    minHeight: 48,
-    minWidth: 96,
-    paddingHorizontal: GRID * 2,
-    borderRadius: RADIUS_LG,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0EA5E9',
-    borderWidth: 3,
-    borderColor: '#0284C7',
-    shadowColor: '#0284C7',
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 3,
-  },
-  secondaryButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.84)',
-    borderWidth: 0,
-    shadowOpacity: 0,
+    color: TEXT_ACCENT_COLOR,
   },
   pressedButton: {
     transform: [{ scale: 0.98 }],
     opacity: 0.86,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-    fontFamily: LATIN_FONT_FAMILY,
-  },
-  secondaryButtonText: {
-    color: '#12334A',
   },
 });

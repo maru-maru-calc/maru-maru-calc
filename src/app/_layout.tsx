@@ -11,6 +11,7 @@ import { BgmControlContext } from '@/audio/bgm-control';
 const BGM_VOLUME = 0.28;
 const BGM_SYNC_CHECK_MS = 250;
 const BGM_END_TOLERANCE_SECONDS = 0.12;
+const BGM_DRIFT_TOLERANCE_SECONDS = 0.045;
 const bgmSource = require('../../assets/audio/bgm.mp3');
 const vocalBgmSource = require('../../assets/audio/bgm-vocal.mp3');
 
@@ -45,6 +46,19 @@ export default function RootLayout() {
     }
   }, []);
 
+  const syncBgmPositionsToCurrentTrack = useCallback(() => {
+    const shouldUseVocalAsAnchor = isVocalEnabledRef.current;
+
+    if (webBgmAudioRef.current && webVocalBgmAudioRef.current) {
+      syncWebBgmPositions(webBgmAudioRef.current, webVocalBgmAudioRef.current, shouldUseVocalAsAnchor);
+      return;
+    }
+
+    if (bgmPlayerRef.current && vocalBgmPlayerRef.current) {
+      void syncNativeBgmPositions(bgmPlayerRef.current, vocalBgmPlayerRef.current, shouldUseVocalAsAnchor);
+    }
+  }, []);
+
   const playSyncedBgmFromStart = useCallback(() => {
     applyBgmVolumes();
     if (webBgmAudioRef.current && webVocalBgmAudioRef.current) {
@@ -72,12 +86,13 @@ export default function RootLayout() {
   }, [applyBgmVolumes]);
 
   const resumeSyncedBgm = useCallback(() => {
+    syncBgmPositionsToCurrentTrack();
     applyBgmVolumes();
     bgmPlayerRef.current?.play();
     vocalBgmPlayerRef.current?.play();
     void webBgmAudioRef.current?.play().catch(() => {});
     void webVocalBgmAudioRef.current?.play().catch(() => {});
-  }, [applyBgmVolumes]);
+  }, [applyBgmVolumes, syncBgmPositionsToCurrentTrack]);
 
   const startBgmAfterUserAction = useCallback(() => {
     if (hasUserStartedBgmRef.current || !isAppActiveRef.current) {
@@ -90,15 +105,17 @@ export default function RootLayout() {
   }, [playSyncedBgmFromStart]);
 
   const toggleVocal = useCallback(() => {
+    syncBgmPositionsToCurrentTrack();
     const nextIsVocalEnabled = !isVocalEnabledRef.current;
     isVocalEnabledRef.current = nextIsVocalEnabled;
     setIsVocalEnabled(nextIsVocalEnabled);
+    syncBgmPositionsToCurrentTrack();
     applyBgmVolumes();
 
     if (hasUserStartedBgmRef.current && isAppActiveRef.current) {
       resumeSyncedBgm();
     }
-  }, [applyBgmVolumes, resumeSyncedBgm]);
+  }, [applyBgmVolumes, resumeSyncedBgm, syncBgmPositionsToCurrentTrack]);
 
   const bgmControlValue = useMemo(
     () => ({
@@ -201,13 +218,17 @@ export default function RootLayout() {
       if (webBgmAudioRef.current && webVocalBgmAudioRef.current) {
         if (areWebTracksBothEnded(webBgmAudioRef.current, webVocalBgmAudioRef.current)) {
           playSyncedBgmFromStart();
+          return;
         }
+        syncBgmPositionsToCurrentTrack();
         return;
       }
 
       if (bgmPlayerRef.current && vocalBgmPlayerRef.current && areNativeTracksBothEnded(bgmPlayerRef.current, vocalBgmPlayerRef.current)) {
         playSyncedBgmFromStart();
+        return;
       }
+      syncBgmPositionsToCurrentTrack();
     }, BGM_SYNC_CHECK_MS);
 
     if (typeof document !== 'undefined') {
@@ -263,6 +284,29 @@ function areWebTracksBothEnded(left: HTMLAudioElement, right: HTMLAudioElement) 
   return isWebTrackEnded(left) && isWebTrackEnded(right);
 }
 
+function syncWebBgmPositions(normalAudio: HTMLAudioElement, vocalAudio: HTMLAudioElement, useVocalAsAnchor: boolean) {
+  const anchor = useVocalAsAnchor ? vocalAudio : normalAudio;
+  const follower = useVocalAsAnchor ? normalAudio : vocalAudio;
+
+  if (!Number.isFinite(anchor.currentTime) || !Number.isFinite(follower.currentTime)) {
+    return;
+  }
+  if (isWebTrackEnded(anchor)) {
+    return;
+  }
+
+  const drift = Math.abs(anchor.currentTime - follower.currentTime);
+  if (drift <= BGM_DRIFT_TOLERANCE_SECONDS) {
+    return;
+  }
+
+  try {
+    follower.currentTime = anchor.currentTime;
+  } catch {
+    // Browsers can reject seeks before metadata is available. The next sync tick will retry.
+  }
+}
+
 function isWebTrackEnded(audio: HTMLAudioElement) {
   if (audio.ended) {
     return true;
@@ -275,6 +319,25 @@ function isWebTrackEnded(audio: HTMLAudioElement) {
 
 function areNativeTracksBothEnded(left: AudioPlayer, right: AudioPlayer) {
   return isNativeTrackEnded(left) && isNativeTrackEnded(right);
+}
+
+async function syncNativeBgmPositions(normalPlayer: AudioPlayer, vocalPlayer: AudioPlayer, useVocalAsAnchor: boolean) {
+  const anchor = useVocalAsAnchor ? vocalPlayer : normalPlayer;
+  const follower = useVocalAsAnchor ? normalPlayer : vocalPlayer;
+
+  if (!Number.isFinite(anchor.currentTime) || !Number.isFinite(follower.currentTime)) {
+    return;
+  }
+  if (isNativeTrackEnded(anchor)) {
+    return;
+  }
+
+  const drift = Math.abs(anchor.currentTime - follower.currentTime);
+  if (drift <= BGM_DRIFT_TOLERANCE_SECONDS) {
+    return;
+  }
+
+  await follower.seekTo(anchor.currentTime);
 }
 
 function isNativeTrackEnded(player: AudioPlayer) {

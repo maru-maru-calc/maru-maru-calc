@@ -7,18 +7,19 @@ test('moves through the depth path into the existing game', async ({ page }) => 
   await page.goto('/');
 
   await expect(page.getByLabel('maru logo')).toBeVisible();
-  await expect(page.getByLabel('bubble-2')).toBeVisible();
+  await expect(page.getByLabel('bubble-5')).toBeVisible();
   await expect(page.getByLabel('bead-normal-1')).toHaveCount(8);
   await expect(page.getByTestId('current-total-value')).toHaveText('8');
   await expect(page.getByTestId('expression-display-text')).toHaveText('8 +');
   await page.screenshot({ path: 'test-results/app-launch.png' });
 
-  await clearLaunch(page);
-  await expect(page.getByTestId('current-total-value')).toHaveText('10');
-  await expect(page.getByTestId('launch-tada')).toBeVisible();
+  await page.getByLabel('bubble-5').click();
+  await expect(page.getByTestId('current-total-value')).toHaveText('13');
+  await expect(page.getByLabel('next stage')).toBeVisible();
   await expect(page.getByTestId('world-select')).toHaveCount(0);
+  await page.getByLabel('next stage').click();
   await expect(page.getByTestId('world-select')).toBeVisible();
-  await expect(page.locator('[data-testid^="depth-background-bubble-"]')).toHaveCount(12);
+  await expect(page.locator('[data-testid^="depth-background-bubble-"]')).toHaveCount(6);
   await expect(page.locator('[data-testid^="depth-fish-"]')).toHaveCount(5);
   await expect(page.getByTestId('depth-shade')).toBeVisible();
   await expect(page.getByLabel('mixed-3', { exact: true })).toBeVisible();
@@ -35,7 +36,7 @@ test('moves through the depth path into the existing game', async ({ page }) => 
 
   await page.getByLabel('+', { exact: true }).click();
   await expect(page.getByTestId('stage-addition-10-ones')).toBeVisible();
-  await expect(page.locator('[data-testid^="depth-background-bubble-"]')).toHaveCount(12);
+  await expect(page.locator('[data-testid^="depth-background-bubble-"]')).toHaveCount(6);
   await expect(page.locator('[data-testid^="depth-fish-"]')).toHaveCount(5);
   await expect(page.getByTestId('depth-shade')).toBeVisible();
   await expect(page.getByTestId('stage-addition-10-six-four')).toBeDisabled();
@@ -63,9 +64,7 @@ test('stage routes can scroll to later mixed problems', async ({ page }) => {
 test('going back from an uncleared next stage does not mark it complete', async ({ page }) => {
   await page.goto('/');
 
-  await page.getByLabel('bubble-2').click();
-  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
-  await page.getByLabel('next stage').click();
+  await clearLaunch(page);
   await expect(page.getByTestId('world-select')).toBeVisible();
   await page.getByLabel('+', { exact: true }).click();
   await page.getByTestId('stage-addition-10-twos').click();
@@ -80,8 +79,8 @@ test('going back from an uncleared next stage does not mark it complete', async 
   await expect(page.getByTestId('operator-+')).toBeVisible();
 
   await page.getByLabel('Back', { exact: true }).click();
-  await expect(page.getByTestId('stage-addition-10-twos').getByText('★')).toBeVisible();
-  await expect(page.getByTestId('stage-addition-10-five-five').getByText('★')).toHaveCount(0);
+  await expect(page.getByTestId('stage-addition-10-twos').getByTestId('stage-done-starfish')).toBeVisible();
+  await expect(page.getByTestId('stage-addition-10-five-five').getByTestId('stage-done-starfish')).toHaveCount(0);
 });
 
 test('back button position is consistent between stage select and game', async ({ page }) => {
@@ -245,17 +244,16 @@ function assertStyleMatch(
 test('launch bubbles can be touched directly', async ({ page }) => {
   await page.goto('/');
 
-  await page.getByLabel('bubble-2').click();
-  await expect(page.getByTestId('current-total-value')).toHaveText('10');
-  await expect(page.getByTestId('launch-tada')).toBeVisible();
+  await page.getByLabel('bubble-5').click();
+  await expect(page.getByTestId('current-total-value')).toHaveText('13');
   await expect(page.getByTestId('world-select')).toHaveCount(0);
-  await expect(page.getByTestId('world-select')).toBeVisible();
+  await expect(page.getByLabel('next stage')).toBeVisible();
 });
 
 test('pending bubbles show an idle tap hint', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByLabel('bubble-2')).toBeVisible();
+  await expect(page.getByLabel('bubble-5')).toBeVisible();
   await expect(page.getByTestId('pending-bubble-hint')).toBeVisible({ timeout: 4000 });
 });
 
@@ -263,9 +261,16 @@ test('background bubbles float behind the field and can be popped', async ({ pag
   await page.goto('/');
 
   const backgroundBubbles = page.locator('[data-testid^="background-bubble-"]');
-  await expect(backgroundBubbles).toHaveCount(12);
-  await backgroundBubbles.first().click({ force: true });
-  await expect(page.getByLabel('bubble-2')).toBeVisible();
+  await expect(backgroundBubbles).toHaveCount(6);
+  for (let index = 0; index < (await backgroundBubbles.count()); index += 1) {
+    const bubble = backgroundBubbles.nth(index);
+    const box = await bubble.boundingBox();
+    if (box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 390 && box.y + box.height <= 844) {
+      await bubble.click({ force: true });
+      break;
+    }
+  }
+  await expect(page.getByLabel('bubble-5')).toBeVisible();
 });
 
 async function clearLaunch(page: Page) {

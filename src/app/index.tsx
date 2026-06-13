@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBgmControl } from '@/audio/bgm-control';
@@ -36,6 +37,8 @@ const DEPTH_BUBBLE_TICK_MS = 90;
 const DEPTH_CREATURE_REACTION_MS = 920;
 const PLAYFUL_FONT_FAMILY = 'KiwiMaru';
 const LATIN_FONT_FAMILY = 'Helvetica';
+const TEXT_BASE_COLOR = '#12334A';
+const TEXT_ACCENT_COLOR = '#0284C7';
 const GRID = 8;
 const RADIUS_SM = 8;
 const RADIUS_LG = 16;
@@ -263,9 +266,7 @@ function DepthBackdrop({
                 opacity: opacity * 0.74,
               },
             ]}
-          >
-            <View pointerEvents="none" style={styles.depthBackgroundBubbleShine} />
-          </Pressable>
+          />
         );
       })}
       {fish.map((spec) => {
@@ -700,12 +701,68 @@ function StageNode({
 
 function StageDoneStarfish() {
   return (
-    <View pointerEvents="none" style={styles.stageDoneStarfish}>
-      <Text style={styles.stageDoneStarfishGlyph}>★</Text>
-      <View style={styles.stageDoneStarfishCenter} />
-      <View style={[styles.stageDoneStarfishDot, styles.stageDoneStarfishDotTop]} />
-      <View style={[styles.stageDoneStarfishDot, styles.stageDoneStarfishDotRight]} />
-      <View style={[styles.stageDoneStarfishDot, styles.stageDoneStarfishDotBottom]} />
+    <View pointerEvents="none" style={styles.stageDoneStarfish} testID="stage-done-starfish">
+      <RoundedStarfish size={24} />
+    </View>
+  );
+}
+
+function RoundedStarfish({ size, style }: { size: number; style?: StyleProp<ViewStyle> }) {
+  const armWidth = size * 0.34;
+  const armHeight = size * 0.5;
+  const center = size / 2;
+  const armRadius = size * 0.23;
+  const dotSize = size * 0.12;
+
+  return (
+    <View style={[{ width: size, height: size }, style]}>
+      {[0, 1, 2, 3, 4].map((index) => {
+        const angle = -90 + index * 72;
+        const radians = (angle * Math.PI) / 180;
+        return (
+          <View
+            key={index}
+            style={[
+              styles.roundedStarfishArm,
+              {
+                width: armWidth,
+                height: armHeight,
+                borderRadius: armWidth,
+                left: center + Math.cos(radians) * armRadius - armWidth / 2,
+                top: center + Math.sin(radians) * armRadius - armHeight / 2,
+                transform: [{ rotate: `${angle + 90}deg` }],
+              },
+            ]}
+          />
+        );
+      })}
+      <View
+        style={[
+          styles.roundedStarfishCenter,
+          {
+            width: size * 0.42,
+            height: size * 0.42,
+            borderRadius: size * 0.21,
+            left: center - size * 0.21,
+            top: center - size * 0.21,
+          },
+        ]}
+      />
+      {[0, 1, 2].map((index) => (
+        <View
+          key={index}
+          style={[
+            styles.roundedStarfishDot,
+            {
+              width: dotSize,
+              height: dotSize,
+              borderRadius: dotSize / 2,
+              left: center + Math.cos((-72 + index * 72) * (Math.PI / 180)) * (size * 0.18) - dotSize / 2,
+              top: center + Math.sin((-72 + index * 72) * (Math.PI / 180)) * (size * 0.18) - dotSize / 2,
+            },
+          ]}
+        />
+      ))}
     </View>
   );
 }
@@ -720,7 +777,7 @@ function BubbleRoute({ from, to }: { from: MapNodeLayout; to: MapNodeLayout }) {
   const dy = to.y - from.y;
   const length = Math.sqrt(dx * dx + dy * dy);
   const angle = Math.atan2(dy, dx);
-  const bubbleCount = Math.max(5, Math.floor(length / 18));
+  const bubbleCount = Math.max(3, Math.floor(length / 38));
 
   return (
     <>
@@ -764,23 +821,32 @@ function SingingMermaid({ isVocalEnabled, mapWidth, onPress }: { isVocalEnabled:
         <>
           <View style={[styles.mermaidSongPulse, styles.mermaidSongPulseOne]} />
           <View style={[styles.mermaidSongPulse, styles.mermaidSongPulseTwo]} />
+          <Text pointerEvents="none" style={[styles.mermaidMusicNote, styles.mermaidMusicNoteOne]}>
+            ♪
+          </Text>
+          <Text pointerEvents="none" style={[styles.mermaidMusicNote, styles.mermaidMusicNoteTwo]}>
+            ♫
+          </Text>
+          <Text pointerEvents="none" style={[styles.mermaidMusicNote, styles.mermaidMusicNoteThree]}>
+            ♪
+          </Text>
         </>
       ) : null}
-      <View style={styles.mermaidRockBack} />
-      <View style={styles.mermaidRockLeft} />
-      <View style={styles.mermaidRockRight} />
-      <View style={styles.mermaidTailFin} />
-      <View style={styles.mermaidTail} />
-      <View style={styles.mermaidBody} />
-      <View style={styles.mermaidArmBack} />
-      <View style={styles.mermaidArmFront} />
-      <View style={styles.mermaidHairBack} />
-      <View style={styles.mermaidLongHair} />
-      <View style={styles.mermaidHead} />
-      <View style={styles.mermaidHairFront} />
+      <View style={[styles.mermaidRockBack, isVocalEnabled && styles.mermaidRockBackActive]} />
+      <View style={[styles.mermaidRockLeft, isVocalEnabled && styles.mermaidRockLeftActive]} />
+      <View style={[styles.mermaidRockRight, isVocalEnabled && styles.mermaidRockRightActive]} />
+      <View style={[styles.mermaidTailFin, isVocalEnabled && styles.mermaidTailFinActive]} />
+      <View style={[styles.mermaidTail, isVocalEnabled && styles.mermaidTailActive]} />
+      <View style={[styles.mermaidBody, isVocalEnabled && styles.mermaidBodyActive]} />
+      <View style={[styles.mermaidArmBack, isVocalEnabled && styles.mermaidSkinActive]} />
+      <View style={[styles.mermaidArmFront, isVocalEnabled && styles.mermaidSkinActive]} />
+      <View style={[styles.mermaidHairBack, isVocalEnabled && styles.mermaidHairActive]} />
+      <View style={[styles.mermaidLongHair, isVocalEnabled && styles.mermaidLongHairActive]} />
+      <View style={[styles.mermaidHead, isVocalEnabled && styles.mermaidHeadActive]} />
+      <View style={[styles.mermaidHairFront, isVocalEnabled && styles.mermaidHairFrontActive]} />
       <View style={styles.mermaidEye} />
-      <View style={styles.mermaidMouth} />
-      <View style={styles.mermaidHairShine} />
+      <View style={[styles.mermaidMouth, isVocalEnabled && styles.mermaidMouthActive]} />
+      <View style={[styles.mermaidHairShine, isVocalEnabled && styles.mermaidHairShineActive]} />
     </Pressable>
   );
 }
@@ -881,15 +947,9 @@ function getDepthBubbleSpecs(width: number): DepthBubbleSpec[] {
     { id: 'large-right', xRatio: 0.94 - wideOffset, size: 116, speed: 15, delay: 0, drift: 9 },
     { id: 'small-left', xRatio: 0.12 + wideOffset, size: 60, speed: 21, delay: 900, drift: 7 },
     { id: 'tiny-right', xRatio: 0.78, size: 30, speed: 18, delay: 1600, drift: 5 },
-    { id: 'medium-left', xRatio: 0.22, size: 42, speed: 13, delay: 2400, drift: 10 },
-    { id: 'tiny-center', xRatio: 0.52, size: 18, speed: 24, delay: 3200, drift: 4 },
     { id: 'medium-right', xRatio: 0.84, size: 54, speed: 12, delay: 4100, drift: 8 },
     { id: 'soft-low-left', xRatio: 0.05 + wideOffset, size: 92, speed: 10, delay: 1700, drift: 7 },
-    { id: 'soft-top-left', xRatio: 0.28, size: 26, speed: 17, delay: 5200, drift: 6 },
     { id: 'soft-center-right', xRatio: 0.66, size: 36, speed: 14, delay: 6100, drift: 9 },
-    { id: 'tiny-far-left', xRatio: 0.02 + wideOffset, size: 22, speed: 20, delay: 6800, drift: 5 },
-    { id: 'wide-center', xRatio: 0.44, size: 72, speed: 11, delay: 7600, drift: 11 },
-    { id: 'tiny-far-right', xRatio: 0.98 - wideOffset, size: 24, speed: 19, delay: 8300, drift: 5 },
   ];
 }
 
@@ -930,7 +990,7 @@ const styles = StyleSheet.create({
   depthBackdrop: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
-    zIndex: 2,
+    zIndex: 3,
   },
   depthBackgroundBubble: {
     position: 'absolute',
@@ -942,15 +1002,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     zIndex: 2,
-  },
-  depthBackgroundBubbleShine: {
-    position: 'absolute',
-    left: '22%',
-    top: '18%',
-    width: '26%',
-    height: '26%',
-    borderRadius: RADIUS_PILL,
-    backgroundColor: 'rgba(255, 255, 255, 0.58)',
   },
   depthShade: {
     ...StyleSheet.absoluteFillObject,
@@ -1581,7 +1632,8 @@ const styles = StyleSheet.create({
   },
   worldScroll: {
     flex: 1,
-    zIndex: 1,
+    zIndex: 2,
+    elevation: 2,
   },
   worldScrollContent: {
     minHeight: 1580,
@@ -1600,7 +1652,11 @@ const styles = StyleSheet.create({
     opacity: 0.76,
   },
   singingMermaidActive: {
-    opacity: 0.92,
+    opacity: 1,
+    shadowColor: '#FDE68A',
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 0 },
   },
   mermaidSongBubbleOne: {
     position: 'absolute',
@@ -1671,6 +1727,40 @@ const styles = StyleSheet.create({
     height: 25,
     borderRadius: 13,
   },
+  mermaidMusicNote: {
+    position: 'absolute',
+    zIndex: 3,
+    color: TEXT_ACCENT_COLOR,
+    fontFamily: LATIN_FONT_FAMILY,
+    fontWeight: '900',
+    textShadowColor: 'rgba(255, 255, 255, 0.82)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  mermaidMusicNoteOne: {
+    right: 36,
+    top: -2,
+    fontSize: 18,
+    lineHeight: 20,
+    transform: [{ rotate: '-10deg' }],
+  },
+  mermaidMusicNoteTwo: {
+    right: 11,
+    top: 13,
+    fontSize: 20,
+    lineHeight: 22,
+    color: TEXT_ACCENT_COLOR,
+    transform: [{ rotate: '8deg' }],
+  },
+  mermaidMusicNoteThree: {
+    right: 55,
+    top: 24,
+    fontSize: 15,
+    lineHeight: 18,
+    color: TEXT_ACCENT_COLOR,
+    opacity: 0.9,
+    transform: [{ rotate: '-18deg' }],
+  },
   mermaidRockBack: {
     position: 'absolute',
     left: 18,
@@ -1682,15 +1772,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(224, 247, 255, 0.28)',
   },
-  mermaidRockHighlight: {
-    position: 'absolute',
-    left: 36,
-    bottom: 27,
-    width: 48,
-    height: 10,
-    borderRadius: 10,
-    backgroundColor: 'rgba(224, 247, 255, 0.18)',
-    transform: [{ rotate: '-6deg' }],
+  mermaidRockBackActive: {
+    backgroundColor: 'rgba(56, 189, 248, 0.3)',
+    borderColor: 'rgba(224, 247, 255, 0.4)',
   },
   mermaidRockLeft: {
     position: 'absolute',
@@ -1702,6 +1786,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(14, 165, 233, 0.24)',
     transform: [{ rotate: '-7deg' }],
   },
+  mermaidRockLeftActive: {
+    backgroundColor: 'rgba(14, 165, 233, 0.32)',
+  },
   mermaidRockRight: {
     position: 'absolute',
     right: 8,
@@ -1711,6 +1798,9 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     backgroundColor: 'rgba(6, 182, 212, 0.2)',
     transform: [{ rotate: '8deg' }],
+  },
+  mermaidRockRightActive: {
+    backgroundColor: 'rgba(6, 182, 212, 0.3)',
   },
   mermaidTail: {
     position: 'absolute',
@@ -1724,38 +1814,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(153, 246, 228, 0.5)',
     transform: [{ rotate: '15deg' }, { scaleY: 0.72 }],
   },
-  mermaidTailScaleOne: {
-    position: 'absolute',
-    left: 84,
-    bottom: 45,
-    width: 12,
-    height: 7,
-    borderRadius: 7,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(236, 253, 245, 0.42)',
-    transform: [{ rotate: '17deg' }],
-  },
-  mermaidTailScaleTwo: {
-    position: 'absolute',
-    left: 100,
-    bottom: 49,
-    width: 12,
-    height: 7,
-    borderRadius: 7,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(236, 253, 245, 0.36)',
-    transform: [{ rotate: '15deg' }],
-  },
-  mermaidTailScaleThree: {
-    position: 'absolute',
-    left: 111,
-    bottom: 41,
-    width: 11,
-    height: 6,
-    borderRadius: 6,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(236, 253, 245, 0.34)',
-    transform: [{ rotate: '13deg' }],
+  mermaidTailActive: {
+    backgroundColor: 'rgba(45, 212, 191, 0.68)',
+    borderColor: 'rgba(153, 246, 228, 0.72)',
   },
   mermaidTailFin: {
     position: 'absolute',
@@ -1771,15 +1832,8 @@ const styles = StyleSheet.create({
     borderLeftColor: 'rgba(45, 212, 191, 0.46)',
     transform: [{ rotate: '14deg' }],
   },
-  mermaidTailFinSplit: {
-    position: 'absolute',
-    right: 33,
-    bottom: 42,
-    width: 20,
-    height: 2,
-    borderRadius: 2,
-    backgroundColor: 'rgba(236, 253, 245, 0.3)',
-    transform: [{ rotate: '15deg' }],
+  mermaidTailFinActive: {
+    borderLeftColor: 'rgba(45, 212, 191, 0.66)',
   },
   mermaidBody: {
     position: 'absolute',
@@ -1793,29 +1847,9 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(251, 207, 232, 0.4)',
     transform: [{ rotate: '-5deg' }],
   },
-  mermaidShellLeft: {
-    position: 'absolute',
-    left: 70,
-    bottom: 82,
-    width: 13,
-    height: 9,
-    borderRadius: 8,
-    backgroundColor: 'rgba(216, 180, 254, 0.7)',
-    borderWidth: 1,
-    borderColor: 'rgba(250, 245, 255, 0.48)',
-    transform: [{ rotate: '-14deg' }],
-  },
-  mermaidShellRight: {
-    position: 'absolute',
-    left: 84,
-    bottom: 82,
-    width: 13,
-    height: 9,
-    borderRadius: 8,
-    backgroundColor: 'rgba(216, 180, 254, 0.68)',
-    borderWidth: 1,
-    borderColor: 'rgba(250, 245, 255, 0.46)',
-    transform: [{ rotate: '12deg' }],
+  mermaidBodyActive: {
+    backgroundColor: 'rgba(244, 114, 182, 0.58)',
+    borderColor: 'rgba(251, 207, 232, 0.62)',
   },
   mermaidArmBack: {
     position: 'absolute',
@@ -1827,15 +1861,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(253, 224, 197, 0.54)',
     transform: [{ rotate: '22deg' }],
   },
-  mermaidHandBack: {
-    position: 'absolute',
-    left: 49,
-    bottom: 63,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: 'rgba(253, 224, 197, 0.58)',
-  },
   mermaidArmFront: {
     position: 'absolute',
     left: 88,
@@ -1846,14 +1871,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(253, 224, 197, 0.58)',
     transform: [{ rotate: '-18deg' }],
   },
-  mermaidHandFront: {
-    position: 'absolute',
-    left: 115,
-    bottom: 64,
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: 'rgba(253, 224, 197, 0.6)',
+  mermaidSkinActive: {
+    backgroundColor: 'rgba(253, 224, 197, 0.72)',
   },
   mermaidHairBack: {
     position: 'absolute',
@@ -1865,6 +1884,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(250, 204, 21, 0.58)',
     transform: [{ rotate: '-8deg' }],
   },
+  mermaidHairActive: {
+    backgroundColor: 'rgba(250, 204, 21, 0.76)',
+  },
   mermaidLongHair: {
     position: 'absolute',
     left: 52,
@@ -1875,15 +1897,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(234, 179, 8, 0.48)',
     transform: [{ rotate: '10deg' }],
   },
-  mermaidHairCurlBack: {
-    position: 'absolute',
-    left: 47,
-    bottom: 72,
-    width: 28,
-    height: 36,
-    borderRadius: 20,
-    backgroundColor: 'rgba(220, 38, 38, 0.58)',
-    transform: [{ rotate: '10deg' }],
+  mermaidLongHairActive: {
+    backgroundColor: 'rgba(234, 179, 8, 0.66)',
   },
   mermaidHead: {
     position: 'absolute',
@@ -1896,6 +1911,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.42)',
   },
+  mermaidHeadActive: {
+    backgroundColor: 'rgba(253, 224, 197, 0.8)',
+    borderColor: 'rgba(255, 255, 255, 0.62)',
+  },
   mermaidHairFront: {
     position: 'absolute',
     left: 56,
@@ -1906,35 +1925,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(253, 224, 71, 0.62)',
     transform: [{ rotate: '-20deg' }],
   },
-  mermaidHairSideLock: {
-    position: 'absolute',
-    left: 53,
-    bottom: 80,
-    width: 18,
-    height: 34,
-    borderRadius: 16,
-    backgroundColor: 'rgba(220, 38, 38, 0.62)',
-    transform: [{ rotate: '-18deg' }],
-  },
-  mermaidBangOne: {
-    position: 'absolute',
-    left: 72,
-    bottom: 108,
-    width: 26,
-    height: 11,
-    borderRadius: 11,
-    backgroundColor: 'rgba(254, 202, 202, 0.42)',
-    transform: [{ rotate: '-12deg' }],
-  },
-  mermaidBangTwo: {
-    position: 'absolute',
-    left: 60,
-    bottom: 96,
-    width: 16,
-    height: 24,
-    borderRadius: 14,
-    backgroundColor: 'rgba(248, 113, 113, 0.7)',
-    transform: [{ rotate: '28deg' }],
+  mermaidHairFrontActive: {
+    backgroundColor: 'rgba(253, 224, 71, 0.82)',
   },
   mermaidHairShine: {
     position: 'absolute',
@@ -1946,6 +1938,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(254, 240, 138, 0.42)',
     transform: [{ rotate: '-22deg' }],
   },
+  mermaidHairShineActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
   mermaidEye: {
     position: 'absolute',
     left: 91,
@@ -1954,24 +1949,6 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: 'rgba(7, 89, 133, 0.52)',
-  },
-  mermaidEyeShine: {
-    position: 'absolute',
-    left: 92,
-    bottom: 106,
-    width: 2,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.86)',
-  },
-  mermaidCheek: {
-    position: 'absolute',
-    left: 83,
-    bottom: 96,
-    width: 8,
-    height: 5,
-    borderRadius: 5,
-    backgroundColor: 'rgba(244, 114, 182, 0.42)',
   },
   mermaidMouth: {
     position: 'absolute',
@@ -1982,6 +1959,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderBottomWidth: 2,
     borderBottomColor: 'rgba(236, 72, 153, 0.5)',
+  },
+  mermaidMouthActive: {
+    width: 10,
+    height: 6,
+    borderBottomColor: 'rgba(236, 72, 153, 0.76)',
   },
   routeBubble: {
     position: 'absolute',
@@ -2036,26 +2018,26 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   worldSymbol: {
-    color: '#075985',
+    color: TEXT_BASE_COLOR,
     fontSize: 36,
     lineHeight: 40,
     fontWeight: '900',
     fontFamily: LATIN_FONT_FAMILY,
   },
   worldSymbolActive: {
-    color: '#0EA5E9',
+    color: TEXT_ACCENT_COLOR,
   },
   worldProgress: {
-    color: '#0284C7',
+    color: TEXT_ACCENT_COLOR,
     fontSize: 11,
     fontWeight: '900',
     fontFamily: LATIN_FONT_FAMILY,
   },
   worldProgressActive: {
-    color: '#075985',
+    color: TEXT_BASE_COLOR,
   },
   mixedWorldSymbols: {
-    color: '#075985',
+    color: TEXT_BASE_COLOR,
     fontSize: 18,
     lineHeight: 22,
     fontWeight: '900',
@@ -2075,7 +2057,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   mixedCountText: {
-    color: '#FFFFFF',
+    color: TEXT_BASE_COLOR,
     fontSize: 14,
     fontWeight: '900',
     fontFamily: LATIN_FONT_FAMILY,
@@ -2094,7 +2076,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   freeBadgeText: {
-    color: '#12334A',
+    color: TEXT_BASE_COLOR,
     fontSize: 16,
     lineHeight: 18,
     fontWeight: '900',
@@ -2104,7 +2086,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: GRID * 3,
     top: 37,
-    zIndex: 3,
+    zIndex: 5,
     width: 48,
     height: 48,
     borderRadius: RADIUS_LG,
@@ -2114,7 +2096,8 @@ const styles = StyleSheet.create({
   },
   stageScroll: {
     flex: 1,
-    zIndex: 1,
+    zIndex: 2,
+    elevation: 2,
   },
   stageScrollContent: {
     paddingTop: GRID * 10,
@@ -2152,21 +2135,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.7)',
   },
   stageNumber: {
-    color: '#0284C7',
+    color: TEXT_ACCENT_COLOR,
     fontSize: 13,
     lineHeight: 16,
     fontWeight: '900',
     fontFamily: LATIN_FONT_FAMILY,
   },
   stageTarget: {
-    color: '#12334A',
+    color: TEXT_BASE_COLOR,
     fontSize: 24,
     lineHeight: 28,
     fontWeight: '900',
     fontFamily: LATIN_FONT_FAMILY,
   },
   stageNumberLocked: {
-    color: '#7DD3FC',
+    color: TEXT_ACCENT_COLOR,
   },
   stageDoneStarfish: {
     position: 'absolute',
@@ -2178,43 +2161,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     opacity: 0.86,
   },
-  stageDoneStarfishGlyph: {
-    color: '#EAB308',
-    fontSize: 20,
-    lineHeight: 24,
-    fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
-    textShadowColor: 'rgba(255, 255, 255, 0.82)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  stageDoneStarfishCenter: {
+  roundedStarfishArm: {
     position: 'absolute',
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 236, 153, 0.92)',
+    backgroundColor: '#EAB308',
     borderWidth: 1,
-    borderColor: 'rgba(202, 138, 4, 0.42)',
+    borderColor: 'rgba(202, 138, 4, 0.28)',
+    shadowColor: '#CA8A04',
+    shadowOpacity: 0.18,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
   },
-  stageDoneStarfishDot: {
+  roundedStarfishCenter: {
     position: 'absolute',
-    width: 2.5,
-    height: 2.5,
-    borderRadius: 2,
+    backgroundColor: '#FDE68A',
+    borderWidth: 1,
+    borderColor: 'rgba(202, 138, 4, 0.34)',
+  },
+  roundedStarfishDot: {
+    position: 'absolute',
     backgroundColor: 'rgba(180, 120, 12, 0.38)',
-  },
-  stageDoneStarfishDotTop: {
-    top: 6,
-    left: 11,
-  },
-  stageDoneStarfishDotRight: {
-    top: 11,
-    right: 6,
-  },
-  stageDoneStarfishDotBottom: {
-    bottom: 6,
-    left: 9,
   },
   pressed: {
     opacity: 0.72,

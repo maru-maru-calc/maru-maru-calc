@@ -15,8 +15,8 @@ test.describe('user-reported regressions', () => {
     await expect(page.getByTestId('operator-+')).toBeVisible();
     await page.getByLabel('Back', { exact: true }).click();
 
-    await expect(page.getByTestId('stage-addition-10-twos').getByText('★')).toBeVisible();
-    await expect(page.getByTestId('stage-addition-10-five-five').getByText('★')).toHaveCount(0);
+    await expect(page.getByTestId('stage-addition-10-twos').getByTestId('stage-done-starfish')).toBeVisible();
+    await expect(page.getByTestId('stage-addition-10-five-five').getByTestId('stage-done-starfish')).toHaveCount(0);
   });
 
   test('stage unlock progress is counted per world, not globally', async ({ page }) => {
@@ -253,18 +253,28 @@ async function expectHeaderGoalOrderAndVerticalPosition(page: Page) {
   const targetBox = await page.getByTestId('stage-goal-target').boundingBox();
   const equalsBox = await page.getByTestId('stage-goal-equals').boundingBox();
   const goalPartsBox = await page.getByTestId('stage-goal-parts').boundingBox();
+  const goalBeadBox = await page.getByTestId('stage-goal-bead').first().boundingBox();
   const stageNumberBox = await page.getByTestId('stage-goal-number').boundingBox();
   expect(targetBox).not.toBeNull();
   expect(equalsBox).not.toBeNull();
   expect(goalPartsBox).not.toBeNull();
+  expect(goalBeadBox).not.toBeNull();
   expect(stageNumberBox).not.toBeNull();
 
+  expect((stageNumberBox?.x ?? 0) + (stageNumberBox?.width ?? 0)).toBeLessThanOrEqual(goalPartsBox?.x ?? 0);
   expect((goalPartsBox?.x ?? 0) + (goalPartsBox?.width ?? 0)).toBeLessThanOrEqual(equalsBox?.x ?? 0);
   expect((equalsBox?.x ?? 0) + (equalsBox?.width ?? 0)).toBeLessThanOrEqual(targetBox?.x ?? 0);
-  expect((targetBox?.x ?? 0) + (targetBox?.width ?? 0)).toBeLessThanOrEqual(stageNumberBox?.x ?? 0);
 
-  const goalBottom = (goalPartsBox?.y ?? 0) + (goalPartsBox?.height ?? 0);
+  const goalBottom = (goalBeadBox?.y ?? 0) + (goalBeadBox?.height ?? 0);
   const targetBottom = (targetBox?.y ?? 0) + (targetBox?.height ?? 0);
-  expect(goalBottom).toBeLessThanOrEqual(targetBottom);
-  expect(targetBottom - goalBottom).toBeLessThanOrEqual(6);
+  expect(Math.abs(targetBottom - goalBottom)).toBeLessThanOrEqual(4);
+
+  const titleBox = await page.getByTestId('stage-goal-title').boundingBox();
+  expect(titleBox).not.toBeNull();
+
+  const stageNumberCenter = (stageNumberBox?.y ?? 0) + (stageNumberBox?.height ?? 0) / 2;
+  const equalsCenter = (equalsBox?.y ?? 0) + (equalsBox?.height ?? 0) / 2;
+  const visualCenter = ((goalBeadBox?.y ?? 0) + targetBottom) / 2;
+  expect(Math.abs(stageNumberCenter - visualCenter)).toBeLessThanOrEqual(5);
+  expect(Math.abs(equalsCenter - visualCenter)).toBeLessThanOrEqual(4);
 }
