@@ -1476,7 +1476,7 @@ export function MarumaruGame({
         </View>
       </View>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { width: fieldWidth }]}>
         <View style={styles.footerControls}>
           <ExpressionDisplay tokens={mode === 'launch' && pendingBubbles.length > 0 ? [String(LAUNCH_INITIAL_TOTAL), '+'] : expressionTokens} />
         </View>
@@ -3800,7 +3800,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    left: -GRID,
+    left: GRID,
     top: 0,
     zIndex: 2,
     width: HEADER_ACTION_BUTTON_SIZE,
@@ -3812,7 +3812,7 @@ const styles = StyleSheet.create({
   },
   headerRetryButton: {
     position: 'absolute',
-    right: -GRID,
+    right: GRID,
     top: 0,
     zIndex: 2,
     width: HEADER_ACTION_BUTTON_SIZE,
@@ -4291,7 +4291,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 48,
     borderRadius: RADIUS_LG,
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: 'rgba(186, 230, 253, 0.72)',
     backgroundColor: 'rgba(255, 255, 255, 0.82)',
     alignItems: 'center',
@@ -5029,6 +5029,8 @@ const styles = StyleSheet.create({
   footer: {
     zIndex: 1,
     minHeight: 96,
+    width: '100%',
+    alignItems: 'stretch',
     paddingHorizontal: GRID * 3,
     paddingTop: GRID,
     paddingBottom: GRID * 2,
@@ -5053,6 +5055,7 @@ const styles = StyleSheet.create({
   footerControls: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
     gap: 0,
   },
   launchPlayButton: {
@@ -5082,8 +5085,9 @@ const styles = StyleSheet.create({
     fontFamily: LATIN_FONT_FAMILY,
   },
   expressionBox: {
+    width: '100%',
     flex: 1,
-    minHeight: 48,
+    height: 48,
     paddingHorizontal: GRID * 2,
     borderRadius: RADIUS_LG,
     borderWidth: 3,
