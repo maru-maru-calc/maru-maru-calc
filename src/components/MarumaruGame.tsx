@@ -133,7 +133,7 @@ type GoalPart = {
 const FIELD_MARGIN = 0;
 const OPERATOR_TABS_HEIGHT = 64;
 const HEADER_HEIGHT = 112;
-const FOOTER_HEIGHT = 92;
+const FOOTER_HEIGHT = 96;
 const PREVIEW_Y = 38;
 const ATTRACTION_RADIUS = 220;
 const ATTRACTION_FORCE = 0.000095;
@@ -174,6 +174,7 @@ const RADIUS_MD = 12;
 const RADIUS_LG = 16;
 const RADIUS_XL = 24;
 const RADIUS_PILL = 999;
+const HEADER_ACTION_BUTTON_SIZE = 48;
 const MIN_TOUCH_TARGET_SIZE = 88;
 const TAP_DRIFT_TO_BURST_THRESHOLD = 24;
 const DETAILED_RELEASE_BEAD_LIMIT = 10;
@@ -3786,7 +3787,7 @@ const styles = StyleSheet.create({
   },
   header: {
     zIndex: 10,
-    minHeight: 116,
+    minHeight: 120,
     paddingHorizontal: GRID * 2,
     paddingTop: GRID,
     paddingBottom: GRID,
@@ -3801,23 +3802,23 @@ const styles = StyleSheet.create({
   backButton: {
     position: 'absolute',
     left: GRID,
-    top: 4,
+    top: GRID,
     zIndex: 2,
-    width: 42,
-    height: 42,
-    borderRadius: RADIUS_SM,
+    width: HEADER_ACTION_BUTTON_SIZE,
+    height: HEADER_ACTION_BUTTON_SIZE,
+    borderRadius: RADIUS_LG,
     backgroundColor: 'rgba(255, 255, 255, 0.26)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerRetryButton: {
     position: 'absolute',
-    right: 4,
-    top: 4,
+    right: GRID,
+    top: GRID,
     zIndex: 2,
-    width: 42,
-    height: 42,
-    borderRadius: RADIUS_SM,
+    width: HEADER_ACTION_BUTTON_SIZE,
+    height: HEADER_ACTION_BUTTON_SIZE,
+    borderRadius: RADIUS_LG,
     backgroundColor: 'rgba(255, 255, 255, 0.26)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -3830,7 +3831,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
   },
   headerLaunchNextButton: {
-    top: 19,
+    top: GRID,
   },
   headerRetryButtonFailed: {
     backgroundColor: 'rgba(255, 255, 255, 0.82)',
@@ -4290,7 +4291,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     flex: 1,
     height: 48,
-    borderRadius: RADIUS_MD,
+    borderRadius: RADIUS_LG,
     borderWidth: 2,
     borderColor: 'rgba(186, 230, 253, 0.72)',
     backgroundColor: 'rgba(255, 255, 255, 0.82)',
@@ -5028,7 +5029,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     zIndex: 1,
-    minHeight: 92,
+    minHeight: 96,
     paddingHorizontal: GRID * 3,
     paddingTop: GRID,
     paddingBottom: GRID * 2,
@@ -5058,7 +5059,7 @@ const styles = StyleSheet.create({
   launchPlayButton: {
     width: 64,
     height: 48,
-    borderRadius: RADIUS_MD,
+    borderRadius: RADIUS_LG,
     backgroundColor: 'rgba(255, 255, 255, 0.32)',
     alignItems: 'center',
     justifyContent: 'center',
