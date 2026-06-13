@@ -73,6 +73,21 @@ test.describe('user-reported regressions', () => {
     await expect(page.locator('[data-testid^="bead-multiplicand-8-"]')).toBeVisible();
   });
 
+  test('large value bubbles release place-value beads and subtraction resolves same-place cancellation', async ({ page }) => {
+    await page.goto('/');
+
+    await clearLaunch(page);
+    await openIslandFromWorld(page, '-');
+    await page.getByTestId('stage-subtraction-3').click();
+
+    await page.getByLabel('bubble-12').click();
+    await expect(page.locator('[data-testid^="bead-normal-1-"]')).toHaveCount(3);
+
+    await page.getByTestId('operator--').click();
+    await page.getByLabel('bubble-5').click();
+    await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 7000 });
+  });
+
   test('stage-select and game back buttons keep the same position and size', async ({ page }) => {
     await page.goto('/');
 

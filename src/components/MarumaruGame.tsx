@@ -137,6 +137,8 @@ const FOOTER_HEIGHT = 92;
 const PREVIEW_Y = 38;
 const ATTRACTION_RADIUS = 220;
 const ATTRACTION_FORCE = 0.000095;
+const ANNIHILATION_ATTRACTION_RADIUS = 360;
+const ANNIHILATION_ATTRACTION_FORCE = 0.00042;
 const SEPARATION_RADIUS = 92;
 const SEPARATION_FORCE = 0.000075;
 const BASIN_BODY_THICKNESS = 18;
@@ -165,9 +167,16 @@ const FIELD_BUBBLE_AUTO_BURST_IDLE_MS = 650;
 const FIELD_BUBBLE_AUTO_BURST_STEP_MS = 360;
 const OPERATORS: OperatorButtonSymbol[] = ['+', '-', '×', '÷'];
 const PLAYFUL_FONT_FAMILY = 'KiwiMaru';
+const LATIN_FONT_FAMILY = 'Helvetica';
+const GRID = 8;
+const RADIUS_SM = 8;
+const RADIUS_MD = 12;
+const RADIUS_LG = 16;
+const RADIUS_XL = 24;
+const RADIUS_PILL = 999;
 const MIN_TOUCH_TARGET_SIZE = 88;
 const TAP_DRIFT_TO_BURST_THRESHOLD = 24;
-const DETAILED_RELEASE_BEAD_LIMIT = 80;
+const DETAILED_RELEASE_BEAD_LIMIT = 10;
 const MULTIPLIER_BUBBLE_X_STEP = 0.34;
 const MULTIPLIER_BUBBLE_Y_STEP = 0.28;
 const COLLISION_CATEGORY_WORLD = 0x0001;
@@ -426,6 +435,11 @@ export function MarumaruGame({
       return;
     }
 
+    if (hasPendingSamePlaceCancellation(beads)) {
+      resultReadySinceRef.current = now;
+      return;
+    }
+
     const currentTotal = getTotalValue(beads);
     if (currentTotal === target) {
       setClearedStageId(stage.id);
@@ -495,7 +509,7 @@ export function MarumaruGame({
 
   const addReleasedBeads = useCallback(
     (totalCount: number, sign: BeadSign, center: { x: number; y: number }) => {
-      if (totalCount <= DETAILED_RELEASE_BEAD_LIMIT) {
+      if (totalCount < DETAILED_RELEASE_BEAD_LIMIT) {
         for (let index = 0; index < totalCount; index += 1) {
           const angle = -Math.PI / 2 + (Math.PI * 2 * index) / Math.max(totalCount, 1);
           const ring = 18 + Math.floor(index / 10) * 10;
@@ -850,20 +864,11 @@ export function MarumaruGame({
         expressionHistoryRef.current = stripExpressionResult(nextTokens);
         return nextTokens;
       });
-      for (let index = 0; index < bubble.count; index += 1) {
-        const angle = -Math.PI / 2 + (Math.PI * 2 * index) / bubble.count;
-        const offsetRadius = bubble.count <= 4 ? 14 : 22;
-        const x = bubble.x + Math.cos(angle) * offsetRadius;
-        const y = bubble.y + Math.sin(angle) * offsetRadius;
-        addBead(1, 1, sign, x, y, false, {
-          x: Math.cos(angle) * 1.8,
-          y: 1.5 + Math.sin(angle) * 0.8,
-        });
-      }
-      setMessage(`${bubble.count}この まるがでたよ`);
+      const usedPlaceValues = addReleasedBeads(bubble.count, sign, { x: bubble.x, y: bubble.y });
+      setMessage(usedPlaceValues ? `${bubble.count}を まとまったまるでだしたよ` : `${bubble.count}この まるがでたよ`);
       resetOperatorSelection();
     },
-    [addBead, divideWrappedGroup, isClear, isFailed, markBubbleInteraction, multiplyWrappedGroup, operatorUsage, playBubblePopSfx, triggerBubbleBurst],
+    [addReleasedBeads, divideWrappedGroup, isClear, isFailed, markBubbleInteraction, multiplyWrappedGroup, operatorUsage, playBubblePopSfx, triggerBubbleBurst],
   );
 
   const consumeOperatorUsage = (operator: OperatorButtonSymbol) => {
@@ -1467,6 +1472,7 @@ export function MarumaruGame({
           {mergeAnimation ? <MergePulse animation={mergeAnimation} /> : null}
           {divisionSplitAnimation ? <DivisionSplitOverlay animation={divisionSplitAnimation} /> : null}
           {divisionFailedAnimation ? <DivisionFailedOverlay animation={divisionFailedAnimation} tick={backgroundBubbleTick} /> : null}
+          {isFailed ? <FailedWaterOverlay progress={failedProgress} /> : null}
         </View>
       </View>
 
@@ -1736,6 +1742,19 @@ function MergePulse({ animation }: { animation: MergeAnimation }) {
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <View
         style={[
+          styles.mergeSettleGlow,
+          {
+            left: animation.center.x - nextKind.radius - 12,
+            top: animation.center.y - nextKind.radius - 12,
+            width: (nextKind.radius + 12) * 2,
+            height: (nextKind.radius + 12) * 2,
+            borderRadius: nextKind.radius + 12,
+            borderColor: nextKind.rimColor,
+          },
+        ]}
+      />
+      <View
+        style={[
           styles.mergePulse,
           {
             left: animation.center.x - nextKind.radius - 20,
@@ -1744,6 +1763,19 @@ function MergePulse({ animation }: { animation: MergeAnimation }) {
             height: (nextKind.radius + 20) * 2,
             borderRadius: nextKind.radius + 20,
             borderColor: nextKind.rimColor,
+            backgroundColor: nextKind.shineColor,
+          },
+          ]}
+      />
+      <View
+        style={[
+          styles.mergeSettleCore,
+          {
+            left: animation.center.x - nextKind.radius * 0.54,
+            top: animation.center.y - nextKind.radius * 0.54,
+            width: nextKind.radius * 1.08,
+            height: nextKind.radius * 1.08,
+            borderRadius: nextKind.radius,
             backgroundColor: nextKind.shineColor,
           },
         ]}
@@ -1764,6 +1796,19 @@ function MergePulse({ animation }: { animation: MergeAnimation }) {
           ]}
         />
       ))}
+    </View>
+  );
+}
+
+function FailedWaterOverlay({ progress }: { progress: number }) {
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.failedWaterOverlay, { opacity: progress }]}>
+      <View style={[styles.failedSiltCloud, styles.failedSiltCloudLeft]} />
+      <View style={[styles.failedSiltCloud, styles.failedSiltCloudCenter]} />
+      <View style={[styles.failedSiltCloud, styles.failedSiltCloudRight]} />
+      <View style={[styles.failedDeflatedBubble, styles.failedDeflatedBubbleOne]} />
+      <View style={[styles.failedDeflatedBubble, styles.failedDeflatedBubbleTwo]} />
+      <View style={[styles.failedDeflatedBubble, styles.failedDeflatedBubbleThree]} />
     </View>
   );
 }
@@ -2288,6 +2333,19 @@ function ClearBubbleFireworks({ fieldWidth, fieldHeight, tick }: { fieldWidth: n
       };
     });
   });
+  const starfish = burstSpecs.slice(0, 3).map((burst, index) => {
+    const age = (baseTime - burst.delay - 160 + cycle) % cycle;
+    const progress = Math.min(age / 1200, 1);
+    const opacity = progress >= 1 ? 0 : Math.max(0, 1 - progress) * 0.78;
+    const drift = 26 + index * 18;
+    return {
+      id: `clear-starfish-${index}`,
+      x: burst.x + Math.cos(index * 2.1) * drift,
+      y: burst.y + Math.sin(index * 1.7) * drift - progress * 34,
+      rotate: -16 + index * 18,
+      opacity,
+    };
+  });
 
   return (
     <View pointerEvents="none" style={styles.clearFireworkLayer}>
@@ -2307,6 +2365,22 @@ function ClearBubbleFireworks({ fieldWidth, fieldHeight, tick }: { fieldWidth: n
             },
           ]}
         />
+      ))}
+      {starfish.map((item) => (
+        <Text
+          key={item.id}
+          style={[
+            styles.clearFireworkStarfish,
+            {
+              left: item.x,
+              top: item.y,
+              opacity: item.opacity,
+              transform: [{ rotate: `${item.rotate}deg` }],
+            },
+          ]}
+        >
+          ★
+        </Text>
       ))}
     </View>
   );
@@ -2793,8 +2867,15 @@ function findDecompositionPair(beads: BeadSnapshot[]) {
         continue;
       }
 
+      const samePlaceCancellationTarget = beads.some(
+        (candidate) => candidate.id !== lower.id && candidate.value === lower.value && candidate.count === lower.count && candidate.sign === -lower.sign,
+      );
+      if (samePlaceCancellationTarget) {
+        continue;
+      }
+
       const distance = getPointDistance(higher, lower);
-      const threshold = getEntityRadius(higher.value, higher.count) + getEntityRadius(lower.value, lower.count) + 8;
+      const threshold = getEntityRadius(higher.value, higher.count) + getEntityRadius(lower.value, lower.count) + 14;
       if (distance <= threshold) {
         return {
           higherBeadId: higher.id,
@@ -2846,7 +2927,7 @@ function findAnnihilationPair(beads: BeadSnapshot[]) {
       }
 
       const distance = getPointDistance(positive, negative);
-      const threshold = getEntityRadius(positive.value, positive.count) * 2.35;
+      const threshold = Math.max(160, getEntityRadius(positive.value, positive.count) + getEntityRadius(negative.value, negative.count) + 34);
       if (distance <= threshold) {
         candidates.push({
           beadIds: [positive.id, negative.id],
@@ -2863,6 +2944,18 @@ function findAnnihilationPair(beads: BeadSnapshot[]) {
 
   const pair = candidates.sort((left, right) => left.value - right.value || left.distance - right.distance)[0];
   return pair ? { beadIds: pair.beadIds, center: pair.center } : undefined;
+}
+
+function hasPendingSamePlaceCancellation(beads: BeadSnapshot[]) {
+  return beads.some((left, leftIndex) =>
+    beads.some(
+      (right, rightIndex) =>
+        leftIndex !== rightIndex &&
+        left.sign !== right.sign &&
+        left.value === right.value &&
+        left.count === right.count,
+    ),
+  );
 }
 
 function isUnitMergeSettled(cluster: MergeCluster, entities: BeadEntity[], fieldHeight: number) {
@@ -3353,6 +3446,26 @@ function applyBeadForces(entities: BeadEntity[], draggingBeadId?: string) {
       const rightSpeed = Math.sqrt(right.body.velocity.x * right.body.velocity.x + right.body.velocity.y * right.body.velocity.y);
       const velocityFactor = clamp(1 - (leftSpeed + rightSpeed) / 18, 0.35, 1);
 
+      if (left.sign !== right.sign && left.value === right.value && left.count === right.count) {
+        if (distance > ANNIHILATION_ATTRACTION_RADIUS) {
+          continue;
+        }
+
+        const closeness = 1 - distance / ANNIHILATION_ATTRACTION_RADIUS;
+        const strength = ANNIHILATION_ATTRACTION_FORCE * closeness * closeness * velocityFactor;
+        const force = {
+          x: (dx / distance) * strength,
+          y: (dy / distance) * strength,
+        };
+
+        Matter.Body.applyForce(left.body, left.body.position, force);
+        Matter.Body.applyForce(right.body, right.body.position, {
+          x: -force.x,
+          y: -force.y,
+        });
+        continue;
+      }
+
       if (left.sign !== right.sign || left.value !== right.value || !getNextPlaceValue(left.value)) {
         applySeparationForce(left, right, dx, dy, distance, velocityFactor);
         continue;
@@ -3674,9 +3787,9 @@ const styles = StyleSheet.create({
   header: {
     zIndex: 10,
     minHeight: 116,
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingHorizontal: GRID * 2,
+    paddingTop: GRID,
+    paddingBottom: GRID,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -3687,12 +3800,12 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    left: 4,
+    left: GRID,
     top: 4,
     zIndex: 2,
     width: 42,
     height: 42,
-    borderRadius: 8,
+    borderRadius: RADIUS_SM,
     backgroundColor: 'rgba(255, 255, 255, 0.26)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -3704,7 +3817,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
     width: 42,
     height: 42,
-    borderRadius: 8,
+    borderRadius: RADIUS_SM,
     backgroundColor: 'rgba(255, 255, 255, 0.26)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -3743,7 +3856,7 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: '900',
     textAlign: 'center',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   stageGameTitle: {
     flexDirection: 'row',
@@ -3763,7 +3876,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     lineHeight: 28,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
     includeFontPadding: false,
   },
   stageGameTarget: {
@@ -3771,7 +3884,7 @@ const styles = StyleSheet.create({
     fontSize: 34,
     lineHeight: 38,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
     includeFontPadding: false,
   },
   stageGameEquals: {
@@ -3779,7 +3892,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     lineHeight: 31,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
     includeFontPadding: false,
   },
   headerGoalParts: {
@@ -3809,7 +3922,7 @@ const styles = StyleSheet.create({
     right: 4,
     top: 4,
     bottom: 4,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.52)',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -3833,7 +3946,7 @@ const styles = StyleSheet.create({
     bottom: -5,
     minWidth: 17,
     height: 17,
-    borderRadius: 9,
+    borderRadius: RADIUS_PILL,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.86)',
     backgroundColor: 'rgba(224, 247, 255, 0.96)',
@@ -3845,12 +3958,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     lineHeight: 12,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   headerGoalOverflow: {
     minWidth: 22,
     height: 22,
-    borderRadius: 11,
+    borderRadius: RADIUS_PILL,
     backgroundColor: 'rgba(255, 255, 255, 0.46)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -3860,7 +3973,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 13,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   launchLogo: {
     alignItems: 'center',
@@ -3878,7 +3991,7 @@ const styles = StyleSheet.create({
     lineHeight: 54,
     fontWeight: '900',
     letterSpacing: 0,
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
     textAlign: 'center',
     zIndex: 2,
     textShadowColor: 'rgba(56, 141, 182, 0.34)',
@@ -3902,6 +4015,7 @@ const styles = StyleSheet.create({
     height: 1,
     opacity: 0,
     overflow: 'hidden',
+    fontFamily: LATIN_FONT_FAMILY,
   },
   scoreShelf: {
     flexDirection: 'row',
@@ -3909,11 +4023,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   goalCupBox: {
-    width: 92,
-    minHeight: 92,
-    paddingVertical: 7,
-    paddingHorizontal: 8,
-    borderRadius: 18,
+    width: 96,
+    minHeight: 96,
+    paddingVertical: GRID,
+    paddingHorizontal: GRID,
+    borderRadius: RADIUS_LG,
     backgroundColor: '#E0F7FF',
     borderWidth: 3,
     borderColor: '#38BDF8',
@@ -3933,10 +4047,10 @@ const styles = StyleSheet.create({
   },
   goalCup: {
     width: 48,
-    height: 44,
-    marginTop: 4,
+    height: 48,
+    marginTop: GRID / 2,
     overflow: 'hidden',
-    borderRadius: 12,
+    borderRadius: RADIUS_MD,
     borderWidth: 3,
     borderTopWidth: 5,
     borderColor: '#0284C7',
@@ -3965,6 +4079,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '900',
     lineHeight: 24,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   goalCupStatus: {
     marginTop: 3,
@@ -3975,10 +4090,10 @@ const styles = StyleSheet.create({
     maxWidth: 74,
   },
   totalBox: {
-    minWidth: 68,
-    paddingVertical: 9,
-    paddingHorizontal: 9,
-    borderRadius: 18,
+    minWidth: 72,
+    paddingVertical: GRID,
+    paddingHorizontal: GRID,
+    borderRadius: RADIUS_LG,
     backgroundColor: '#FFFFFF',
     borderWidth: 3,
     borderColor: '#38BDF8',
@@ -3999,6 +4114,7 @@ const styles = StyleSheet.create({
     color: '#12334A',
     fontSize: 28,
     fontWeight: '900',
+    fontFamily: LATIN_FONT_FAMILY,
   },
   playArea: {
     zIndex: 1,
@@ -4019,6 +4135,63 @@ const styles = StyleSheet.create({
     zIndex: 5,
     backgroundColor: 'rgba(3, 7, 18, 0.38)',
   },
+  failedWaterOverlay: {
+    zIndex: 5,
+    overflow: 'hidden',
+  },
+  failedSiltCloud: {
+    position: 'absolute',
+    bottom: 18,
+    borderRadius: 999,
+    backgroundColor: 'rgba(186, 230, 253, 0.24)',
+    borderWidth: 2,
+    borderColor: 'rgba(125, 211, 252, 0.18)',
+  },
+  failedSiltCloudLeft: {
+    left: 24,
+    width: 120,
+    height: 56,
+  },
+  failedSiltCloudCenter: {
+    left: '34%',
+    width: 148,
+    height: 68,
+    bottom: 6,
+  },
+  failedSiltCloudRight: {
+    right: 20,
+    width: 106,
+    height: 50,
+    bottom: 28,
+  },
+  failedDeflatedBubble: {
+    position: 'absolute',
+    borderWidth: 3,
+    borderColor: 'rgba(186, 230, 253, 0.42)',
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    transform: [{ scaleY: 0.62 }],
+  },
+  failedDeflatedBubbleOne: {
+    left: '22%',
+    top: '28%',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  failedDeflatedBubbleTwo: {
+    right: '24%',
+    top: '44%',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+  },
+  failedDeflatedBubbleThree: {
+    left: '48%',
+    bottom: '24%',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+  },
   clearFireworkLayer: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 7,
@@ -4032,6 +4205,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.92,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 0 },
+  },
+  clearFireworkStarfish: {
+    position: 'absolute',
+    color: '#EAB308',
+    fontSize: 18,
+    lineHeight: 20,
+    fontWeight: '900',
+    fontFamily: PLAYFUL_FONT_FAMILY,
+    textShadowColor: 'rgba(255, 255, 255, 0.68)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   backgroundBubbleLayer: {
     ...StyleSheet.absoluteFillObject,
@@ -4094,19 +4278,19 @@ const styles = StyleSheet.create({
     zIndex: 1,
     width: '100%',
     height: OPERATOR_TABS_HEIGHT,
-    paddingHorizontal: 22,
-    paddingTop: 7,
-    paddingBottom: 7,
+    paddingHorizontal: GRID * 3,
+    paddingTop: GRID,
+    paddingBottom: GRID,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: GRID,
     backgroundColor: '#C6E8F4',
   },
   operatorButton: {
     position: 'relative',
     flex: 1,
-    height: 50,
-    borderRadius: 12,
+    height: 48,
+    borderRadius: RADIUS_MD,
     borderWidth: 2,
     borderColor: 'rgba(186, 230, 253, 0.72)',
     backgroundColor: 'rgba(255, 255, 255, 0.82)',
@@ -4152,7 +4336,7 @@ const styles = StyleSheet.create({
     minWidth: 22,
     height: 22,
     paddingHorizontal: 6,
-    borderRadius: 11,
+    borderRadius: RADIUS_PILL,
     borderWidth: 2,
     borderColor: '#FFFFFF',
     backgroundColor: '#0EA5E9',
@@ -4168,7 +4352,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 14,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   basinTraySegment: {
     position: 'absolute',
@@ -4259,7 +4443,7 @@ const styles = StyleSheet.create({
     right: 6,
     top: 6,
     bottom: 6,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.62)',
     backgroundColor: 'rgba(255, 255, 255, 0.04)',
@@ -4293,6 +4477,20 @@ const styles = StyleSheet.create({
     zIndex: 3,
     borderWidth: 4,
     opacity: 0.28,
+  },
+  mergeSettleGlow: {
+    position: 'absolute',
+    zIndex: 2,
+    borderWidth: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    opacity: 0.52,
+  },
+  mergeSettleCore: {
+    position: 'absolute',
+    zIndex: 4,
+    opacity: 0.62,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.72)',
   },
   mergePopParticle: {
     position: 'absolute',
@@ -4456,7 +4654,7 @@ const styles = StyleSheet.create({
     right: 7,
     top: 7,
     bottom: 7,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.52)',
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
@@ -4466,9 +4664,9 @@ const styles = StyleSheet.create({
     right: -6,
     bottom: -4,
     minWidth: 30,
-    height: 26,
-    paddingHorizontal: 7,
-    borderRadius: 13,
+    height: 24,
+    paddingHorizontal: GRID,
+    borderRadius: RADIUS_PILL,
     borderWidth: 2,
     borderColor: '#BAE6FD',
     backgroundColor: 'rgba(255, 255, 255, 0.94)',
@@ -4485,6 +4683,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     lineHeight: 18,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   containedBead: {
     position: 'absolute',
@@ -4516,11 +4715,11 @@ const styles = StyleSheet.create({
   clearPanel: {
     position: 'absolute',
     zIndex: 6,
-    left: 24,
-    right: 24,
+    left: GRID * 3,
+    right: GRID * 3,
     top: '34%',
-    padding: 18,
-    borderRadius: 22,
+    padding: GRID * 3,
+    borderRadius: RADIUS_XL,
     borderWidth: 3,
     borderColor: '#0EA5E9',
     backgroundColor: '#FFFFFF',
@@ -4558,11 +4757,11 @@ const styles = StyleSheet.create({
   resultPanel: {
     position: 'absolute',
     zIndex: 6,
-    left: 30,
-    right: 30,
+    left: GRID * 4,
+    right: GRID * 4,
     top: '22%',
-    padding: 18,
-    borderRadius: 24,
+    padding: GRID * 3,
+    borderRadius: RADIUS_XL,
     backgroundColor: 'rgba(246, 253, 255, 0.88)',
     alignItems: 'center',
     shadowColor: '#0284C7',
@@ -4728,23 +4927,24 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
     textAlign: 'center',
     maxWidth: '100%',
+    fontFamily: LATIN_FONT_FAMILY,
   },
   failedEquation: {
     fontSize: 34,
   },
   resultActions: {
-    marginTop: 24,
+    marginTop: GRID * 3,
     width: '100%',
     flexDirection: 'row',
-    gap: 12,
+    gap: GRID * 2,
   },
   resultActionsFailed: {
     marginTop: 24,
   },
   resultActionButton: {
-    width: 76,
-    height: 62,
-    borderRadius: 10,
+    width: 80,
+    height: 64,
+    borderRadius: RADIUS_MD,
     backgroundColor: 'rgba(255, 255, 255, 0.34)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -4829,14 +5029,14 @@ const styles = StyleSheet.create({
   footer: {
     zIndex: 1,
     minHeight: 92,
-    paddingHorizontal: 28,
-    paddingTop: 12,
-    paddingBottom: 20,
+    paddingHorizontal: GRID * 3,
+    paddingTop: GRID,
+    paddingBottom: GRID * 2,
   },
   statusMessageBox: {
-    minHeight: 34,
-    paddingHorizontal: 14,
-    borderRadius: 16,
+    minHeight: 32,
+    paddingHorizontal: GRID * 2,
+    borderRadius: RADIUS_LG,
     backgroundColor: 'rgba(255, 255, 255, 0.72)',
     justifyContent: 'center',
   },
@@ -4856,9 +5056,9 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   launchPlayButton: {
-    width: 62,
-    height: 52,
-    borderRadius: 10,
+    width: 64,
+    height: 48,
+    borderRadius: RADIUS_MD,
     backgroundColor: 'rgba(255, 255, 255, 0.32)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -4879,13 +5079,13 @@ const styles = StyleSheet.create({
     fontSize: 30,
     lineHeight: 32,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   expressionBox: {
     flex: 1,
-    minHeight: 50,
-    paddingHorizontal: 14,
-    borderRadius: 18,
+    minHeight: 48,
+    paddingHorizontal: GRID * 2,
+    borderRadius: RADIUS_LG,
     borderWidth: 3,
     borderColor: 'rgba(186, 230, 253, 0.72)',
     backgroundColor: 'rgba(255, 255, 255, 0.58)',
@@ -4897,16 +5097,16 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     fontWeight: '900',
     textAlign: 'center',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   expressionPlaceholder: {
     color: '#7DD3FC',
   },
   button: {
     minHeight: 48,
-    minWidth: 92,
-    paddingHorizontal: 16,
-    borderRadius: 16,
+    minWidth: 96,
+    paddingHorizontal: GRID * 2,
+    borderRadius: RADIUS_LG,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#0EA5E9',
@@ -4931,6 +5131,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '900',
+    fontFamily: LATIN_FONT_FAMILY,
   },
   secondaryButtonText: {
     color: '#12334A',

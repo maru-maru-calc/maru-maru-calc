@@ -35,6 +35,11 @@ type DepthFishSpec = {
 const DEPTH_BUBBLE_TICK_MS = 90;
 const DEPTH_CREATURE_REACTION_MS = 920;
 const PLAYFUL_FONT_FAMILY = 'KiwiMaru';
+const LATIN_FONT_FAMILY = 'Helvetica';
+const GRID = 8;
+const RADIUS_SM = 8;
+const RADIUS_LG = 16;
+const RADIUS_PILL = 999;
 
 export default function IndexScreen() {
   const { width, height } = useWindowDimensions();
@@ -685,6 +690,7 @@ function StageNode({
     >
       <View pointerEvents="none" style={styles.nodeBubbleInnerGlow} />
       <View pointerEvents="none" style={styles.nodeBubbleShine} />
+      {isLocked ? <View pointerEvents="none" style={styles.stageLockedMembrane} /> : null}
       <Text style={[styles.stageNumber, isLocked && styles.stageNumberLocked]}>#{number}</Text>
       <Text style={[styles.stageTarget, isLocked && styles.stageNumberLocked]}>{stage.target}</Text>
       {isDone ? <StageDoneStarfish /> : null}
@@ -751,9 +757,15 @@ function SingingMermaid({ isVocalEnabled, mapWidth, onPress }: { isVocalEnabled:
       testID="singing-mermaid"
       style={({ pressed }) => [styles.singingMermaid, isVocalEnabled && styles.singingMermaidActive, { left }, pressed && styles.pressed]}
     >
-      <View style={styles.mermaidSongBubbleOne} />
-      <View style={styles.mermaidSongBubbleTwo} />
-      <Text style={[styles.mermaidSongNote, isVocalEnabled && styles.mermaidSongNoteActive]}>♪</Text>
+      <View style={[styles.mermaidSongBubbleOne, isVocalEnabled && styles.mermaidSongBubbleActive]} />
+      <View style={[styles.mermaidSongBubbleTwo, isVocalEnabled && styles.mermaidSongBubbleActive]} />
+      <View style={[styles.mermaidSongBubbleThree, isVocalEnabled && styles.mermaidSongBubbleActiveStrong]} />
+      {isVocalEnabled ? (
+        <>
+          <View style={[styles.mermaidSongPulse, styles.mermaidSongPulseOne]} />
+          <View style={[styles.mermaidSongPulse, styles.mermaidSongPulseTwo]} />
+        </>
+      ) : null}
       <View style={styles.mermaidRockBack} />
       <View style={styles.mermaidRockLeft} />
       <View style={styles.mermaidRockRight} />
@@ -937,7 +949,7 @@ const styles = StyleSheet.create({
     top: '18%',
     width: '26%',
     height: '26%',
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: 'rgba(255, 255, 255, 0.58)',
   },
   depthShade: {
@@ -981,7 +993,7 @@ const styles = StyleSheet.create({
     top: '15%',
     width: '72%',
     height: '70%',
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     backgroundColor: 'rgba(251, 146, 60, 0.56)',
     borderWidth: 1,
     borderColor: 'rgba(251, 191, 36, 0.38)',
@@ -1573,8 +1585,8 @@ const styles = StyleSheet.create({
   },
   worldScrollContent: {
     minHeight: 1580,
-    paddingTop: 76,
-    paddingBottom: 90,
+    paddingTop: GRID * 10,
+    paddingBottom: GRID * 12,
   },
   routeLayer: {
     position: 'relative',
@@ -1612,21 +1624,52 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(125, 211, 252, 0.44)',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
-  mermaidSongNote: {
+  mermaidSongBubbleThree: {
     position: 'absolute',
-    right: 46,
-    top: 0,
-    color: 'rgba(2, 132, 199, 0.5)',
-    fontSize: 22,
-    lineHeight: 24,
-    fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    right: 50,
+    top: 4,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: 'rgba(125, 211, 252, 0.4)',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
   },
-  mermaidSongNoteActive: {
-    color: 'rgba(236, 72, 153, 0.72)',
-    textShadowColor: 'rgba(255, 255, 255, 0.56)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+  mermaidSongBubbleActive: {
+    borderColor: 'rgba(56, 189, 248, 0.78)',
+    backgroundColor: 'rgba(224, 247, 255, 0.5)',
+    shadowColor: '#7DD3FC',
+    shadowOpacity: 0.34,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  mermaidSongBubbleActiveStrong: {
+    borderColor: 'rgba(45, 212, 191, 0.82)',
+    backgroundColor: 'rgba(204, 251, 241, 0.52)',
+    shadowColor: '#2DD4BF',
+    shadowOpacity: 0.36,
+    shadowRadius: 9,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  mermaidSongPulse: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderColor: 'rgba(125, 211, 252, 0.36)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  mermaidSongPulseOne: {
+    right: 22,
+    top: 6,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+  },
+  mermaidSongPulseTwo: {
+    right: 2,
+    top: 26,
+    width: 25,
+    height: 25,
+    borderRadius: 13,
   },
   mermaidRockBack: {
     position: 'absolute',
@@ -1960,7 +2003,7 @@ const styles = StyleSheet.create({
     right: 8,
     top: 8,
     bottom: 8,
-    borderRadius: 999,
+    borderRadius: RADIUS_PILL,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.58)',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -1977,9 +2020,9 @@ const styles = StyleSheet.create({
   },
   worldNode: {
     position: 'absolute',
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     borderWidth: 3,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1997,7 +2040,7 @@ const styles = StyleSheet.create({
     fontSize: 36,
     lineHeight: 40,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   worldSymbolActive: {
     color: '#0EA5E9',
@@ -2006,7 +2049,7 @@ const styles = StyleSheet.create({
     color: '#0284C7',
     fontSize: 11,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   worldProgressActive: {
     color: '#075985',
@@ -2016,15 +2059,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 22,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   mixedCountBadge: {
     position: 'absolute',
-    right: -2,
-    bottom: -2,
-    minWidth: 28,
-    height: 28,
-    borderRadius: 14,
+    right: -4,
+    bottom: -4,
+    minWidth: 32,
+    height: 32,
+    borderRadius: RADIUS_PILL,
     borderWidth: 3,
     borderColor: '#FFFFFF',
     backgroundColor: '#0EA5E9',
@@ -2035,15 +2078,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   freeBadge: {
     position: 'absolute',
-    left: -2,
-    bottom: -2,
-    minWidth: 28,
-    height: 28,
-    borderRadius: 14,
+    left: -4,
+    bottom: -4,
+    minWidth: 32,
+    height: 32,
+    borderRadius: RADIUS_PILL,
     borderWidth: 3,
     borderColor: '#FFFFFF',
     backgroundColor: '#FACC15',
@@ -2055,16 +2098,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 18,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   backButton: {
     position: 'absolute',
-    left: 22,
+    left: GRID * 3,
     top: 40,
     zIndex: 3,
     width: 42,
     height: 42,
-    borderRadius: 8,
+    borderRadius: RADIUS_SM,
     backgroundColor: 'rgba(255, 255, 255, 0.26)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2074,8 +2117,8 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   stageScrollContent: {
-    paddingTop: 76,
-    paddingBottom: 90,
+    paddingTop: GRID * 10,
+    paddingBottom: GRID * 12,
   },
   stageMap: {
     position: 'relative',
@@ -2094,6 +2137,17 @@ const styles = StyleSheet.create({
     opacity: 0.48,
     borderColor: 'rgba(186, 230, 253, 0.8)',
   },
+  stageLockedMembrane: {
+    position: 'absolute',
+    left: 6,
+    right: 6,
+    top: 6,
+    bottom: 6,
+    borderRadius: RADIUS_PILL,
+    borderWidth: 3,
+    borderColor: 'rgba(224, 247, 255, 0.7)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
   stageNodeDone: {
     backgroundColor: 'rgba(255, 255, 255, 0.7)',
   },
@@ -2102,14 +2156,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 16,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   stageTarget: {
     color: '#12334A',
     fontSize: 24,
     lineHeight: 28,
     fontWeight: '900',
-    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontFamily: LATIN_FONT_FAMILY,
   },
   stageNumberLocked: {
     color: '#7DD3FC',

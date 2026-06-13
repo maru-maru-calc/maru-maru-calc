@@ -5,7 +5,7 @@ test.use({ viewport: { width: 390, height: 844 } });
 test('operator limits match launch and addition island rules', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.getByTestId('operator-+')).toBeDisabled();
+  await expect(page.getByTestId('operator-+')).toBeEnabled();
   await expect(page.getByTestId('operator--')).toBeDisabled();
   await expect(page.getByTestId('operator-×')).toBeDisabled();
   await expect(page.getByTestId('operator-÷')).toBeDisabled();
@@ -158,18 +158,19 @@ test('subtraction with tens does not drift from the expression result', async ({
   await openIsland(page, '-');
   await page.getByTestId('stage-subtraction-3').click();
 
-  await page.getByLabel('bubble-30').click();
+  await page.getByLabel('bubble-12').click();
   await page.getByTestId('operator--').click();
-  await page.getByLabel('bubble-10').first().click();
+  await page.getByLabel('bubble-5').first().click();
 
-  await expect(page.getByTestId('expression-display-text')).toContainText('30 - 10 = 20');
-  await expect(page.getByTestId('current-total-value')).toHaveText('20');
-  await expect(page.getByLabel('clear equation')).toContainText('30 - 10 = 20');
+  await expect(page.getByTestId('expression-display-text')).toContainText('12 - 5 = 7');
+  await expect(page.getByTestId('current-total-value')).toHaveText('7');
+  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 7000 });
 });
 
 async function openIsland(page: Page, label: string) {
-  await page.getByTestId('launch-play').click();
-  await expect(page.getByTestId('launch-tada')).toBeVisible();
+  await page.getByLabel('bubble-5').click();
+  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
+  await page.getByLabel('next stage').click();
   await expect(page.getByTestId('world-select')).toBeVisible();
   await page.getByLabel(label, { exact: true }).click();
 }
