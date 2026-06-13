@@ -109,7 +109,7 @@ test.describe('user-reported regressions', () => {
     expect(Math.abs((gameBackBox?.height ?? 0) - (stageBackBox?.height ?? 0))).toBeLessThanOrEqual(1);
   });
 
-  test('launch-clear and game-clear next buttons keep the same position and size', async ({ page }) => {
+test('launch-clear and game-clear next buttons keep the same position and size', async ({ page }) => {
     await page.goto('/');
 
     await page.getByLabel('bubble-5').click();
@@ -127,8 +127,61 @@ test.describe('user-reported regressions', () => {
     expect(gameNextBox).not.toBeNull();
     expect(Math.abs((gameNextBox?.x ?? 0) - (launchNextBox?.x ?? 0))).toBeLessThanOrEqual(1);
     expect(Math.abs((gameNextBox?.y ?? 0) - (launchNextBox?.y ?? 0))).toBeLessThanOrEqual(1);
-    expect(Math.abs((gameNextBox?.width ?? 0) - (launchNextBox?.width ?? 0))).toBeLessThanOrEqual(1);
-    expect(Math.abs((gameNextBox?.height ?? 0) - (launchNextBox?.height ?? 0))).toBeLessThanOrEqual(1);
+  expect(Math.abs((gameNextBox?.width ?? 0) - (launchNextBox?.width ?? 0))).toBeLessThanOrEqual(1);
+  expect(Math.abs((gameNextBox?.height ?? 0) - (launchNextBox?.height ?? 0))).toBeLessThanOrEqual(1);
+});
+
+  test('launch and game operator buttons keep the same position and size', async ({ page }) => {
+    await page.goto('/');
+
+    const launchOperatorPlusBox = await page.getByTestId('operator-+').boundingBox();
+    const launchOperatorMinusBox = await page.getByTestId('operator--').boundingBox();
+    const launchOperatorMultiplyBox = await page.getByTestId('operator-×').boundingBox();
+    const launchOperatorDivideBox = await page.getByTestId('operator-÷').boundingBox();
+    expect(launchOperatorPlusBox).not.toBeNull();
+    expect(launchOperatorMinusBox).not.toBeNull();
+    expect(launchOperatorMultiplyBox).not.toBeNull();
+    expect(launchOperatorDivideBox).not.toBeNull();
+
+    await clearLaunch(page);
+    await expect(page.getByTestId('world-select')).toBeVisible();
+    await openIslandFromWorld(page, '+');
+    await expect(page.getByTestId('stage-addition-10-twos')).toBeVisible();
+    await page.getByTestId('stage-addition-10-twos').click();
+    await expect(page.getByTestId('operator-+')).toBeVisible();
+
+    const gameOperatorPlusBox = await page.getByTestId('operator-+').boundingBox();
+    const gameOperatorMinusBox = await page.getByTestId('operator--').boundingBox();
+    const gameOperatorMultiplyBox = await page.getByTestId('operator-×').boundingBox();
+    const gameOperatorDivideBox = await page.getByTestId('operator-÷').boundingBox();
+    expect(gameOperatorPlusBox).not.toBeNull();
+    expect(gameOperatorMinusBox).not.toBeNull();
+    expect(gameOperatorMultiplyBox).not.toBeNull();
+    expect(gameOperatorDivideBox).not.toBeNull();
+
+    assertBoxMatch(launchOperatorPlusBox, gameOperatorPlusBox);
+    assertBoxMatch(launchOperatorMinusBox, gameOperatorMinusBox);
+    assertBoxMatch(launchOperatorMultiplyBox, gameOperatorMultiplyBox);
+    assertBoxMatch(launchOperatorDivideBox, gameOperatorDivideBox);
+  });
+
+  test('launch and game expression boxes keep the same position and size', async ({ page }) => {
+    await page.goto('/');
+
+    const launchExpressionBox = await page.getByTestId('expression-display').boundingBox();
+    expect(launchExpressionBox).not.toBeNull();
+
+    await clearLaunch(page);
+    await expect(page.getByTestId('world-select')).toBeVisible();
+    await openIslandFromWorld(page, '+');
+    await expect(page.getByTestId('stage-addition-10-twos')).toBeVisible();
+    await page.getByTestId('stage-addition-10-twos').click();
+    await expect(page.getByTestId('expression-display')).toBeVisible();
+
+    const gameExpressionBox = await page.getByTestId('expression-display').boundingBox();
+    expect(gameExpressionBox).not.toBeNull();
+
+    assertBoxMatch(launchExpressionBox, gameExpressionBox);
   });
 
   test('retry icon uses the same image icon pipeline as back and next', async ({ page }) => {
@@ -181,6 +234,19 @@ async function clearAdditionTwos(page: Page) {
   }
   await expect(page.getByTestId('current-total-value')).toHaveText('10');
   await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
+}
+
+function assertBoxMatch(actual: { x: number; y: number; width: number; height: number } | null, expected: { x: number; y: number; width: number; height: number } | null) {
+  expect(actual).not.toBeNull();
+  expect(expected).not.toBeNull();
+
+  const actualBox = actual as { x: number; y: number; width: number; height: number };
+  const expectedBox = expected as { x: number; y: number; width: number; height: number };
+
+  expect(Math.abs(actualBox.x - expectedBox.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(actualBox.y - expectedBox.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(actualBox.width - expectedBox.width)).toBeLessThanOrEqual(1);
+  expect(Math.abs(actualBox.height - expectedBox.height)).toBeLessThanOrEqual(1);
 }
 
 async function expectHeaderGoalOrderAndVerticalPosition(page: Page) {
