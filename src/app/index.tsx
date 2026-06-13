@@ -2103,7 +2103,7 @@ const styles = StyleSheet.create({
   backButton: {
     position: 'absolute',
     left: GRID,
-    top: GRID,
+    top: 37,
     zIndex: 3,
     width: 48,
     height: 48,

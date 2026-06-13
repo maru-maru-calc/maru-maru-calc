@@ -2,7 +2,6 @@ import * as Matter from 'matter-js';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { SFX } from '@/audio/sfx';
 import { useOneShotAudio } from '@/audio/use-one-shot-audio';
@@ -1343,7 +1342,7 @@ export function MarumaruGame({
   const failedEquation = `${total} ≠ ${target}`;
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <View style={styles.screen}>
       <View style={styles.header}>
         <View style={styles.headerTitleGroup}>
           {onBack && mode !== 'launch' ? (
@@ -1494,7 +1493,7 @@ export function MarumaruGame({
           setBackgroundBubbleStarts((current) => ({ ...current, [bubbleId]: Date.now() }));
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -3801,8 +3800,8 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    left: GRID,
-    top: GRID,
+    left: -GRID,
+    top: 0,
     zIndex: 2,
     width: HEADER_ACTION_BUTTON_SIZE,
     height: HEADER_ACTION_BUTTON_SIZE,
@@ -3813,8 +3812,8 @@ const styles = StyleSheet.create({
   },
   headerRetryButton: {
     position: 'absolute',
-    right: GRID,
-    top: GRID,
+    right: -GRID,
+    top: 0,
     zIndex: 2,
     width: HEADER_ACTION_BUTTON_SIZE,
     height: HEADER_ACTION_BUTTON_SIZE,
@@ -3831,7 +3830,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
   },
   headerLaunchNextButton: {
-    top: GRID,
+    top: 15,
   },
   headerRetryButtonFailed: {
     backgroundColor: 'rgba(255, 255, 255, 0.82)',
