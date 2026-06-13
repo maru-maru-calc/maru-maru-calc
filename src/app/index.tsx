@@ -687,8 +687,20 @@ function StageNode({
       <View pointerEvents="none" style={styles.nodeBubbleShine} />
       <Text style={[styles.stageNumber, isLocked && styles.stageNumberLocked]}>#{number}</Text>
       <Text style={[styles.stageTarget, isLocked && styles.stageNumberLocked]}>{stage.target}</Text>
-      {isDone ? <Text style={styles.stageDoneStar}>★</Text> : null}
+      {isDone ? <StageDoneStarfish /> : null}
     </Pressable>
+  );
+}
+
+function StageDoneStarfish() {
+  return (
+    <View pointerEvents="none" style={styles.stageDoneStarfish}>
+      <Text style={styles.stageDoneStarfishGlyph}>★</Text>
+      <View style={styles.stageDoneStarfishCenter} />
+      <View style={[styles.stageDoneStarfishDot, styles.stageDoneStarfishDotTop]} />
+      <View style={[styles.stageDoneStarfishDot, styles.stageDoneStarfishDotRight]} />
+      <View style={[styles.stageDoneStarfishDot, styles.stageDoneStarfishDotBottom]} />
+    </View>
   );
 }
 
@@ -2102,19 +2114,53 @@ const styles = StyleSheet.create({
   stageNumberLocked: {
     color: '#7DD3FC',
   },
-  stageDoneStar: {
+  stageDoneStarfish: {
     position: 'absolute',
     right: -4,
     top: -7,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.86,
+  },
+  stageDoneStarfishGlyph: {
     color: '#EAB308',
     fontSize: 20,
     lineHeight: 24,
     fontWeight: '900',
     fontFamily: PLAYFUL_FONT_FAMILY,
-    opacity: 0.82,
     textShadowColor: 'rgba(255, 255, 255, 0.82)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  stageDoneStarfishCenter: {
+    position: 'absolute',
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 236, 153, 0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(202, 138, 4, 0.42)',
+  },
+  stageDoneStarfishDot: {
+    position: 'absolute',
+    width: 2.5,
+    height: 2.5,
+    borderRadius: 2,
+    backgroundColor: 'rgba(180, 120, 12, 0.38)',
+  },
+  stageDoneStarfishDotTop: {
+    top: 6,
+    left: 11,
+  },
+  stageDoneStarfishDotRight: {
+    top: 11,
+    right: 6,
+  },
+  stageDoneStarfishDotBottom: {
+    bottom: 6,
+    left: 9,
   },
   pressed: {
     opacity: 0.72,

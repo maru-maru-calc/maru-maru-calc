@@ -1388,6 +1388,21 @@ export function MarumaruGame({
         <View style={[styles.field, { width: fieldWidth, height: fieldHeight }]}>
           {basinFrameSegments.map((segment) => (
             <View
+              key={`${segment.id}-tray`}
+              pointerEvents="none"
+              style={[
+                styles.basinTraySegment,
+                {
+                  left: segment.x,
+                  top: segment.y + 3,
+                  width: segment.length + 4,
+                  transform: [{ rotate: `${segment.angle}rad` }],
+                },
+              ]}
+            />
+          ))}
+          {basinFrameSegments.map((segment) => (
+            <View
               key={segment.id}
               pointerEvents="none"
               style={[
@@ -1396,6 +1411,21 @@ export function MarumaruGame({
                   left: segment.x,
                   top: segment.y,
                   width: segment.length + 3,
+                  transform: [{ rotate: `${segment.angle}rad` }],
+                },
+              ]}
+            />
+          ))}
+          {basinFrameSegments.map((segment) => (
+            <View
+              key={`${segment.id}-shine`}
+              pointerEvents="none"
+              style={[
+                styles.basinFrameHighlightSegment,
+                {
+                  left: segment.x + 1,
+                  top: segment.y - 2,
+                  width: segment.length,
                   transform: [{ rotate: `${segment.angle}rad` }],
                 },
               ]}
@@ -2574,8 +2604,13 @@ function getResultEquationFontSize(equation: string) {
 
 function ResultStar() {
   return (
-    <View accessibilityLabel="clear star" style={styles.resultStar}>
+    <View accessibilityLabel="clear starfish" style={styles.resultStar}>
       <Text style={styles.resultStarGlyph}>★</Text>
+      <View style={styles.resultStarfishCenter} />
+      <View style={[styles.resultStarfishDot, styles.resultStarfishDotTop]} />
+      <View style={[styles.resultStarfishDot, styles.resultStarfishDotRight]} />
+      <View style={[styles.resultStarfishDot, styles.resultStarfishDotBottom]} />
+      <View style={[styles.resultStarfishDot, styles.resultStarfishDotLeft]} />
     </View>
   );
 }
@@ -4135,15 +4170,31 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontFamily: PLAYFUL_FONT_FAMILY,
   },
+  basinTraySegment: {
+    position: 'absolute',
+    height: BASIN_FRAME_THICKNESS + 3,
+    borderRadius: BASIN_FRAME_THICKNESS + 3,
+    backgroundColor: 'rgba(224, 247, 255, 0.12)',
+    shadowColor: '#075985',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 4 },
+  },
   basinFrameSegment: {
     position: 'absolute',
     height: BASIN_FRAME_THICKNESS,
     borderRadius: BASIN_FRAME_THICKNESS,
-    backgroundColor: 'rgba(125, 211, 252, 0.84)',
+    backgroundColor: 'rgba(125, 211, 252, 0.78)',
     shadowColor: '#0284C7',
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
+  },
+  basinFrameHighlightSegment: {
+    position: 'absolute',
+    height: 2,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.28)',
   },
   pendingBubbleButton: {
     position: 'absolute',
@@ -4548,6 +4599,38 @@ const styles = StyleSheet.create({
     fontSize: 43,
     lineHeight: 48,
     fontWeight: '900',
+  },
+  resultStarfishCenter: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 241, 166, 0.92)',
+    borderWidth: 2,
+    borderColor: 'rgba(202, 138, 4, 0.38)',
+  },
+  resultStarfishDot: {
+    position: 'absolute',
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(180, 120, 12, 0.34)',
+  },
+  resultStarfishDotTop: {
+    top: 22,
+    left: 37,
+  },
+  resultStarfishDotRight: {
+    top: 36,
+    right: 20,
+  },
+  resultStarfishDotBottom: {
+    bottom: 21,
+    left: 34,
+  },
+  resultStarfishDotLeft: {
+    top: 39,
+    left: 22,
   },
   resultPearlGlow: {
     position: 'absolute',
