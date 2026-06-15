@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react';
+import { createElement, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Asset } from 'expo-asset';
 import { useRouter } from 'expo-router';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
@@ -211,25 +211,13 @@ function AppPreview({ children, compact }: { children?: ReactNode; compact: bool
   return (
     <View style={[styles.previewBlock, compact && styles.previewBlockCompact]}>
       <View style={[styles.previewVideoFrame, compact && styles.previewVideoFrameCompact]} testID="landing-app-preview">
-        {Platform.OS === 'web'
-          ? createElement('video', {
-              src: videoUri,
-              autoPlay: true,
-              muted: true,
-              loop: true,
-              playsInline: true,
-              'aria-label': 'maru maru calc gameplay preview',
-              'data-testid': 'landing-gameplay-video',
-              style: {
-                width: '100%',
-                height: '100%',
-                objectFit: compact ? 'contain' : 'cover',
-                display: 'block',
-                borderRadius: RADIUS_XL,
-                pointerEvents: 'none',
-              },
-            })
-          : null}
+        <AutoPlayVideo
+          borderRadius={RADIUS_XL}
+          compact={compact}
+          label="maru maru calc gameplay preview"
+          testID="landing-gameplay-video"
+          uri={videoUri}
+        />
       </View>
       <Text style={[styles.heroAgeNote, compact && styles.heroAgeNoteCompact]}>親子であそぶなら、3歳ごろから</Text>
       {children ? <View style={[styles.previewActionsSlot, compact && styles.previewActionsSlotCompact]}>{children}</View> : null}
@@ -416,35 +404,158 @@ function FlowRow({
 }
 
 function OperationVideo({ uri, testID, playbackRate, compact }: { uri: string; testID: string; playbackRate: number; compact: boolean }) {
-  const syncPlaybackRate = (event: { currentTarget?: HTMLVideoElement }) => {
-    if (event.currentTarget) {
-      event.currentTarget.playbackRate = playbackRate;
-    }
-  };
-
   return (
     <View style={[styles.operationVideoFrame, compact && styles.operationVideoFrameCompact]} testID={testID}>
-      {Platform.OS === 'web'
-        ? createElement('video', {
-            src: uri,
-            autoPlay: true,
-            muted: true,
-            loop: true,
-            playsInline: true,
-            'aria-label': testID,
-            'data-testid': `${testID}-media`,
-            onLoadedMetadata: syncPlaybackRate,
-            onPlay: syncPlaybackRate,
-            style: {
-              width: '100%',
-              height: '100%',
-              objectFit: compact ? 'contain' : 'cover',
-              display: 'block',
-              borderRadius: RADIUS_LG,
-              pointerEvents: 'none',
-            },
-          })
-        : null}
+      <AutoPlayVideo
+        borderRadius={RADIUS_LG}
+        compact={compact}
+        label={testID}
+        playbackRate={playbackRate}
+        testID={`${testID}-media`}
+        uri={uri}
+      />
+    </View>
+  );
+}
+
+function AutoPlayVideo({
+  borderRadius,
+  compact,
+  label,
+  playbackRate = 1,
+  testID,
+  uri,
+}: {
+  borderRadius: number;
+  compact: boolean;
+  label: string;
+  playbackRate?: number;
+  testID: string;
+  uri: string;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [autoplayFailed, setAutoplayFailed] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof IntersectionObserver === 'undefined') {
+      return;
+    }
+
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    let shouldPlay = false;
+    const syncVideoOptions = () => {
+      video.muted = true;
+      video.defaultMuted = true;
+      video.playsInline = true;
+      video.playbackRate = playbackRate;
+    };
+    const play = () => {
+      shouldPlay = true;
+      syncVideoOptions();
+      void video
+        .play()
+        .then(() => setAutoplayFailed(false))
+        .catch(() => {
+          if (shouldPlay) {
+            setAutoplayFailed(true);
+          }
+        });
+    };
+    const pause = () => {
+      shouldPlay = false;
+      video.pause();
+    };
+
+    syncVideoOptions();
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting && entry.intersectionRatio >= 0.35 && document.visibilityState === 'visible') {
+          play();
+          return;
+        }
+
+        pause();
+      },
+      { threshold: [0, 0.35, 0.6] }
+    );
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && shouldPlay) {
+        play();
+        return;
+      }
+
+      video.pause();
+    };
+
+    observer.observe(video);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      video.pause();
+    };
+  }, [playbackRate]);
+
+  if (Platform.OS !== 'web') {
+    return null;
+  }
+
+  if (autoplayFailed) {
+    return <VideoFallbackScene borderRadius={borderRadius} />;
+  }
+
+  return createElement('video', {
+    ref: videoRef,
+    src: uri,
+    autoPlay: true,
+    muted: true,
+    defaultMuted: true,
+    loop: true,
+    playsInline: true,
+    preload: 'metadata',
+    'aria-label': label,
+    'data-testid': testID,
+    onLoadedMetadata: () => {
+      if (videoRef.current) {
+        videoRef.current.playbackRate = playbackRate;
+      }
+    },
+    onPlay: () => {
+      if (videoRef.current) {
+        videoRef.current.playbackRate = playbackRate;
+      }
+    },
+    style: {
+      width: '100%',
+      height: '100%',
+      objectFit: compact ? 'contain' : 'cover',
+      display: 'block',
+      borderRadius,
+      pointerEvents: 'none',
+    },
+  });
+}
+
+function VideoFallbackScene({ borderRadius }: { borderRadius: number }) {
+  return (
+    <View style={[styles.videoFallbackScene, { borderRadius }]} testID="landing-video-fallback">
+      <View style={styles.videoFallbackBubbleLarge}>
+        <View style={styles.videoFallbackBubbleShine} />
+        <View style={[styles.videoFallbackMaru, styles.videoFallbackMaruOne]} />
+        <View style={[styles.videoFallbackMaru, styles.videoFallbackMaruTwo]} />
+      </View>
+      <View style={styles.videoFallbackBasinLine} />
+      <View style={[styles.videoFallbackMaru, styles.videoFallbackMaruThree]} />
+      <View style={[styles.videoFallbackMaru, styles.videoFallbackMaruFour]} />
+      <View style={[styles.videoFallbackMaru, styles.videoFallbackMaruFive]} />
+      <View style={styles.videoFallbackSmallBubble} />
     </View>
   );
 }
@@ -1370,6 +1481,85 @@ const styles = StyleSheet.create({
     flexBasis: 'auto',
     maxWidth: '100%',
     height: GRID * 24,
+  },
+  videoFallbackScene: {
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+    backgroundColor: 'rgba(198, 232, 244, 0.7)',
+    position: 'relative',
+  },
+  videoFallbackBasinLine: {
+    position: 'absolute',
+    left: '18%',
+    right: '18%',
+    bottom: '18%',
+    height: '58%',
+    borderBottomWidth: 4,
+    borderColor: 'rgba(56, 189, 248, 0.2)',
+    borderRadius: 999,
+    transform: [{ rotate: '-2deg' }],
+  },
+  videoFallbackBubbleLarge: {
+    position: 'absolute',
+    top: '12%',
+    left: '50%',
+    width: 76,
+    height: 76,
+    marginLeft: -38,
+    borderRadius: 38,
+    borderWidth: 5,
+    borderColor: 'rgba(125, 211, 252, 0.28)',
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+  },
+  videoFallbackBubbleShine: {
+    position: 'absolute',
+    left: 12,
+    top: 10,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.58)',
+  },
+  videoFallbackMaru: {
+    position: 'absolute',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 3,
+    borderColor: 'rgba(203, 161, 33, 0.38)',
+    backgroundColor: 'rgba(239, 245, 220, 0.5)',
+  },
+  videoFallbackMaruOne: {
+    right: 20,
+    top: 26,
+  },
+  videoFallbackMaruTwo: {
+    right: 34,
+    top: 38,
+  },
+  videoFallbackMaruThree: {
+    left: '42%',
+    bottom: '16%',
+  },
+  videoFallbackMaruFour: {
+    left: '48%',
+    bottom: '14%',
+  },
+  videoFallbackMaruFive: {
+    left: '54%',
+    bottom: '16%',
+  },
+  videoFallbackSmallBubble: {
+    position: 'absolute',
+    right: '14%',
+    bottom: '22%',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 4,
+    borderColor: 'rgba(125, 211, 252, 0.18)',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   finalSection: {
     position: 'relative',
