@@ -1,4 +1,4 @@
-import { createElement, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createElement, useEffect, useRef, type ReactNode } from 'react';
 import { Asset } from 'expo-asset';
 import { useRouter } from 'expo-router';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
@@ -434,7 +434,6 @@ function AutoPlayVideo({
   uri: string;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [autoplayFailed, setAutoplayFailed] = useState(false);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof IntersectionObserver === 'undefined') {
@@ -457,14 +456,7 @@ function AutoPlayVideo({
     const play = () => {
       shouldPlay = true;
       syncVideoOptions();
-      void video
-        .play()
-        .then(() => setAutoplayFailed(false))
-        .catch(() => {
-          if (shouldPlay) {
-            setAutoplayFailed(true);
-          }
-        });
+      void video.play().catch(() => {});
     };
     const pause = () => {
       shouldPlay = false;
@@ -507,10 +499,6 @@ function AutoPlayVideo({
     return null;
   }
 
-  if (autoplayFailed) {
-    return <VideoFallbackScene borderRadius={borderRadius} />;
-  }
-
   return createElement('video', {
     ref: videoRef,
     src: uri,
@@ -541,23 +529,6 @@ function AutoPlayVideo({
       pointerEvents: 'none',
     },
   });
-}
-
-function VideoFallbackScene({ borderRadius }: { borderRadius: number }) {
-  return (
-    <View style={[styles.videoFallbackScene, { borderRadius }]} testID="landing-video-fallback">
-      <View style={styles.videoFallbackBubbleLarge}>
-        <View style={styles.videoFallbackBubbleShine} />
-        <View style={[styles.videoFallbackMaru, styles.videoFallbackMaruOne]} />
-        <View style={[styles.videoFallbackMaru, styles.videoFallbackMaruTwo]} />
-      </View>
-      <View style={styles.videoFallbackBasinLine} />
-      <View style={[styles.videoFallbackMaru, styles.videoFallbackMaruThree]} />
-      <View style={[styles.videoFallbackMaru, styles.videoFallbackMaruFour]} />
-      <View style={[styles.videoFallbackMaru, styles.videoFallbackMaruFive]} />
-      <View style={styles.videoFallbackSmallBubble} />
-    </View>
-  );
 }
 
 function LandingSectionAmbient({ variant }: { variant: 'features' | 'flow' | 'final' }) {
@@ -1481,85 +1452,6 @@ const styles = StyleSheet.create({
     flexBasis: 'auto',
     maxWidth: '100%',
     height: GRID * 24,
-  },
-  videoFallbackScene: {
-    width: '100%',
-    height: '100%',
-    overflow: 'hidden',
-    backgroundColor: 'rgba(198, 232, 244, 0.7)',
-    position: 'relative',
-  },
-  videoFallbackBasinLine: {
-    position: 'absolute',
-    left: '18%',
-    right: '18%',
-    bottom: '18%',
-    height: '58%',
-    borderBottomWidth: 4,
-    borderColor: 'rgba(56, 189, 248, 0.2)',
-    borderRadius: 999,
-    transform: [{ rotate: '-2deg' }],
-  },
-  videoFallbackBubbleLarge: {
-    position: 'absolute',
-    top: '12%',
-    left: '50%',
-    width: 76,
-    height: 76,
-    marginLeft: -38,
-    borderRadius: 38,
-    borderWidth: 5,
-    borderColor: 'rgba(125, 211, 252, 0.28)',
-    backgroundColor: 'rgba(255, 255, 255, 0.14)',
-  },
-  videoFallbackBubbleShine: {
-    position: 'absolute',
-    left: 12,
-    top: 10,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.58)',
-  },
-  videoFallbackMaru: {
-    position: 'absolute',
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 3,
-    borderColor: 'rgba(203, 161, 33, 0.38)',
-    backgroundColor: 'rgba(239, 245, 220, 0.5)',
-  },
-  videoFallbackMaruOne: {
-    right: 20,
-    top: 26,
-  },
-  videoFallbackMaruTwo: {
-    right: 34,
-    top: 38,
-  },
-  videoFallbackMaruThree: {
-    left: '42%',
-    bottom: '16%',
-  },
-  videoFallbackMaruFour: {
-    left: '48%',
-    bottom: '14%',
-  },
-  videoFallbackMaruFive: {
-    left: '54%',
-    bottom: '16%',
-  },
-  videoFallbackSmallBubble: {
-    position: 'absolute',
-    right: '14%',
-    bottom: '22%',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 4,
-    borderColor: 'rgba(125, 211, 252, 0.18)',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   finalSection: {
     position: 'relative',
