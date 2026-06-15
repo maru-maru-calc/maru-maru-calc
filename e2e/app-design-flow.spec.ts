@@ -10,7 +10,7 @@ declare global {
   }
 }
 
-test.use({ viewport: { width: 390, height: 844 } });
+test.use({ locale: 'ja-JP', viewport: { width: 390, height: 844 } });
 
 test('landing page presents the core copy and opens the app', async ({ page }) => {
   await page.goto('/');
@@ -51,6 +51,21 @@ test('landing page presents the core copy and opens the app', async ({ page }) =
   await page.getByTestId('landing-play-button').click();
   await expect(page).toHaveURL(/\/game$/);
   await expect(page.getByLabel('maru logo')).toBeVisible();
+});
+
+test('landing page switches to English for non-Japanese browser languages', async ({ browser }) => {
+  const context = await browser.newContext({ locale: 'en-US', viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.goto('/');
+
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.getByText('Touch numbers').first()).toBeVisible();
+  await expect(page.getByText('A hands-on math playground with little “maru” circles')).toBeVisible();
+  await expect(page.getByText('Discover before the answer')).toBeVisible();
+  await expect(page.getByText('4 ways to play')).toBeVisible();
+  await expect(page.getByText('Play on web').first()).toBeVisible();
+
+  await context.close();
 });
 
 test('desktop landing play button opens the framed play page in a new tab', async ({ browser }) => {
@@ -132,7 +147,9 @@ test('landing page clicks do not start background music', async ({ page }) => {
     window.__mediaPlayCalls = 0;
     const originalPlay = window.HTMLMediaElement.prototype.play;
     window.HTMLMediaElement.prototype.play = function patchedPlay() {
-      window.__mediaPlayCalls += 1;
+      if (this.tagName !== 'VIDEO') {
+        window.__mediaPlayCalls += 1;
+      }
       return originalPlay.call(this);
     };
   });

@@ -28,18 +28,102 @@ const operationSubtractVideoSource = require('../../assets/landing/operation-sub
 const operationMultiplyVideoSource = require('../../assets/landing/operation-multiply-short.webm');
 const operationDivideVideoSource = require('../../assets/landing/operation-divide-short.webm');
 
-const operationDemos = [
-  { label: 'たす', expression: '8 + 5 = 13', description: 'ボウルに一緒に落ちた"まる"が10こを超えると、まとまって少し大きい"まる"になるよ。どんな種類の"まる"があるかな？', source: operationAddVideoSource, testID: 'operation-video-add', playbackRate: 1 },
-  { label: 'ひく', expression: '12 - 5 = 7', description: '黒い"まる"は、同じ大きさの"まる"とぶつかると一緒に消えちゃうよ。残った"まる"は何個かな？', source: operationSubtractVideoSource, testID: 'operation-video-subtract', playbackRate: 1 },
-  { label: 'かける', expression: '4 × 3 = 12', description: '"まる"をまとめた"あわ"が3つになったね。"あわ"が弾けたあとの"まる"は何個になったかな？', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
-  { label: 'わる', expression: '12 ÷ 3 = 4', description: '"まる"を同じ数で分けた"あわ"が、一つだけ残ったね。"まる"は何個になったかな？', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
-];
+type LandingLocale = 'ja' | 'en';
+
+const landingCopy = {
+  ja: {
+    siteTitle: 'まるまる電卓 | すうじをさわる計算あそび',
+    siteDescription: 'まるをさわって、動かして。足し算から割り算まで、数を見た目で感じる子ども向け計算あそび。',
+    heroTitleBefore: 'すうじ',
+    heroTitleParticle: 'を',
+    heroTitleAfter: 'さわろう',
+    heroSubtitle: '"まる"がまるまる「まるまるでんたく」',
+    playWeb: 'web であそぶ',
+    playApp: 'アプリであそぶ',
+    ageNote: '親子であそぶなら、3歳ごろから',
+    featureTitle: '答えの前に発見を',
+    features: [
+      { title: 'さわって気づく', body: 'まるをさわって、動かして。数を見た目で感じよう。', variant: 'touch' },
+      { title: 'まちがえてわかる', body: 'わざとまちがえてみよう。どうなるか見てみよう。', variant: 'mistake' },
+      { title: '自分で進める', body: '音と動きが、次にしたいことを教えてくれるよ。', variant: 'solo' },
+      { title: '一緒に見つける', body: 'おとなも子どもも、同じ変化をいっしょに見つけよう。', variant: 'together' },
+    ],
+    flowTitleBefore: '４つ',
+    flowTitleParticle: 'の',
+    flowTitleAfter: 'さわりかた',
+    operationDemos: [
+      { label: 'たす', expression: '8 + 5 = 13', description: 'ボウルに一緒に落ちた"まる"が10こを超えると、まとまって少し大きい"まる"になるよ。どんな種類の"まる"があるかな？', source: operationAddVideoSource, testID: 'operation-video-add', playbackRate: 1 },
+      { label: 'ひく', expression: '12 - 5 = 7', description: '黒い"まる"は、同じ大きさの"まる"とぶつかると一緒に消えちゃうよ。残った"まる"は何個かな？', source: operationSubtractVideoSource, testID: 'operation-video-subtract', playbackRate: 1 },
+      { label: 'かける', expression: '4 × 3 = 12', description: '"まる"をまとめた"あわ"が3つになったね。"あわ"が弾けたあとの"まる"は何個になったかな？', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
+      { label: 'わる', expression: '12 ÷ 3 = 4', description: '"まる"を同じ数で分けた"あわ"が、一つだけ残ったね。"まる"は何個になったかな？', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
+    ],
+    finalTitle: 'さがしてごらん',
+    finalSegments: [
+      { text: '魚は何種類いるかな？' },
+      { text: '人魚にさわると歌をうたってくれるよ。' },
+    ],
+    underwaterSceneLabel: '水中の仕掛けのイメージ',
+  },
+  en: {
+    siteTitle: 'Marumaru Calculator | A hands-on math playground',
+    siteDescription: 'Touch, move, and discover numbers with little maru circles. A playful math experience for addition, subtraction, multiplication, and division.',
+    heroTitleBefore: 'Touch',
+    heroTitleParticle: '',
+    heroTitleAfter: 'numbers',
+    heroSubtitle: 'A hands-on math playground with little “maru” circles',
+    playWeb: 'Play on web',
+    playApp: 'Play in app',
+    ageNote: 'Made for playing together, around age 3+',
+    featureTitle: 'Discover before the answer',
+    features: [
+      { title: 'Touch to notice', body: 'Touch and move the maru. See numbers change right in front of you.', variant: 'touch' },
+      { title: 'Learn from mistakes', body: 'Try a wrong answer on purpose. Watch what happens next.', variant: 'mistake' },
+      { title: 'Move at your pace', body: 'Sound and motion gently guide the next thing to try.', variant: 'solo' },
+      { title: 'Find it together', body: 'Children and grown-ups can spot the same changes together.', variant: 'together' },
+    ],
+    flowTitleBefore: '4',
+    flowTitleParticle: '',
+    flowTitleAfter: 'ways to play',
+    operationDemos: [
+      { label: 'Add', expression: '8 + 5 = 13', description: 'When more than 10 maru land in the bowl, they gather into a slightly bigger maru. What kinds can you find?', source: operationAddVideoSource, testID: 'operation-video-add', playbackRate: 1 },
+      { label: 'Subtract', expression: '12 - 5 = 7', description: 'Black maru disappear when they meet a matching maru. How many are left?', source: operationSubtractVideoSource, testID: 'operation-video-subtract', playbackRate: 1 },
+      { label: 'Multiply', expression: '4 × 3 = 12', description: 'Three bubbles each hold a group of maru. How many maru are there after the bubbles pop?', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
+      { label: 'Divide', expression: '12 ÷ 3 = 4', description: 'The maru are split evenly, and one bubble remains. How many maru are inside?', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
+    ],
+    finalTitle: 'Look around',
+    finalSegments: [
+      { text: 'How many kinds of fish can you find?' },
+      { text: 'Tap the mermaid and she will sing.' },
+    ],
+    underwaterSceneLabel: 'An underwater play scene',
+  },
+} as const;
+
+function getPreferredLandingLocale(): LandingLocale {
+  if (Platform.OS !== 'web' || typeof navigator === 'undefined') {
+    return 'ja';
+  }
+
+  const languages = navigator.languages?.length ? navigator.languages : [navigator.language];
+  return languages.some((language) => language.toLowerCase().startsWith('ja')) ? 'ja' : 'en';
+}
 
 export default function LandingPage() {
   const { width, height } = useWindowDimensions();
   const router = useRouter();
   const isCompact = width < LANDING_DESKTOP_MIN_WIDTH;
   const heroHeight = Math.max(600, Math.min(height * 0.82, 720));
+  const locale = getPreferredLandingLocale();
+  const copy = landingCopy[locale];
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.documentElement.lang = locale;
+      document.title = copy.siteTitle;
+      document.querySelector('meta[name="description"]')?.setAttribute('content', copy.siteDescription);
+    }
+  }, [copy.siteDescription, copy.siteTitle, locale]);
+
   const openApp = () => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       if (width >= DESKTOP_MIN_WIDTH) {
@@ -70,27 +154,29 @@ export default function LandingPage() {
               <>
                 <View style={[styles.heroCopy, styles.heroCopyCompact, styles.heroTitleGroupCompact]}>
                   <Text style={[styles.heroTitle, styles.heroTitleCompact]}>
-                    すうじ<Text style={[styles.heroTitleParticle, styles.heroTitleParticleCompact]}>を</Text>さわろう
+                    {copy.heroTitleBefore}
+                    {copy.heroTitleParticle ? <Text style={[styles.heroTitleParticle, styles.heroTitleParticleCompact]}>{copy.heroTitleParticle}</Text> : ' '}
+                    {copy.heroTitleAfter}
                   </Text>
                 </View>
                 <View style={[styles.heroCopy, styles.heroCopyCompact]}>
                   <RubyLine
                     align="center"
                     segments={[
-                      { text: '"まる"がまるまる「まるまるでんたく」' },
+                      { text: copy.heroSubtitle },
                     ]}
                     textStyle={[styles.heroSubtitle, styles.heroSubtitleCompact]}
                     rubyStyle={[styles.heroSubtitleRuby, styles.heroSubtitleRubyCompact]}
                     lineStyle={[styles.heroSubtitleLine, styles.heroSubtitleLineCompact]}
                   />
                 </View>
-                <AppPreview compact={isCompact}>
+                <AppPreview ageNote={copy.ageNote} compact={isCompact}>
                   <View style={[styles.heroActions, styles.heroActionsCompact]}>
                     <Pressable accessibilityRole="button" onPress={openApp} style={styles.primaryButton} testID="landing-play-button">
-                      <Text style={styles.primaryButtonText}>web であそぶ</Text>
+                      <Text style={styles.primaryButtonText}>{copy.playWeb}</Text>
                     </Pressable>
                     <View style={styles.storeBadge}>
-                      <Text style={styles.storeBadgeText}>アプリであそぶ</Text>
+                      <Text style={styles.storeBadgeText}>{copy.playApp}</Text>
                     </View>
                   </View>
                 </AppPreview>
@@ -99,12 +185,14 @@ export default function LandingPage() {
               <>
                 <View style={styles.heroCopy}>
                   <Text style={styles.heroTitle}>
-                    すうじ<Text style={styles.heroTitleParticle}>を</Text>さわろう
+                    {copy.heroTitleBefore}
+                    {copy.heroTitleParticle ? <Text style={styles.heroTitleParticle}>{copy.heroTitleParticle}</Text> : ' '}
+                    {copy.heroTitleAfter}
                   </Text>
                   <RubyLine
                     align="left"
                     segments={[
-                      { text: '"まる"がまるまる「まるまるでんたく」' },
+                      { text: copy.heroSubtitle },
                     ]}
                     textStyle={styles.heroSubtitle}
                     rubyStyle={styles.heroSubtitleRuby}
@@ -112,14 +200,14 @@ export default function LandingPage() {
                   />
                   <View style={styles.heroActions}>
                     <Pressable accessibilityRole="button" onPress={openApp} style={styles.primaryButton} testID="landing-play-button">
-                      <Text style={styles.primaryButtonText}>web であそぶ</Text>
+                      <Text style={styles.primaryButtonText}>{copy.playWeb}</Text>
                     </Pressable>
                     <View style={styles.storeBadge}>
-                      <Text style={styles.storeBadgeText}>アプリであそぶ</Text>
+                      <Text style={styles.storeBadgeText}>{copy.playApp}</Text>
                     </View>
                   </View>
                 </View>
-                <AppPreview compact={isCompact} />
+                <AppPreview ageNote={copy.ageNote} compact={isCompact} />
               </>
             )}
           </View>
@@ -128,22 +216,23 @@ export default function LandingPage() {
 
       <View style={[styles.section, styles.decoratedSection]}>
         <LandingSectionAmbient variant="features" />
-        <Text style={styles.sectionTitle}>答えの前に発見を</Text>
+        <Text style={styles.sectionTitle}>{copy.featureTitle}</Text>
         <View style={[styles.featureGrid, isCompact && styles.featureGridCompact]}>
-          <FeatureItem compact={isCompact} title="さわって気づく" body="まるをさわって、動かして。数を見た目で感じよう。" variant="touch" />
-          <FeatureItem compact={isCompact} title="まちがえてわかる" body="わざとまちがえてみよう。どうなるか見てみよう。" variant="mistake" />
-          <FeatureItem compact={isCompact} title="自分で進める" body="音と動きが、次にしたいことを教えてくれるよ。" variant="solo" />
-          <FeatureItem compact={isCompact} title="一緒に見つける" body="おとなも子どもも、同じ変化をいっしょに見つけよう。" variant="together" />
+          {copy.features.map((feature) => (
+            <FeatureItem key={feature.title} compact={isCompact} title={feature.title} body={feature.body} variant={feature.variant} />
+          ))}
         </View>
       </View>
 
       <View style={[styles.section, styles.flowSection, styles.decoratedSection]}>
         <LandingSectionAmbient variant="flow" />
         <Text style={styles.sectionTitle}>
-          ４つ<Text style={styles.sectionTitleParticle}>の</Text>さわりかた
+          {copy.flowTitleBefore}
+          {copy.flowTitleParticle ? <Text style={styles.sectionTitleParticle}>{copy.flowTitleParticle}</Text> : ' '}
+          {copy.flowTitleAfter}
         </Text>
         <View style={styles.flowRows}>
-          {operationDemos.map((demo) => (
+          {copy.operationDemos.map((demo) => (
             <FlowRow key={demo.testID} {...demo} compact={isCompact} />
           ))}
         </View>
@@ -155,17 +244,17 @@ export default function LandingPage() {
           {isCompact ? (
             <>
               <View style={[styles.finalCopy, styles.finalCopyCompact]}>
-                <Text style={styles.finalTitle}>さがしてごらん</Text>
+                <Text style={styles.finalTitle}>{copy.finalTitle}</Text>
               </View>
-              <UnderwaterPlayScene />
-              <FinalDescription openApp={openApp} compact />
+              <UnderwaterPlayScene accessibilityLabel={copy.underwaterSceneLabel} />
+              <FinalDescription copy={copy} openApp={openApp} compact />
             </>
           ) : (
             <>
-              <UnderwaterPlayScene />
+              <UnderwaterPlayScene accessibilityLabel={copy.underwaterSceneLabel} />
               <View style={styles.finalCopy}>
-                <Text style={styles.finalTitle}>さがしてごらん</Text>
-                <FinalDescription openApp={openApp} compact={false} />
+                <Text style={styles.finalTitle}>{copy.finalTitle}</Text>
+                <FinalDescription copy={copy} openApp={openApp} compact={false} />
               </View>
             </>
           )}
@@ -205,7 +294,7 @@ function FloatingBubble({ size, left, top, opacity }: { size: number; left: `${n
   );
 }
 
-function AppPreview({ children, compact }: { children?: ReactNode; compact: boolean }) {
+function AppPreview({ ageNote, children, compact }: { ageNote: string; children?: ReactNode; compact: boolean }) {
   const videoUri = Asset.fromModule(demoVideoSource).uri;
 
   return (
@@ -219,7 +308,7 @@ function AppPreview({ children, compact }: { children?: ReactNode; compact: bool
           uri={videoUri}
         />
       </View>
-      <Text style={[styles.heroAgeNote, compact && styles.heroAgeNoteCompact]}>親子であそぶなら、3歳ごろから</Text>
+      <Text style={[styles.heroAgeNote, compact && styles.heroAgeNoteCompact]}>{ageNote}</Text>
       {children ? <View style={[styles.previewActionsSlot, compact && styles.previewActionsSlotCompact]}>{children}</View> : null}
     </View>
   );
@@ -320,25 +409,22 @@ function FeaturePenguinParent({ style }: { style: StyleProp<ViewStyle> }) {
   );
 }
 
-function FinalDescription({ openApp, compact }: { openApp: () => void; compact: boolean }) {
+function FinalDescription({ copy, openApp, compact }: { copy: typeof landingCopy[LandingLocale]; openApp: () => void; compact: boolean }) {
   return (
     <View style={[styles.finalDescription, compact && styles.finalDescriptionCompact]}>
       <RubyLine
         align={compact ? 'center' : 'left'}
-        segments={[
-          { text: '魚は何種類いるかな？' },
-          { text: '人魚にさわると歌をうたってくれるよ。' },
-        ]}
+        segments={copy.finalSegments}
         textStyle={styles.finalBody}
         rubyStyle={styles.finalBodyRuby}
         lineStyle={[styles.finalBodyRubyLine, compact && styles.finalBodyRubyLineCompact]}
       />
       <View style={[styles.finalActions, compact && styles.finalActionsCompact]}>
         <Pressable accessibilityRole="button" onPress={openApp} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>web であそぶ</Text>
+          <Text style={styles.primaryButtonText}>{copy.playWeb}</Text>
         </Pressable>
         <View style={styles.storeBadge}>
-          <Text style={styles.storeBadgeText}>アプリであそぶ</Text>
+          <Text style={styles.storeBadgeText}>{copy.playApp}</Text>
         </View>
       </View>
     </View>
@@ -352,7 +438,7 @@ function RubyLine({
   lineStyle,
   align,
 }: {
-  segments: Array<{ text: string; ruby?: string }>;
+  segments: ReadonlyArray<{ text: string; ruby?: string }>;
   textStyle: StyleProp<TextStyle>;
   rubyStyle: StyleProp<TextStyle>;
   lineStyle?: StyleProp<ViewStyle>;
@@ -570,9 +656,9 @@ function LandingSectionAmbient({ variant }: { variant: 'features' | 'flow' | 'fi
   );
 }
 
-function UnderwaterPlayScene() {
+function UnderwaterPlayScene({ accessibilityLabel }: { accessibilityLabel: string }) {
   return (
-    <View style={styles.underwaterScene} accessibilityLabel="水中の仕掛けのイメージ">
+    <View style={styles.underwaterScene} accessibilityLabel={accessibilityLabel}>
       <View style={[styles.sceneBubble, styles.sceneBubbleLarge]}>
         <View style={styles.sceneBubbleShine} />
       </View>
@@ -790,6 +876,7 @@ const styles = StyleSheet.create({
   heroSubtitleCompact: {
     fontSize: 18,
     lineHeight: 25,
+    textAlign: 'center',
   },
   heroSubtitleLine: {
     marginTop: GRID * 2,
@@ -820,6 +907,8 @@ const styles = StyleSheet.create({
   },
   rubySegment: {
     alignItems: 'center',
+    maxWidth: '100%',
+    flexShrink: 1,
   },
   rubySpacer: {
     color: 'transparent',
