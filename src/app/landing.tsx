@@ -20,6 +20,7 @@ const RADIUS_XL = 24;
 const RADIUS_PILL = 999;
 const COPYRIGHT_TEXT = '© 2026 nozomitaguchi';
 const DESKTOP_MIN_WIDTH = 900;
+const LANDING_DESKTOP_MIN_WIDTH = 1100;
 const BASE_PATH = process.env.EXPO_BASE_URL ?? '';
 const demoVideoSource = require('../../assets/landing/maru-demo-field-wide-short.webm');
 const operationAddVideoSource = require('../../assets/landing/operation-add.webm');
@@ -37,7 +38,7 @@ const operationDemos = [
 export default function LandingPage() {
   const { width, height } = useWindowDimensions();
   const router = useRouter();
-  const isCompact = width < 720;
+  const isCompact = width < LANDING_DESKTOP_MIN_WIDTH;
   const heroHeight = Math.max(600, Math.min(height * 0.82, 720));
   const openApp = () => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
