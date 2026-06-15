@@ -11,6 +11,8 @@
   },
   "exclude": [
     "node_modules",
+    "dist",
+    "dist-e2e",
     "src_legacy"
   ]
 }

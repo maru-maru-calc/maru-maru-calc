@@ -5,13 +5,15 @@ declare global {
   interface Window {
     __mediaPlayCalls: number;
     __mediaPauseCalls: number;
+    __testAudioElements: HTMLAudioElement[];
+    __testAudioSeekLog: number[];
   }
 }
 
 test.use({ viewport: { width: 390, height: 844 } });
 
 test('landing page presents the core copy and opens the app', async ({ page }) => {
-  await page.goto('/landing');
+  await page.goto('/');
 
   await expect(page.getByTestId('landing-page')).toBeVisible();
   await expect(page.getByText('すうじ').first()).toBeVisible();
@@ -20,11 +22,11 @@ test('landing page presents the core copy and opens the app', async ({ page }) =
   await page.getByTestId('landing-features-ambient').scrollIntoViewIfNeeded();
   await expect(page.getByText('答えの前に発見を')).toBeVisible();
   await expect(page.getByText('さわって気づく')).toBeVisible();
-  await expect(page.getByText('まるを動かすうちに数の意味が見えてくる')).toBeVisible();
+  await expect(page.getByText('まるをさわって、動かして。数を見た目で感じよう。')).toBeVisible();
   await expect(page.getByText('まちがえてわかる')).toBeVisible();
-  await expect(page.getByText('試した結果が次の考え方につながっていく')).toBeVisible();
-  await expect(page.getByText('音と動きが次に試したいことをそっと導く')).toBeVisible();
-  await expect(page.getByText('親子で同じ変化を見ながら発見を共有できる')).toBeVisible();
+  await expect(page.getByText('わざとまちがえてみよう。どうなるか見てみよう。')).toBeVisible();
+  await expect(page.getByText('音と動きが、次にしたいことを教えてくれるよ。')).toBeVisible();
+  await expect(page.getByText('おとなも子どもも、同じ変化をいっしょに見つけよう。')).toBeVisible();
   await expect(page.getByText('４つ')).toBeVisible();
   await expect(page.getByText('さわりかた')).toBeVisible();
   await expect(page.getByText('ボウルに一緒に落ちた"まる"が10こを超えると、まとまって少し大きい"まる"になるよ。どんな種類の"まる"があるかな？')).toBeVisible();
@@ -47,14 +49,14 @@ test('landing page presents the core copy and opens the app', async ({ page }) =
   await expect(page.getByTestId('operation-video-divide')).toBeVisible();
 
   await page.getByTestId('landing-play-button').click();
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/game$/);
   await expect(page.getByLabel('maru logo')).toBeVisible();
 });
 
 test('desktop landing play button opens the framed play page in a new tab', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
-  await page.goto('/landing');
+  await page.goto('/');
 
   const popupPromise = page.waitForEvent('popup');
   await page.getByTestId('landing-play-button').click();
@@ -83,23 +85,23 @@ test('desktop play page presents the app inside a phone frame', async ({ browser
 test('mobile play page redirects to the app itself', async ({ page }) => {
   await page.goto('/play');
 
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/game$/);
   await expect(page.getByLabel('maru logo')).toBeVisible();
 });
 
 test('web logos link back to the landing page', async ({ browser }) => {
   const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const mobilePage = await mobileContext.newPage();
-  await mobilePage.goto('/');
+  await mobilePage.goto('/game');
   await expect(mobilePage.getByLabel('maru logo')).toBeVisible();
-  await expect(mobilePage).not.toHaveURL(/\/landing$/);
+  await expect(mobilePage).toHaveURL(/\/game$/);
   await mobileContext.close();
 
   const landingContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const landingPage = await landingContext.newPage();
-  await landingPage.goto('/landing');
+  await landingPage.goto('/');
   await landingPage.getByLabel('maru maru calc logo').click();
-  await expect(landingPage).toHaveURL(/\/landing$/);
+  await expect(landingPage).toHaveURL(/\/$/);
   await landingContext.close();
 
   const desktopContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
@@ -121,7 +123,7 @@ test('web logos link back to the landing page', async ({ browser }) => {
   await desktopPage.getByLabel('maru maru calc logo').click();
   await desktopPage.waitForTimeout(25);
   await expect.poll(() => appFrame.evaluate(() => window.__mediaPauseCalls)).toBeGreaterThan(0);
-  await expect(desktopPage).toHaveURL(/\/landing$/);
+  await expect(desktopPage).toHaveURL(/\/$/);
   await desktopContext.close();
 });
 
@@ -135,15 +137,103 @@ test('landing page clicks do not start background music', async ({ page }) => {
     };
   });
 
-  await page.goto('/landing');
+  await page.goto('/');
   await page.getByText('すうじ').first().click();
   await page.getByTestId('landing-app-preview').click();
 
   await expect.poll(() => page.evaluate(() => window.__mediaPlayCalls)).toBe(0);
 });
 
+test('mermaid song toggle keeps the background music position', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__testAudioElements = [];
+    window.__testAudioSeekLog = [];
+    const NativeAudio = window.Audio;
+    const mediaTimes = new WeakMap<HTMLMediaElement, number>();
+
+    Object.defineProperty(window.HTMLMediaElement.prototype, 'currentTime', {
+      configurable: true,
+      get() {
+        return mediaTimes.get(this) ?? 0;
+      },
+      set(value: number) {
+        mediaTimes.set(this, value);
+        window.__testAudioSeekLog.push(value);
+      },
+    });
+    Object.defineProperty(window.HTMLMediaElement.prototype, 'duration', {
+      configurable: true,
+      get() {
+        return 180;
+      },
+    });
+    Object.defineProperty(window.HTMLMediaElement.prototype, 'ended', {
+      configurable: true,
+      get() {
+        return false;
+      },
+    });
+    window.HTMLMediaElement.prototype.play = function patchedPlay() {
+      return Promise.resolve();
+    };
+    window.HTMLMediaElement.prototype.pause = function patchedPause() {};
+    window.Audio = function PatchedAudio(src?: string) {
+      const audio = new NativeAudio(src);
+      window.__testAudioElements.push(audio);
+      return audio;
+    } as unknown as typeof Audio;
+  });
+
+  await page.goto('/game');
+  await clearLaunch(page);
+  await expect(page.getByTestId('world-select')).toBeVisible();
+  await page.evaluate(() => {
+    const normalBgm = window.__testAudioElements.find((audio) => audio.src.includes('/bgm.') && !audio.src.includes('bgm-vocal'));
+    const vocalBgm = window.__testAudioElements.find((audio) => audio.src.includes('bgm-vocal'));
+    if (!normalBgm || !vocalBgm) {
+      throw new Error('BGM audio elements were not created');
+    }
+    normalBgm.currentTime = 42;
+    vocalBgm.currentTime = 0;
+    window.__testAudioSeekLog = [];
+  });
+
+  await page.getByLabel('turn on mermaid song').click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const vocalBgm = window.__testAudioElements.find((audio) => audio.src.includes('bgm-vocal'));
+        return vocalBgm?.currentTime ?? 0;
+      }),
+    )
+    .toBeGreaterThan(41);
+
+  await page.evaluate(() => {
+    const normalBgm = window.__testAudioElements.find((audio) => audio.src.includes('/bgm.') && !audio.src.includes('bgm-vocal'));
+    const vocalBgm = window.__testAudioElements.find((audio) => audio.src.includes('bgm-vocal'));
+    if (!normalBgm || !vocalBgm) {
+      throw new Error('BGM audio elements were not created');
+    }
+    normalBgm.currentTime = 0;
+    vocalBgm.currentTime = 63;
+    window.__testAudioSeekLog = [];
+  });
+
+  await page.getByLabel('turn off mermaid song').click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const normalBgm = window.__testAudioElements.find((audio) => audio.src.includes('/bgm.') && !audio.src.includes('bgm-vocal'));
+        return normalBgm?.currentTime ?? 0;
+      }),
+    )
+    .toBeGreaterThan(62);
+});
+
 test('moves through the depth path into the existing game', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await expect(page.getByLabel('maru logo')).toBeVisible();
   await expect(page.getByLabel('bubble-5')).toBeVisible();
@@ -189,7 +279,7 @@ test('moves through the depth path into the existing game', async ({ page }) => 
 });
 
 test('stage routes can scroll to later mixed problems', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await clearLaunch(page);
   await expect(page.getByTestId('world-select')).toBeVisible();
@@ -201,7 +291,7 @@ test('stage routes can scroll to later mixed problems', async ({ page }) => {
 });
 
 test('going back from an uncleared next stage does not mark it complete', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await clearLaunch(page);
   await expect(page.getByTestId('world-select')).toBeVisible();
@@ -223,7 +313,7 @@ test('going back from an uncleared next stage does not mark it complete', async 
 });
 
 test('back button position is consistent between stage select and game', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await clearLaunch(page);
   await expect(page.getByTestId('world-select')).toBeVisible();
@@ -245,7 +335,7 @@ test('back button position is consistent between stage select and game', async (
 });
 
 test('launch and game operator buttons are aligned', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   const launchOperatorPlusBox = await page.getByTestId('operator-+').boundingBox();
   const launchOperatorMinusBox = await page.getByTestId('operator--').boundingBox();
@@ -279,7 +369,7 @@ test('launch and game operator buttons are aligned', async ({ page }) => {
 });
 
 test('launch and game operator corners and expression metrics are identical', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   const launchOperatorBoxes = await Promise.all([
     getMeasuredBox(page.getByTestId('operator-+')),
@@ -315,7 +405,7 @@ test('launch and game operator corners and expression metrics are identical', as
 });
 
 test('launch and game expression boxes are aligned', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   const launchExpressionBox = await page.getByTestId('expression-display').boundingBox();
   expect(launchExpressionBox).not.toBeNull();
@@ -381,7 +471,7 @@ function assertStyleMatch(
 }
 
 test('launch bubbles can be touched directly', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await page.getByLabel('bubble-5').click();
   await expect(page.getByTestId('current-total-value')).toHaveText('13');
@@ -390,14 +480,14 @@ test('launch bubbles can be touched directly', async ({ page }) => {
 });
 
 test('pending bubbles show an idle tap hint', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await expect(page.getByLabel('bubble-5')).toBeVisible();
   await expect(page.getByTestId('pending-bubble-hint')).toBeVisible({ timeout: 4000 });
 });
 
 test('background bubbles float behind the field and can be popped', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   const backgroundBubbles = page.locator('[data-testid^="background-bubble-"]');
   await expect(backgroundBubbles).toHaveCount(6);

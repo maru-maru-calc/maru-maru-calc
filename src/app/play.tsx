@@ -26,14 +26,14 @@ export default function PlayPage() {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       const frame = document.querySelector('[data-testid="play-frame"]') as HTMLIFrameElement | null;
       frame?.contentWindow?.postMessage({ type: 'marumaru:pause-bgm' }, window.location.origin);
-      window.setTimeout(() => router.push('/landing'), 50);
+      window.setTimeout(() => router.push('/'), 50);
       return;
     }
-    router.push('/landing');
+    router.push('/');
   };
 
   if (!shouldUsePhoneFrame) {
-    return <Redirect href="/" />;
+    return <Redirect href="/game" />;
   }
 
   return (
@@ -63,7 +63,7 @@ export default function PlayPage() {
         <View style={styles.phoneSpeaker} />
         <View style={styles.phoneViewport}>
           {createElement('iframe', {
-            src: '/',
+            src: '/game',
             title: 'maru maru calc playable web app',
             'data-testid': 'play-frame',
             style: {

@@ -3,7 +3,7 @@ import { expect, Page, test } from '@playwright/test';
 test.use({ viewport: { width: 390, height: 844 } });
 
 test('operator limits match launch and addition island rules', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await expect(page.getByTestId('operator-+')).toBeEnabled();
   await expect(page.getByTestId('operator--')).toBeDisabled();
@@ -29,7 +29,7 @@ test('operator limits match launch and addition island rules', async ({ page }) 
 });
 
 test('subtraction island allows both addition and subtraction', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await openIsland(page, '-');
   await page.getByTestId('stage-subtraction-1').click();
@@ -48,7 +48,7 @@ test('subtraction island allows both addition and subtraction', async ({ page })
 });
 
 test('mixed stages start from plus and expose finite usage badges', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await openIsland(page, 'mixed-3');
   await page.getByTestId('stage-mixed3-1').click();
@@ -64,7 +64,7 @@ test('mixed stages start from plus and expose finite usage badges', async ({ pag
 });
 
 test('finite operator usage is spent after an operation', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await openIsland(page, 'mixed-3');
   await page.getByTestId('stage-mixed3-1').click();
@@ -81,7 +81,7 @@ test('finite operator usage is spent after an operation', async ({ page }) => {
 });
 
 test('free mixed worlds allow all four operators without usage badges', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await openIsland(page, 'mixed-3-free');
   await page.getByTestId('stage-mixed3Free-1').click();
@@ -100,7 +100,7 @@ test('free mixed worlds allow all four operators without usage badges', async ({
 });
 
 test('multiplication world starts with multiplication only and has about twenty five stages', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await openIsland(page, '×');
   await page.getByTestId('stage-multiplication-1').click();
@@ -122,7 +122,7 @@ test('multiplication world starts with multiplication only and has about twenty 
 });
 
 test('division world starts with division only and has about twenty five stages', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await openIsland(page, '÷');
   await page.getByTestId('stage-division-1').click();
@@ -144,7 +144,7 @@ test('division world starts with division only and has about twenty five stages'
 });
 
 test('subtraction world has about twenty five stages', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await openIsland(page, '-');
   await expect(page.getByTestId('stage-subtraction-1')).toBeVisible();
@@ -153,7 +153,7 @@ test('subtraction world has about twenty five stages', async ({ page }) => {
 });
 
 test('subtraction with tens does not drift from the expression result', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
 
   await openIsland(page, '-');
   await page.getByTestId('stage-subtraction-3').click();

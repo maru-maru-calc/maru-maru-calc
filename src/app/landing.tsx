@@ -45,11 +45,11 @@ export default function LandingPage() {
         return;
       }
 
-      window.location.assign('/');
+      window.location.assign('/game');
       return;
     }
 
-    router.push('/');
+    router.push('/game');
   };
 
   return (
@@ -58,7 +58,7 @@ export default function LandingPage() {
         <HeroWaterScene />
         <SafeAreaView style={styles.heroSafe}>
           <View style={styles.heroTopBar}>
-            <Pressable accessibilityLabel="maru maru calc logo" accessibilityRole="link" onPress={() => router.push('/landing')} style={({ pressed }) => pressed && styles.pressedLogo}>
+            <Pressable accessibilityLabel="maru maru calc logo" accessibilityRole="link" onPress={() => router.push('/')} style={({ pressed }) => pressed && styles.pressedLogo}>
               <BrandLogo />
             </Pressable>
           </View>

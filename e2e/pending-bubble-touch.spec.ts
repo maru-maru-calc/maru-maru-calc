@@ -3,7 +3,7 @@ import { expect, Page, test } from '@playwright/test';
 test.use({ viewport: { width: 390, height: 844 } });
 
 test('pending bubbles still burst after operator selection when the tap drifts slightly', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/game');
   await openCurrentLaunch(page);
   await page.getByLabel('mixed-5-free', { exact: true }).scrollIntoViewIfNeeded();
   await page.getByLabel('mixed-5-free', { exact: true }).click();

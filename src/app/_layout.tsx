@@ -18,13 +18,14 @@ const vocalBgmSource = require('../../assets/audio/bgm-vocal.mp3');
 
 export default function RootLayout() {
   const pathname = usePathname();
-  const isBgmEnabledOnRoute = pathname === '/';
+  const isBgmEnabledOnRoute = pathname === '/game';
   const bgmPlayerRef = useRef<AudioPlayer | null>(null);
   const vocalBgmPlayerRef = useRef<AudioPlayer | null>(null);
   const webBgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const webVocalBgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const webSwitchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const hasUserStartedBgmRef = useRef(false);
+  const isBgmSwitchingRef = useRef(false);
   const isAppActiveRef = useRef(true);
   const isVocalEnabledRef = useRef(false);
   const [isVocalEnabled, setIsVocalEnabled] = useState(false);
@@ -69,10 +70,10 @@ export default function RootLayout() {
         activeAudio.currentTime = 0;
         inactiveAudio.currentTime = 0;
       } catch {
-        // Some browsers can reject seeking before metadata is ready. Playback still starts normally.
+          // Some browsers can reject seeking before metadata is ready. Playback still starts normally.
       }
-      inactiveAudio.pause();
       void activeAudio.play().catch(() => {});
+      void inactiveAudio.play().catch(() => {});
       return;
     }
 
@@ -95,8 +96,8 @@ export default function RootLayout() {
     if (webBgmAudioRef.current && webVocalBgmAudioRef.current) {
       const activeAudio = getActiveWebBgmAudio(webBgmAudioRef.current, webVocalBgmAudioRef.current, isVocalEnabledRef.current);
       const inactiveAudio = getInactiveWebBgmAudio(webBgmAudioRef.current, webVocalBgmAudioRef.current, isVocalEnabledRef.current);
-      inactiveAudio.pause();
       void activeAudio.play().catch(() => {});
+      void inactiveAudio.play().catch(() => {});
       return;
     }
 
@@ -130,16 +131,26 @@ export default function RootLayout() {
       return;
     }
 
-    syncBgmPositionsToCurrentTrack();
+    if (bgmPlayerRef.current && vocalBgmPlayerRef.current) {
+      isBgmSwitchingRef.current = true;
+      void switchNativeBgmTrack(
+        bgmPlayerRef.current,
+        vocalBgmPlayerRef.current,
+        isVocalEnabledRef.current,
+        nextIsVocalEnabled,
+        hasUserStartedBgmRef.current && isAppActiveRef.current && isBgmEnabledOnRoute,
+      ).finally(() => {
+        isBgmSwitchingRef.current = false;
+      });
+      isVocalEnabledRef.current = nextIsVocalEnabled;
+      setIsVocalEnabled(nextIsVocalEnabled);
+      return;
+    }
+
     isVocalEnabledRef.current = nextIsVocalEnabled;
     setIsVocalEnabled(nextIsVocalEnabled);
-    syncBgmPositionsToCurrentTrack();
     applyBgmVolumes();
-
-    if (hasUserStartedBgmRef.current && isAppActiveRef.current) {
-      resumeSyncedBgm();
-    }
-  }, [applyBgmVolumes, isBgmEnabledOnRoute, resumeSyncedBgm, syncBgmPositionsToCurrentTrack]);
+  }, [applyBgmVolumes, isBgmEnabledOnRoute]);
 
   const pauseBgm = useCallback(() => {
     bgmPlayerRef.current?.pause();
@@ -276,7 +287,7 @@ export default function RootLayout() {
     });
 
     const syncInterval = setInterval(() => {
-      if (!isBgmEnabledOnRoute || !hasUserStartedBgmRef.current || !isAppActiveRef.current) {
+      if (!isBgmEnabledOnRoute || !hasUserStartedBgmRef.current || !isAppActiveRef.current || isBgmSwitchingRef.current) {
         return;
       }
 
@@ -374,41 +385,40 @@ function switchWebBgmTrack(
   const toAudio = getActiveWebBgmAudio(normalAudio, vocalAudio, nextIsVocalEnabled);
   const targetTime = Number.isFinite(fromAudio.currentTime) ? fromAudio.currentTime : 0;
   const switchStartedAt = Date.now();
+  const applyTargetVolumes = () => {
+    normalAudio.volume = nextIsVocalEnabled ? 0 : BGM_VOLUME;
+    vocalAudio.volume = nextIsVocalEnabled ? BGM_VOLUME : 0;
+  };
+  const seekToSwitchTime = () => {
+    try {
+      toAudio.currentTime = targetTime + (shouldPlay ? (Date.now() - switchStartedAt) / 1000 : 0);
+    } catch {
+      // Browsers can reject seeks before metadata is available. Later media events retry the sync.
+    }
+  };
 
-  normalAudio.volume = nextIsVocalEnabled ? 0 : BGM_VOLUME;
-  vocalAudio.volume = nextIsVocalEnabled ? BGM_VOLUME : 0;
+  toAudio.addEventListener('loadedmetadata', seekToSwitchTime, { once: true });
+  toAudio.addEventListener('canplay', seekToSwitchTime, { once: true });
 
   if (!shouldPlay) {
-    try {
-      toAudio.currentTime = targetTime;
-    } catch {
-      // Browsers can reject seeks before metadata is ready. The next user start will seek again.
-    }
-    fromAudio.pause();
+    seekToSwitchTime();
+    applyTargetVolumes();
     return;
   }
 
-  try {
-    toAudio.currentTime = targetTime;
-  } catch {
-    // Browsers can reject seeks before metadata is ready. The delayed resync below will retry.
-  }
+  seekToSwitchTime();
 
   void toAudio
     .play()
     .then(() => {
       timeoutRef.current = setTimeout(() => {
-        try {
-          toAudio.currentTime = targetTime + (Date.now() - switchStartedAt) / 1000;
-        } catch {
-          // If Safari rejects this late seek, the initial seek still gives the best available sync.
-        }
-        fromAudio.pause();
+        seekToSwitchTime();
+        applyTargetVolumes();
         timeoutRef.current = undefined;
       }, BGM_WEB_SWITCH_RESYNC_MS);
     })
     .catch(() => {
-      fromAudio.pause();
+      applyTargetVolumes();
     });
 }
 
@@ -447,6 +457,41 @@ function isWebTrackEnded(audio: HTMLAudioElement) {
 
 function areNativeTracksBothEnded(left: AudioPlayer, right: AudioPlayer) {
   return isNativeTrackEnded(left) && isNativeTrackEnded(right);
+}
+
+async function switchNativeBgmTrack(
+  normalPlayer: AudioPlayer,
+  vocalPlayer: AudioPlayer,
+  wasVocalEnabled: boolean,
+  nextIsVocalEnabled: boolean,
+  shouldPlay: boolean,
+) {
+  const fromPlayer = getActiveNativeBgmPlayer(normalPlayer, vocalPlayer, wasVocalEnabled);
+  const toPlayer = getActiveNativeBgmPlayer(normalPlayer, vocalPlayer, nextIsVocalEnabled);
+  const targetTime = Number.isFinite(fromPlayer.currentTime) ? fromPlayer.currentTime : 0;
+  const applyTargetVolumes = () => {
+    normalPlayer.volume = nextIsVocalEnabled ? 0 : BGM_VOLUME;
+    vocalPlayer.volume = nextIsVocalEnabled ? BGM_VOLUME : 0;
+  };
+
+  if (!isNativeTrackEnded(fromPlayer)) {
+    try {
+      await toPlayer.seekTo(targetTime);
+    } catch {
+      // Native audio can reject a seek while a source is still preparing. The sync interval will retry.
+    }
+  }
+
+  if (shouldPlay) {
+    normalPlayer.play();
+    vocalPlayer.play();
+  }
+
+  applyTargetVolumes();
+}
+
+function getActiveNativeBgmPlayer(normalPlayer: AudioPlayer, vocalPlayer: AudioPlayer, isVocalEnabled: boolean) {
+  return isVocalEnabled ? vocalPlayer : normalPlayer;
 }
 
 async function syncNativeBgmPositions(normalPlayer: AudioPlayer, vocalPlayer: AudioPlayer, useVocalAsAnchor: boolean) {

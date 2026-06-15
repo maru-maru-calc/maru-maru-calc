@@ -4,7 +4,7 @@ test.use({ viewport: { width: 390, height: 844 } });
 
 test.describe('user-reported regressions', () => {
   test('going back from an uncleared next stage does not add a clear mark', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/game');
 
     await clearLaunch(page);
     await openIsland(page, '+');
@@ -20,7 +20,7 @@ test.describe('user-reported regressions', () => {
   });
 
   test('stage unlock progress is counted per world, not globally', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/game');
 
     await clearLaunch(page);
     await openIsland(page, '+');
@@ -38,7 +38,7 @@ test.describe('user-reported regressions', () => {
   });
 
   test('wrapped bubbles that settle on the basin burst even while unused bubbles remain', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/game');
 
     await clearLaunch(page);
     await openIsland(page, 'mixed-5-free');
@@ -54,7 +54,7 @@ test.describe('user-reported regressions', () => {
   });
 
   test('multiplication preview bubble does not auto-burst while multiply is selected', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/game');
 
     await clearLaunch(page);
     await openIsland(page, 'mixed-5-free');
@@ -74,7 +74,7 @@ test.describe('user-reported regressions', () => {
   });
 
   test('large value bubbles release place-value beads and subtraction resolves same-place cancellation', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/game');
 
     await clearLaunch(page);
     await openIslandFromWorld(page, '-');
@@ -89,7 +89,7 @@ test.describe('user-reported regressions', () => {
   });
 
   test('stage-select and game back buttons keep the same position and size', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/game');
 
     await clearLaunch(page);
     await openIslandFromWorld(page, '+');
@@ -110,7 +110,7 @@ test.describe('user-reported regressions', () => {
   });
 
 test('launch-clear and game-clear next buttons keep the same position and size', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/game');
 
     await page.getByLabel('bubble-5').click();
     await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
@@ -132,7 +132,7 @@ test('launch-clear and game-clear next buttons keep the same position and size',
 });
 
   test('launch and game operator buttons keep the same position and size', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/game');
 
     const launchOperatorPlusBox = await page.getByTestId('operator-+').boundingBox();
     const launchOperatorMinusBox = await page.getByTestId('operator--').boundingBox();
@@ -166,7 +166,7 @@ test('launch-clear and game-clear next buttons keep the same position and size',
   });
 
   test('launch and game expression boxes keep the same position and size', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/game');
 
     const launchExpressionBox = await page.getByTestId('expression-display').boundingBox();
     expect(launchExpressionBox).not.toBeNull();
@@ -185,7 +185,7 @@ test('launch-clear and game-clear next buttons keep the same position and size',
   });
 
   test('retry icon uses the same image icon pipeline as back and next', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/game');
 
     await clearLaunch(page);
     await openIslandFromWorld(page, '+');
@@ -197,7 +197,7 @@ test('launch-clear and game-clear next buttons keep the same position and size',
   });
 
   test('goal beads align close to the target number baseline in the header', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/game');
 
     await clearLaunch(page);
     await openIslandFromWorld(page, '+');
