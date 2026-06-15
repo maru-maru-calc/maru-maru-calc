@@ -78,6 +78,46 @@ test('landing page language can be forced with a query parameter', async ({ page
 
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
   await expect(page.getByText('すうじ').first()).toBeVisible();
+
+  await page.goto('/?lang=zh-Hans');
+
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-hans');
+  await expect(page.getByText('触摸数字').first()).toBeVisible();
+
+  await page.goto('/?lang=zh-Hant');
+
+  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-hant');
+  await expect(page.getByText('觸摸數字').first()).toBeVisible();
+
+  await page.goto('/?lang=ko');
+
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ko');
+  await expect(page.getByText('숫자를 만져 보자').first()).toBeVisible();
+
+  await page.goto('/?lang=de');
+
+  await expect(page.locator('html')).toHaveAttribute('lang', 'de');
+  await expect(page.getByText('Zahlen anfassen').first()).toBeVisible();
+});
+
+test('landing page switches to Chinese, Korean, and German browser languages', async ({ browser }) => {
+  const cases = [
+    { locale: 'zh-CN', lang: 'zh-hans', text: '触摸数字' },
+    { locale: 'zh-TW', lang: 'zh-hant', text: '觸摸數字' },
+    { locale: 'ko-KR', lang: 'ko', text: '숫자를 만져 보자' },
+    { locale: 'de-DE', lang: 'de', text: 'Zahlen anfassen' },
+  ];
+
+  for (const testCase of cases) {
+    const context = await browser.newContext({ locale: testCase.locale, viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    await page.goto('/');
+
+    await expect(page.locator('html')).toHaveAttribute('lang', testCase.lang);
+    await expect(page.getByText(testCase.text).first()).toBeVisible();
+
+    await context.close();
+  }
 });
 
 test('desktop landing play button opens the framed play page in a new tab', async ({ browser }) => {

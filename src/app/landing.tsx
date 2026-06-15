@@ -28,7 +28,7 @@ const operationSubtractVideoSource = require('../../assets/landing/operation-sub
 const operationMultiplyVideoSource = require('../../assets/landing/operation-multiply-short.webm');
 const operationDivideVideoSource = require('../../assets/landing/operation-divide-short.webm');
 
-type LandingLocale = 'ja' | 'en';
+type LandingLocale = 'ja' | 'en' | 'zh-hans' | 'zh-hant' | 'ko' | 'de';
 
 const landingCopy = {
   ja: {
@@ -36,6 +36,7 @@ const landingCopy = {
     siteDescription: 'まるをさわって、動かして。足し算から割り算まで、数を見た目で感じる子ども向け計算あそび。',
     heroTitleBefore: 'すうじ',
     heroTitleParticle: 'を',
+    heroTitleJoiner: '',
     heroTitleAfter: 'さわろう',
     heroSubtitle: '"まる"がまるまる「まるまるでんたく」',
     playWeb: 'web であそぶ',
@@ -69,6 +70,7 @@ const landingCopy = {
     siteDescription: 'Touch, move, and discover numbers with little maru circles. A playful math experience for addition, subtraction, multiplication, and division.',
     heroTitleBefore: 'Touch',
     heroTitleParticle: '',
+    heroTitleJoiner: ' ',
     heroTitleAfter: 'numbers',
     heroSubtitle: 'A hands-on math playground with little “maru” circles',
     playWeb: 'Play on web',
@@ -97,6 +99,142 @@ const landingCopy = {
     ],
     underwaterSceneLabel: 'An underwater play scene',
   },
+  'zh-hans': {
+    siteTitle: 'Marumaru 计算器 | 可触摸的数学游戏',
+    siteDescription: '触摸、移动并观察小圆点的变化。通过加法、减法、乘法和除法来感受数字。',
+    heroTitleBefore: '触摸',
+    heroTitleParticle: '',
+    heroTitleJoiner: '',
+    heroTitleAfter: '数字',
+    heroSubtitle: '和小小的“maru”圆点一起玩的数学游戏',
+    playWeb: '网页版开始',
+    playApp: '应用版开始',
+    ageNote: '适合亲子一起玩，大约 3 岁起',
+    featureTitle: '先发现，再找答案',
+    features: [
+      { title: '触摸中发现', body: '触摸并移动圆点，用眼睛感受数字的变化。', variant: 'touch' },
+      { title: '从错误中理解', body: '也可以故意试错，看看接下来会发生什么。', variant: 'mistake' },
+      { title: '按自己的节奏', body: '声音和动作会轻轻提示下一步可以尝试什么。', variant: 'solo' },
+      { title: '一起寻找', body: '孩子和大人可以一起发现同一个变化。', variant: 'together' },
+    ],
+    flowTitleBefore: '4',
+    flowTitleParticle: '',
+    flowTitleAfter: '种玩法',
+    operationDemos: [
+      { label: '加法', expression: '8 + 5 = 13', description: '当落进碗里的圆点超过 10 个时，它们会聚成稍大一点的圆点。你能找到哪些种类？', source: operationAddVideoSource, testID: 'operation-video-add', playbackRate: 1 },
+      { label: '减法', expression: '12 - 5 = 7', description: '黑色圆点碰到相同大小的圆点时会一起消失。最后还剩几个？', source: operationSubtractVideoSource, testID: 'operation-video-subtract', playbackRate: 1 },
+      { label: '乘法', expression: '4 × 3 = 12', description: '3 个泡泡里各有一组圆点。泡泡破掉以后，一共有几个圆点？', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
+      { label: '除法', expression: '12 ÷ 3 = 4', description: '圆点被平均分开，只留下一个泡泡。里面有几个圆点？', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
+    ],
+    finalTitle: '找找看',
+    finalSegments: [
+      { text: '你能找到几种鱼？' },
+      { text: '点一下美人鱼，她会唱歌。' },
+    ],
+    underwaterSceneLabel: '水中的互动场景',
+  },
+  'zh-hant': {
+    siteTitle: 'Marumaru 計算機 | 可以觸摸的數學遊戲',
+    siteDescription: '觸摸、移動並觀察小圓點的變化。透過加法、減法、乘法和除法來感受數字。',
+    heroTitleBefore: '觸摸',
+    heroTitleParticle: '',
+    heroTitleJoiner: '',
+    heroTitleAfter: '數字',
+    heroSubtitle: '和小小的「maru」圓點一起玩的數學遊戲',
+    playWeb: '網頁版開始',
+    playApp: 'App 版開始',
+    ageNote: '適合親子一起玩，大約 3 歲起',
+    featureTitle: '先發現，再找答案',
+    features: [
+      { title: '觸摸中發現', body: '觸摸並移動圓點，用眼睛感受數字的變化。', variant: 'touch' },
+      { title: '從錯誤中理解', body: '也可以故意試錯，看看接下來會發生什麼。', variant: 'mistake' },
+      { title: '按自己的節奏', body: '聲音和動作會輕輕提示下一步可以嘗試什麼。', variant: 'solo' },
+      { title: '一起尋找', body: '孩子和大人可以一起發現同一個變化。', variant: 'together' },
+    ],
+    flowTitleBefore: '4',
+    flowTitleParticle: '',
+    flowTitleAfter: '種玩法',
+    operationDemos: [
+      { label: '加法', expression: '8 + 5 = 13', description: '當落進碗裡的圓點超過 10 個時，它們會聚成稍大一點的圓點。你能找到哪些種類？', source: operationAddVideoSource, testID: 'operation-video-add', playbackRate: 1 },
+      { label: '減法', expression: '12 - 5 = 7', description: '黑色圓點碰到相同大小的圓點時會一起消失。最後還剩幾個？', source: operationSubtractVideoSource, testID: 'operation-video-subtract', playbackRate: 1 },
+      { label: '乘法', expression: '4 × 3 = 12', description: '3 個泡泡裡各有一組圓點。泡泡破掉以後，一共有幾個圓點？', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
+      { label: '除法', expression: '12 ÷ 3 = 4', description: '圓點被平均分開，只留下一個泡泡。裡面有幾個圓點？', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
+    ],
+    finalTitle: '找找看',
+    finalSegments: [
+      { text: '你能找到幾種魚？' },
+      { text: '點一下美人魚，她會唱歌。' },
+    ],
+    underwaterSceneLabel: '水中的互動場景',
+  },
+  ko: {
+    siteTitle: 'Marumaru Calculator | 만지며 배우는 수학 놀이',
+    siteDescription: '작은 maru 원을 만지고 움직이며 숫자의 변화를 발견합니다. 덧셈, 뺄셈, 곱셈, 나눗셈을 놀이처럼 느껴 보세요.',
+    heroTitleBefore: '숫자를',
+    heroTitleParticle: '',
+    heroTitleJoiner: ' ',
+    heroTitleAfter: '만져 보자',
+    heroSubtitle: '작은 “maru” 원으로 즐기는 수학 놀이터',
+    playWeb: '웹에서 놀기',
+    playApp: '앱에서 놀기',
+    ageNote: '부모와 함께라면 만 3세쯤부터',
+    featureTitle: '답보다 먼저 발견을',
+    features: [
+      { title: '만지며 알아차리기', body: '원을 만지고 움직이며 숫자의 변화를 눈으로 느껴요.', variant: 'touch' },
+      { title: '틀리며 이해하기', body: '일부러 틀려 봐도 괜찮아요. 어떤 일이 일어나는지 살펴봐요.', variant: 'mistake' },
+      { title: '내 속도로 진행하기', body: '소리와 움직임이 다음에 해 볼 일을 부드럽게 알려줘요.', variant: 'solo' },
+      { title: '함께 찾아보기', body: '아이와 어른이 같은 변화를 함께 발견할 수 있어요.', variant: 'together' },
+    ],
+    flowTitleBefore: '4',
+    flowTitleParticle: '',
+    flowTitleAfter: '가지 놀이 방식',
+    operationDemos: [
+      { label: '더하기', expression: '8 + 5 = 13', description: '그릇에 들어간 원이 10개를 넘으면 조금 더 큰 원으로 모여요. 어떤 종류의 원이 있을까요?', source: operationAddVideoSource, testID: 'operation-video-add', playbackRate: 1 },
+      { label: '빼기', expression: '12 - 5 = 7', description: '검은 원은 같은 크기의 원과 만나면 함께 사라져요. 몇 개가 남았을까요?', source: operationSubtractVideoSource, testID: 'operation-video-subtract', playbackRate: 1 },
+      { label: '곱하기', expression: '4 × 3 = 12', description: '3개의 거품 안에 원 묶음이 있어요. 거품이 터지면 원은 모두 몇 개일까요?', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
+      { label: '나누기', expression: '12 ÷ 3 = 4', description: '원이 똑같이 나뉘고 거품 하나만 남았어요. 안에는 원이 몇 개 있을까요?', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
+    ],
+    finalTitle: '찾아봐요',
+    finalSegments: [
+      { text: '물고기는 몇 종류가 있을까요?' },
+      { text: '인어를 누르면 노래를 불러요.' },
+    ],
+    underwaterSceneLabel: '물속 놀이 장면',
+  },
+  de: {
+    siteTitle: 'Marumaru Calculator | Mathe zum Anfassen',
+    siteDescription: 'Berühre, bewege und entdecke Zahlen mit kleinen maru-Kreisen. Ein spielerisches Mathe-Erlebnis für Addition, Subtraktion, Multiplikation und Division.',
+    heroTitleBefore: 'Zahlen',
+    heroTitleParticle: '',
+    heroTitleJoiner: ' ',
+    heroTitleAfter: 'anfassen',
+    heroSubtitle: 'Ein Mathe-Spielplatz mit kleinen “maru”-Kreisen',
+    playWeb: 'Im Web spielen',
+    playApp: 'In der App spielen',
+    ageNote: 'Für gemeinsames Spielen, etwa ab 3 Jahren',
+    featureTitle: 'Erst entdecken, dann lösen',
+    features: [
+      { title: 'Durch Berühren verstehen', body: 'Berühre und bewege die maru-Kreise. Sieh, wie sich Zahlen verändern.', variant: 'touch' },
+      { title: 'Aus Fehlern lernen', body: 'Probier ruhig auch eine falsche Antwort aus. Schau, was dann passiert.', variant: 'mistake' },
+      { title: 'Im eigenen Tempo', body: 'Klänge und Bewegungen zeigen sanft, was du als Nächstes versuchen kannst.', variant: 'solo' },
+      { title: 'Gemeinsam entdecken', body: 'Kinder und Erwachsene können dieselben Veränderungen zusammen entdecken.', variant: 'together' },
+    ],
+    flowTitleBefore: '4',
+    flowTitleParticle: '',
+    flowTitleAfter: 'Spielweisen',
+    operationDemos: [
+      { label: 'Plus', expression: '8 + 5 = 13', description: 'Wenn mehr als 10 maru im Becken landen, werden sie zu einem etwas größeren maru. Welche Arten findest du?', source: operationAddVideoSource, testID: 'operation-video-add', playbackRate: 1 },
+      { label: 'Minus', expression: '12 - 5 = 7', description: 'Schwarze maru verschwinden, wenn sie ein passendes maru treffen. Wie viele bleiben übrig?', source: operationSubtractVideoSource, testID: 'operation-video-subtract', playbackRate: 1 },
+      { label: 'Mal', expression: '4 × 3 = 12', description: 'In 3 Blasen steckt jeweils eine Gruppe maru. Wie viele maru sind es, nachdem die Blasen platzen?', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
+      { label: 'Geteilt', expression: '12 ÷ 3 = 4', description: 'Die maru werden gleichmäßig aufgeteilt, und eine Blase bleibt übrig. Wie viele maru sind darin?', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
+    ],
+    finalTitle: 'Schau dich um',
+    finalSegments: [
+      { text: 'Wie viele Fischarten findest du?' },
+      { text: 'Tippe auf die Meerjungfrau, dann singt sie.' },
+    ],
+    underwaterSceneLabel: 'Eine Unterwasser-Spielszene',
+  },
 } as const;
 
 function getPreferredLandingLocale(): LandingLocale {
@@ -106,14 +244,56 @@ function getPreferredLandingLocale(): LandingLocale {
 
   if (typeof window !== 'undefined') {
     const queryLocale = new URLSearchParams(window.location.search).get('lang')?.toLowerCase();
+    const queryLocaleMap: Record<string, LandingLocale> = {
+      ja: 'ja',
+      en: 'en',
+      de: 'de',
+      ko: 'ko',
+      kr: 'ko',
+      zh: 'zh-hans',
+      'zh-cn': 'zh-hans',
+      'zh-sg': 'zh-hans',
+      'zh-hans': 'zh-hans',
+      'zh-hans-cn': 'zh-hans',
+      'zh-tw': 'zh-hant',
+      'zh-hk': 'zh-hant',
+      'zh-mo': 'zh-hant',
+      'zh-hant': 'zh-hant',
+      'zh-hant-tw': 'zh-hant',
+    };
 
-    if (queryLocale === 'ja' || queryLocale === 'en') {
-      return queryLocale;
+    if (queryLocale && queryLocaleMap[queryLocale]) {
+      return queryLocaleMap[queryLocale];
     }
   }
 
   const languages = navigator.languages?.length ? navigator.languages : [navigator.language];
-  return languages.some((language) => language.toLowerCase().startsWith('ja')) ? 'ja' : 'en';
+
+  for (const language of languages) {
+    const normalizedLanguage = language.toLowerCase();
+
+    if (normalizedLanguage.startsWith('ja')) {
+      return 'ja';
+    }
+
+    if (normalizedLanguage.startsWith('ko')) {
+      return 'ko';
+    }
+
+    if (normalizedLanguage.startsWith('de')) {
+      return 'de';
+    }
+
+    if (normalizedLanguage.startsWith('zh-hant') || normalizedLanguage.startsWith('zh-tw') || normalizedLanguage.startsWith('zh-hk') || normalizedLanguage.startsWith('zh-mo')) {
+      return 'zh-hant';
+    }
+
+    if (normalizedLanguage.startsWith('zh')) {
+      return 'zh-hans';
+    }
+  }
+
+  return 'en';
 }
 
 export default function LandingPage() {
@@ -163,7 +343,7 @@ export default function LandingPage() {
                 <View style={[styles.heroCopy, styles.heroCopyCompact, styles.heroTitleGroupCompact]}>
                   <Text style={[styles.heroTitle, styles.heroTitleCompact]}>
                     {copy.heroTitleBefore}
-                    {copy.heroTitleParticle ? <Text style={[styles.heroTitleParticle, styles.heroTitleParticleCompact]}>{copy.heroTitleParticle}</Text> : ' '}
+                    {copy.heroTitleParticle ? <Text style={[styles.heroTitleParticle, styles.heroTitleParticleCompact]}>{copy.heroTitleParticle}</Text> : copy.heroTitleJoiner}
                     {copy.heroTitleAfter}
                   </Text>
                 </View>
@@ -194,7 +374,7 @@ export default function LandingPage() {
                 <View style={styles.heroCopy}>
                   <Text style={styles.heroTitle}>
                     {copy.heroTitleBefore}
-                    {copy.heroTitleParticle ? <Text style={styles.heroTitleParticle}>{copy.heroTitleParticle}</Text> : ' '}
+                    {copy.heroTitleParticle ? <Text style={styles.heroTitleParticle}>{copy.heroTitleParticle}</Text> : copy.heroTitleJoiner}
                     {copy.heroTitleAfter}
                   </Text>
                   <RubyLine
