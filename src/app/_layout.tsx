@@ -72,8 +72,8 @@ export default function RootLayout() {
       } catch {
           // Some browsers can reject seeking before metadata is ready. Playback still starts normally.
       }
+      inactiveAudio.pause();
       void activeAudio.play().catch(() => {});
-      void inactiveAudio.play().catch(() => {});
       return;
     }
 
@@ -96,8 +96,8 @@ export default function RootLayout() {
     if (webBgmAudioRef.current && webVocalBgmAudioRef.current) {
       const activeAudio = getActiveWebBgmAudio(webBgmAudioRef.current, webVocalBgmAudioRef.current, isVocalEnabledRef.current);
       const inactiveAudio = getInactiveWebBgmAudio(webBgmAudioRef.current, webVocalBgmAudioRef.current, isVocalEnabledRef.current);
+      inactiveAudio.pause();
       void activeAudio.play().catch(() => {});
-      void inactiveAudio.play().catch(() => {});
       return;
     }
 
@@ -403,10 +403,12 @@ function switchWebBgmTrack(
   if (!shouldPlay) {
     seekToSwitchTime();
     applyTargetVolumes();
+    fromAudio.pause();
     return;
   }
 
   seekToSwitchTime();
+  fromAudio.pause();
 
   void toAudio
     .play()
@@ -414,6 +416,7 @@ function switchWebBgmTrack(
       timeoutRef.current = setTimeout(() => {
         seekToSwitchTime();
         applyTargetVolumes();
+        fromAudio.pause();
         timeoutRef.current = undefined;
       }, BGM_WEB_SWITCH_RESYNC_MS);
     })

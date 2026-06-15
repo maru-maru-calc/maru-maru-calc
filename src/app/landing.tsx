@@ -83,7 +83,6 @@ export default function LandingPage() {
                     lineStyle={[styles.heroSubtitleLine, styles.heroSubtitleLineCompact]}
                   />
                 </View>
-                <AppPreview compact={isCompact} />
                 <View style={[styles.heroCopy, styles.heroCopyCompact]}>
                   <View style={[styles.heroActions, styles.heroActionsCompact]}>
                     <Pressable accessibilityRole="button" onPress={openApp} style={styles.primaryButton} testID="landing-play-button">
@@ -94,6 +93,7 @@ export default function LandingPage() {
                     </View>
                   </View>
                 </View>
+                <AppPreview compact={isCompact} />
               </>
             ) : (
               <>
@@ -650,9 +650,9 @@ const styles = StyleSheet.create({
   heroContentCompact: {
     flexDirection: 'column',
     justifyContent: 'flex-start',
-    gap: GRID * 1.5,
-    paddingTop: GRID * 2,
-    paddingBottom: GRID * 2,
+    gap: GRID * 1.25,
+    paddingTop: GRID,
+    paddingBottom: GRID * 3,
   },
   heroCopy: {
     flex: 1,
@@ -663,11 +663,13 @@ const styles = StyleSheet.create({
     flex: 0,
     width: '100%',
     maxWidth: '100%',
+    minHeight: GRID * 7,
     alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 2,
   },
   heroTitleGroupCompact: {
-    marginBottom: GRID * 3,
+    marginBottom: 0,
   },
   heroTitle: {
     color: TEXT_BASE_COLOR,
@@ -679,8 +681,8 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   heroTitleCompact: {
-    fontSize: 32,
-    lineHeight: 40,
+    fontSize: 29,
+    lineHeight: 35,
     textAlign: 'center',
   },
   heroTitleParticle: {
@@ -689,8 +691,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   heroTitleParticleCompact: {
-    fontSize: 27,
-    lineHeight: 36,
+    fontSize: 24,
+    lineHeight: 31,
     marginHorizontal: 3,
   },
   heroSubtitle: {
@@ -703,8 +705,8 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   heroSubtitleCompact: {
-    fontSize: 19,
-    lineHeight: 26,
+    fontSize: 18,
+    lineHeight: 25,
   },
   heroSubtitleLine: {
     marginTop: GRID * 2,
@@ -752,7 +754,8 @@ const styles = StyleSheet.create({
   heroActionsCompact: {
     width: '100%',
     maxWidth: '100%',
-    marginTop: GRID * 1.5,
+    marginTop: 0,
+    gap: GRID,
     flexWrap: 'nowrap',
   },
   heroAgeNote: {
@@ -768,7 +771,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   primaryButton: {
-    width: GRID * 20,
+    width: GRID * 19,
     height: GRID * 7,
     borderRadius: RADIUS_LG,
     backgroundColor: '#FFFFFF',
@@ -781,14 +784,14 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: TEXT_BASE_COLOR,
-    fontSize: 17,
+    fontSize: 16,
     lineHeight: 22,
     fontWeight: '900',
     fontFamily: PLAYFUL_FONT_FAMILY,
     letterSpacing: 0.4,
   },
   storeBadge: {
-    width: GRID * 20,
+    width: GRID * 19,
     height: GRID * 7,
     paddingHorizontal: GRID * 2,
     borderRadius: RADIUS_LG,
@@ -798,7 +801,7 @@ const styles = StyleSheet.create({
   },
   storeBadgeText: {
     color: TEXT_BASE_COLOR,
-    fontSize: 17,
+    fontSize: 16,
     lineHeight: 22,
     fontWeight: '900',
     fontFamily: PLAYFUL_FONT_FAMILY,
@@ -813,6 +816,9 @@ const styles = StyleSheet.create({
     flex: 0,
     width: '100%',
     maxWidth: '100%',
+    height: GRID * 31,
+    marginTop: GRID * 0.5,
+    marginBottom: GRID,
   },
   previewVideoFrame: {
     width: 440,
@@ -833,9 +839,9 @@ const styles = StyleSheet.create({
     flexGrow: 0,
     flexShrink: 0,
     alignSelf: 'center',
-    marginTop: GRID * 4,
+    marginTop: 0,
     marginBottom: 0,
-    height: GRID * 25,
+    height: GRID * 23,
     aspectRatio: undefined,
     zIndex: 1,
   },
