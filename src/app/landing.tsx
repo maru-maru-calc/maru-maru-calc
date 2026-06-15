@@ -20,6 +20,7 @@ const RADIUS_XL = 24;
 const RADIUS_PILL = 999;
 const COPYRIGHT_TEXT = '© 2026 nozomitaguchi';
 const DESKTOP_MIN_WIDTH = 900;
+const BASE_PATH = process.env.EXPO_BASE_URL ?? '';
 const demoVideoSource = require('../../assets/landing/maru-demo-field-wide-short.webm');
 const operationAddVideoSource = require('../../assets/landing/operation-add.webm');
 const operationSubtractVideoSource = require('../../assets/landing/operation-subtract.webm');
@@ -41,11 +42,11 @@ export default function LandingPage() {
   const openApp = () => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       if (width >= DESKTOP_MIN_WIDTH) {
-        window.open('/play', '_blank', 'noopener,noreferrer');
+        window.open(`${BASE_PATH}/play`, '_blank', 'noopener,noreferrer');
         return;
       }
 
-      window.location.assign('/game');
+      window.location.assign(`${BASE_PATH}/game`);
       return;
     }
 

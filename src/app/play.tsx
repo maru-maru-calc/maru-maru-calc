@@ -17,6 +17,7 @@ const RADIUS_XL = 24;
 const RADIUS_PILL = 999;
 const DESKTOP_MIN_WIDTH = 900;
 const COPYRIGHT_TEXT = '© 2026 nozomitaguchi';
+const BASE_PATH = process.env.EXPO_BASE_URL ?? '';
 
 export default function PlayPage() {
   const { width } = useWindowDimensions();
@@ -63,7 +64,7 @@ export default function PlayPage() {
         <View style={styles.phoneSpeaker} />
         <View style={styles.phoneViewport}>
           {createElement('iframe', {
-            src: '/game',
+            src: `${BASE_PATH}/game`,
             title: 'maru maru calc playable web app',
             'data-testid': 'play-frame',
             style: {

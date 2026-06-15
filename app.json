@@ -27,6 +27,9 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "experiments": {
+      "baseUrl": "/maru-maru-calc"
+    },
     "plugins": [
       "expo-router"
     ]
