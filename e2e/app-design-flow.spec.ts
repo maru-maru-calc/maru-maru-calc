@@ -68,6 +68,18 @@ test('landing page switches to English for non-Japanese browser languages', asyn
   await context.close();
 });
 
+test('landing page language can be forced with a query parameter', async ({ page }) => {
+  await page.goto('/?lang=en');
+
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.getByText('Touch numbers').first()).toBeVisible();
+
+  await page.goto('/?lang=ja');
+
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+  await expect(page.getByText('すうじ').first()).toBeVisible();
+});
+
 test('desktop landing play button opens the framed play page in a new tab', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();

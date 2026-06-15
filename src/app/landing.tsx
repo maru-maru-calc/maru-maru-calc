@@ -104,6 +104,14 @@ function getPreferredLandingLocale(): LandingLocale {
     return 'ja';
   }
 
+  if (typeof window !== 'undefined') {
+    const queryLocale = new URLSearchParams(window.location.search).get('lang')?.toLowerCase();
+
+    if (queryLocale === 'ja' || queryLocale === 'en') {
+      return queryLocale;
+    }
+  }
+
   const languages = navigator.languages?.length ? navigator.languages : [navigator.language];
   return languages.some((language) => language.toLowerCase().startsWith('ja')) ? 'ja' : 'en';
 }
