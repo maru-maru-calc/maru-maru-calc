@@ -83,7 +83,7 @@ export default function LandingPage() {
                     lineStyle={[styles.heroSubtitleLine, styles.heroSubtitleLineCompact]}
                   />
                 </View>
-                <View style={[styles.heroCopy, styles.heroCopyCompact]}>
+                <AppPreview compact={isCompact}>
                   <View style={[styles.heroActions, styles.heroActionsCompact]}>
                     <Pressable accessibilityRole="button" onPress={openApp} style={styles.primaryButton} testID="landing-play-button">
                       <Text style={styles.primaryButtonText}>web であそぶ</Text>
@@ -92,8 +92,7 @@ export default function LandingPage() {
                       <Text style={styles.storeBadgeText}>アプリであそぶ</Text>
                     </View>
                   </View>
-                </View>
-                <AppPreview compact={isCompact} />
+                </AppPreview>
               </>
             ) : (
               <>
@@ -205,7 +204,7 @@ function FloatingBubble({ size, left, top, opacity }: { size: number; left: `${n
   );
 }
 
-function AppPreview({ compact }: { compact: boolean }) {
+function AppPreview({ children, compact }: { children?: ReactNode; compact: boolean }) {
   const videoUri = Asset.fromModule(demoVideoSource).uri;
 
   return (
@@ -232,6 +231,7 @@ function AppPreview({ compact }: { compact: boolean }) {
           : null}
       </View>
       <Text style={[styles.heroAgeNote, compact && styles.heroAgeNoteCompact]}>親子であそぶなら、3歳ごろから</Text>
+      {children ? <View style={[styles.previewActionsSlot, compact && styles.previewActionsSlotCompact]}>{children}</View> : null}
     </View>
   );
 }
@@ -816,9 +816,15 @@ const styles = StyleSheet.create({
     flex: 0,
     width: '100%',
     maxWidth: '100%',
-    height: GRID * 31,
+    height: GRID * 39,
     marginTop: GRID * 0.5,
     marginBottom: GRID,
+  },
+  previewActionsSlot: {
+    width: '100%',
+  },
+  previewActionsSlotCompact: {
+    marginTop: GRID * 1.5,
   },
   previewVideoFrame: {
     width: 440,
