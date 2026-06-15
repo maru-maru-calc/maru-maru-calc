@@ -6,6 +6,7 @@ import type { StyleProp, ViewStyle } from 'react-native';
 
 import { SFX } from '@/audio/sfx';
 import { useOneShotAudio } from '@/audio/use-one-shot-audio';
+import { BrandLogo } from '@/components/BrandLogo';
 import { NavImageIcon } from '@/components/NavImageIcon';
 import { OperatorImageIcon } from '@/components/OperatorImageIcon';
 import { getBeadKind, getNextPlaceValue } from '@/game/beads';
@@ -101,6 +102,17 @@ type BubbleBurstAnimation = {
   startedAt: number;
 };
 
+type MultiplicationExpansionAnimation = {
+  id: string;
+  groups: Array<{
+    x: number;
+    y: number;
+    count: number;
+    sign: BeadSign;
+  }>;
+  startedAt: number;
+};
+
 type OperationSource = {
   entities: BeadEntity[];
   count: number;
@@ -160,7 +172,8 @@ const BUBBLE_BURST_ANIMATION_MS = 120;
 const ANNIHILATION_ANIMATION_MS = 420;
 const DIVISION_SPLIT_ANIMATION_MS = 760;
 const DIVISION_FAILED_ANIMATION_MS = 980;
-const PRODUCT_BUBBLE_BURST_DELAY_MS = 950;
+const MULTIPLICATION_EXPANSION_HOLD_MS = 1100;
+const PRODUCT_BUBBLE_BURST_DELAY_MS = 1250;
 const BACKGROUND_BUBBLE_TICK_MS = 90;
 const FAILED_VEIL_FADE_IN_MS = 3200;
 const FIELD_BUBBLE_AUTO_BURST_IDLE_MS = 650;
@@ -170,7 +183,7 @@ const BUBBLE_BURST_DROP_COUNT = 6;
 const BUBBLE_BURST_SHARD_COUNT = 3;
 const MERGE_POP_PARTICLE_COUNT = 4;
 const OPERATORS: OperatorButtonSymbol[] = ['+', '-', '×', '÷'];
-const PLAYFUL_FONT_FAMILY = 'KiwiMaru';
+const PLAYFUL_FONT_FAMILY = 'Noto Sans Japanese';
 const LATIN_FONT_FAMILY = 'Helvetica';
 const TEXT_BASE_COLOR = '#12334A';
 const TEXT_ACCENT_COLOR = '#0284C7';
@@ -201,12 +214,14 @@ export function MarumaruGame({
   onStageClear,
   mode = 'stage',
   onComplete,
+  onLogoPress,
 }: {
   initialStageIndex?: number;
   onBack?: () => void;
   onStageClear?: (stageId: string) => void;
   mode?: 'stage' | 'launch';
   onComplete?: () => void;
+  onLogoPress?: () => void;
 }) {
   const { width, height } = useWindowDimensions();
   const fieldWidth = Math.max(240, width - FIELD_MARGIN * 2);
@@ -229,6 +244,7 @@ export function MarumaruGame({
   const [annihilationAnimation, setAnnihilationAnimation] = useState<AnnihilationAnimation | undefined>(undefined);
   const [divisionSplitAnimation, setDivisionSplitAnimation] = useState<DivisionSplitAnimation | undefined>(undefined);
   const [divisionFailedAnimation, setDivisionFailedAnimation] = useState<DivisionFailedAnimation | undefined>(undefined);
+  const [multiplicationExpansionAnimation, setMultiplicationExpansionAnimation] = useState<MultiplicationExpansionAnimation | undefined>(undefined);
   const [bubbleBurstAnimations, setBubbleBurstAnimations] = useState<BubbleBurstAnimation[]>([]);
   const [message, setMessage] = useState('あわをさわると まるがでるよ');
   const [operatorUsage, setOperatorUsage] = useState<OperatorUsageLimits>(() => getInitialOperatorUsage(getStage(initialStageIndex), mode));
@@ -363,6 +379,7 @@ export function MarumaruGame({
     setAnnihilationAnimation(undefined);
     setDivisionSplitAnimation(undefined);
     setDivisionFailedAnimation(undefined);
+    setMultiplicationExpansionAnimation(undefined);
     setBubbleBurstAnimations([]);
     setMessage('');
     setIsClear(false);
@@ -431,7 +448,7 @@ export function MarumaruGame({
   }, [isClear, mode, onComplete]);
 
   useEffect(() => {
-    if (isClear || !isStageReadyForResult(pendingBubbles) || mergeAnimation || annihilationAnimation || divisionSplitAnimation || divisionFailedAnimation) {
+    if (isClear || !isStageReadyForResult(pendingBubbles) || mergeAnimation || annihilationAnimation || divisionSplitAnimation || divisionFailedAnimation || multiplicationExpansionAnimation) {
       resultReadySinceRef.current = undefined;
       return;
     }
@@ -464,7 +481,7 @@ export function MarumaruGame({
     }
 
     return undefined;
-  }, [annihilationAnimation, beads, divisionFailedAnimation, divisionSplitAnimation, isClear, isFailed, mergeAnimation, pendingBubbles, stage.id, target]);
+  }, [annihilationAnimation, beads, divisionFailedAnimation, divisionSplitAnimation, isClear, isFailed, mergeAnimation, multiplicationExpansionAnimation, pendingBubbles, stage.id, target]);
 
   const addBead = useCallback(
     (
@@ -612,14 +629,26 @@ export function MarumaruGame({
       const resultSign = multiplySigns(source.sign, multiplierSign);
       const signedSourceCount = source.count * source.sign;
       const signedMultiplier = bubble.count * multiplierSign;
-
-      for (let index = 0; index < bubble.count; index += 1) {
+      const expansionGroups = Array.from({ length: bubble.count }, (_, index) => {
         const angle = -Math.PI / 2 + (Math.PI * 2 * index) / bubble.count;
         const spread = Math.max(46, getEntityRadius(1, source.count) * 0.78);
-        const x = sourceCenter.x + Math.cos(angle) * spread;
-        const y = sourceCenter.y + Math.sin(angle) * spread * 0.72;
-        addBead(1, source.count, resultSign, x, y, false, { x: Math.cos(angle) * 1.8, y: 2 + Math.sin(angle) }, 'product');
-      }
+        return {
+          angle,
+          x: sourceCenter.x + Math.cos(angle) * spread,
+          y: sourceCenter.y + Math.sin(angle) * spread * 0.72,
+        };
+      });
+      const expansionId = `multiplication-expansion-${bubble.id}-${Date.now()}`;
+      setMultiplicationExpansionAnimation({
+        id: expansionId,
+        groups: expansionGroups.map((group) => ({
+          x: group.x,
+          y: group.y,
+          count: source.count,
+          sign: resultSign,
+        })),
+        startedAt: Date.now(),
+      });
 
       const productTotal = signedSourceCount * signedMultiplier;
       expressionTotalRef.current = remainingTotal + productTotal;
@@ -635,6 +664,17 @@ export function MarumaruGame({
       setExpressionTokens(nextExpressionTokens);
       setMessage(`${formatSignedCount(signedSourceCount)}のまとまりが ${formatSignedCount(signedMultiplier)}こ`);
       setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
+      setTimeout(() => {
+        if (engineRef.current !== engine) {
+          return;
+        }
+
+        expansionGroups.forEach((group) => {
+          addBead(1, source.count, resultSign, group.x, group.y, false, { x: Math.cos(group.angle) * 1.8, y: 2 + Math.sin(group.angle) }, 'product');
+        });
+        setMultiplicationExpansionAnimation((current) => (current?.id === expansionId ? undefined : current));
+        setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
+      }, MULTIPLICATION_EXPANSION_HOLD_MS);
       return true;
     },
     [addBead, fieldHeight, fieldWidth, triggerBubbleBurst],
@@ -794,7 +834,7 @@ export function MarumaruGame({
   }, [backgroundBubbleTick, divisionFailedAnimation]);
 
   useEffect(() => {
-    if (isClear || isFailed || draggingBeadId !== undefined || mergeAnimation || divisionSplitAnimation || divisionFailedAnimation || annihilationAnimation) {
+    if (isClear || isFailed || draggingBeadId !== undefined || mergeAnimation || divisionSplitAnimation || divisionFailedAnimation || annihilationAnimation || multiplicationExpansionAnimation) {
       return;
     }
 
@@ -815,7 +855,7 @@ export function MarumaruGame({
     lastFieldBubbleAutoBurstAtRef.current = backgroundBubbleTick;
     playBubblePopSfx();
     unwrapBeadGroup(fieldBubble.id);
-  }, [annihilationAnimation, backgroundBubbleTick, divisionFailedAnimation, divisionSplitAnimation, draggingBeadId, fieldHeight, fieldWidth, isClear, isFailed, mergeAnimation, playBubblePopSfx, unwrapBeadGroup]);
+  }, [annihilationAnimation, backgroundBubbleTick, divisionFailedAnimation, divisionSplitAnimation, draggingBeadId, fieldHeight, fieldWidth, isClear, isFailed, mergeAnimation, multiplicationExpansionAnimation, playBubblePopSfx, unwrapBeadGroup]);
 
   const burstBubble = useCallback(
     (bubble: PendingBubble) => {
@@ -1376,11 +1416,13 @@ export function MarumaruGame({
               </View>
             </Pressable>
           ) : null}
-          {mode === 'launch' ? (
-            <LaunchLogo />
-          ) : (
-            <StageGoalTitle stageNumber={stageNumberInIsland} target={target} maxWidth={Math.max(168, fieldWidth - 132)} />
-          )}
+          <View style={styles.headerMainTitleShift}>
+            {mode === 'launch' ? (
+              <LaunchLogo onPress={onLogoPress} />
+            ) : (
+              <StageGoalTitle stageNumber={stageNumberInIsland} target={target} maxWidth={Math.max(168, fieldWidth - 132)} />
+            )}
+          </View>
         </View>
         <Text testID="current-total-value" style={styles.hiddenMetric}>
           {total}
@@ -1462,6 +1504,7 @@ export function MarumaruGame({
           {bubbleBurstAnimations.map((animation) => (
             <BubbleBurst key={animation.id} animation={animation} />
           ))}
+          {multiplicationExpansionAnimation ? <MultiplicationExpansionOverlay animation={multiplicationExpansionAnimation} /> : null}
           {isClear ? <ClearBubbleFireworks fieldWidth={fieldWidth} fieldHeight={fieldHeight} tick={backgroundBubbleTick} /> : null}
           {displayBeads.map((bead) => (
             divisionSplitAnimation?.resultBeadId === bead.id ? null :
@@ -1504,26 +1547,21 @@ export function MarumaruGame({
   );
 }
 
-function LaunchLogo({ variant = 'header' }: { variant?: 'header' | 'tada' }) {
-  return (
-    <View accessibilityLabel="maru logo" style={[styles.launchLogo, variant === 'tada' && styles.launchLogoTada]}>
-      <LogoGameBead value={10} x={70} y={24} />
-      <LogoGameBubble style={styles.launchLogoBubbleU} />
-      <LogoGameBead value={1} x={302} y={32} />
-      <Text style={styles.launchLogoWord}>maru maru calc</Text>
+function LaunchLogo({ variant = 'header', onPress }: { variant?: 'header' | 'tada'; onPress?: () => void }) {
+  const content = (
+    <View accessibilityLabel={onPress ? undefined : 'maru logo'} style={[styles.launchLogo, variant === 'tada' && styles.launchLogoTada]}>
+      <BrandLogo size="medium" />
     </View>
   );
-}
 
-function LogoGameBead({ value, x, y }: { value: PlaceValue; x: number; y: number }) {
-  return <BeadView value={value} count={1} sign={1} x={x} y={y} />;
-}
+  if (!onPress) {
+    return content;
+  }
 
-function LogoGameBubble({ style }: { style: object }) {
   return (
-    <View pointerEvents="none" style={[styles.backgroundBubble, styles.launchLogoGameBubble, style]}>
-      <View style={styles.backgroundBubbleShine} />
-    </View>
+    <Pressable accessibilityLabel="maru logo" accessibilityRole="link" onPress={onPress} style={({ pressed }) => pressed && styles.pressedButton}>
+      {content}
+    </Pressable>
   );
 }
 
@@ -1805,6 +1843,34 @@ function FailedWaterOverlay({ progress }: { progress: number }) {
       <View style={[styles.failedDeflatedBubble, styles.failedDeflatedBubbleOne]} />
       <View style={[styles.failedDeflatedBubble, styles.failedDeflatedBubbleTwo]} />
       <View style={[styles.failedDeflatedBubble, styles.failedDeflatedBubbleThree]} />
+    </View>
+  );
+}
+
+function MultiplicationExpansionOverlay({ animation }: { animation: MultiplicationExpansionAnimation }) {
+  const age = Date.now() - animation.startedAt;
+  const settleProgress = clamp(age / MULTIPLICATION_EXPANSION_HOLD_MS, 0, 1);
+  const scale = 0.92 + settleProgress * 0.08;
+  const opacity = clamp(age / 180, 0, 1) * (1 - clamp((age - MULTIPLICATION_EXPANSION_HOLD_MS + 220) / 220, 0, 0.18));
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {animation.groups.map((group, index) => (
+        <View
+          key={`${animation.id}-${index}`}
+          style={[
+            styles.multiplicationExpansionBubble,
+            {
+              left: group.x,
+              top: group.y,
+              opacity,
+              transform: [{ scale }],
+            },
+          ]}
+        >
+          <BeadView value={1} count={group.count} sign={group.sign} x={0} y={0} role="product" isPreview />
+        </View>
+      ))}
     </View>
   );
 }
@@ -3795,6 +3861,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
   },
+  headerMainTitleShift: {
+    transform: [{ translateY: GRID * 1.5 }],
+  },
   backButton: {
     position: 'absolute',
     left: GRID,
@@ -3967,36 +4036,12 @@ const styles = StyleSheet.create({
   launchLogo: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 360,
-    height: 76,
+    width: 220,
+    height: 56,
     position: 'relative',
   },
   launchLogoTada: {
     transform: [{ scale: 1.03 }],
-  },
-  launchLogoWord: {
-    color: '#FFFFFF',
-    fontSize: 36,
-    lineHeight: 44,
-    fontWeight: '900',
-    letterSpacing: 0,
-    fontFamily: LATIN_FONT_FAMILY,
-    textAlign: 'center',
-    zIndex: 2,
-    textShadowColor: 'rgba(56, 141, 182, 0.34)',
-    textShadowOffset: { width: 0, height: 5 },
-    textShadowRadius: 0,
-  },
-  launchLogoBubbleU: {
-    position: 'absolute',
-    left: 160,
-    top: 23,
-  },
-  launchLogoGameBubble: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    zIndex: 1,
   },
   hiddenMetric: {
     position: 'absolute',
@@ -4004,6 +4049,7 @@ const styles = StyleSheet.create({
     height: 1,
     opacity: 0,
     overflow: 'hidden',
+    pointerEvents: 'none',
     fontFamily: LATIN_FONT_FAMILY,
   },
   playArea: {
@@ -4386,6 +4432,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
+  },
+  multiplicationExpansionBubble: {
+    position: 'absolute',
+    zIndex: 5,
   },
   divisionSplitPart: {
     position: 'absolute',

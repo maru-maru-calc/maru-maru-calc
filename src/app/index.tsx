@@ -35,7 +35,7 @@ type DepthFishSpec = {
 
 const DEPTH_BUBBLE_TICK_MS = 90;
 const DEPTH_CREATURE_REACTION_MS = 920;
-const PLAYFUL_FONT_FAMILY = 'KiwiMaru';
+const PLAYFUL_FONT_FAMILY = 'Noto Sans Japanese';
 const LATIN_FONT_FAMILY = 'Helvetica';
 const TEXT_BASE_COLOR = '#12334A';
 const TEXT_ACCENT_COLOR = '#0284C7';
@@ -59,7 +59,6 @@ export default function IndexScreen() {
     setPlayingStageIndex(getStageIndexById(stage.id));
     setScreen('game');
   };
-
   if (screen === 'launch') {
     return <MarumaruGame mode="launch" onComplete={() => setScreen('world')} />;
   }

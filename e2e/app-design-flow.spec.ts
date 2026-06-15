@@ -1,7 +1,146 @@
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
+declare global {
+  interface Window {
+    __mediaPlayCalls: number;
+    __mediaPauseCalls: number;
+  }
+}
+
 test.use({ viewport: { width: 390, height: 844 } });
+
+test('landing page presents the core copy and opens the app', async ({ page }) => {
+  await page.goto('/landing');
+
+  await expect(page.getByTestId('landing-page')).toBeVisible();
+  await expect(page.getByText('すうじ').first()).toBeVisible();
+  await expect(page.getByText('さわろう').first()).toBeVisible();
+  await expect(page.getByText('"まる"がまるまる「まるまるでんたく」')).toBeVisible();
+  await page.getByTestId('landing-features-ambient').scrollIntoViewIfNeeded();
+  await expect(page.getByText('答えの前に発見を')).toBeVisible();
+  await expect(page.getByText('さわって気づく')).toBeVisible();
+  await expect(page.getByText('まるを動かすうちに数の意味が見えてくる')).toBeVisible();
+  await expect(page.getByText('まちがえてわかる')).toBeVisible();
+  await expect(page.getByText('試した結果が次の考え方につながっていく')).toBeVisible();
+  await expect(page.getByText('音と動きが次に試したいことをそっと導く')).toBeVisible();
+  await expect(page.getByText('親子で同じ変化を見ながら発見を共有できる')).toBeVisible();
+  await expect(page.getByText('４つ')).toBeVisible();
+  await expect(page.getByText('さわりかた')).toBeVisible();
+  await expect(page.getByText('ボウルに一緒に落ちた"まる"が10こを超えると、まとまって少し大きい"まる"になるよ。どんな種類の"まる"があるかな？')).toBeVisible();
+  await expect(page.getByText('黒い"まる"は、同じ大きさの"まる"とぶつかると一緒に消えちゃうよ。残った"まる"は何個かな？')).toBeVisible();
+  await expect(page.getByText('"まる"をまとめた"あわ"が3つになったね。"あわ"が弾けたあとの"まる"は何個になったかな？')).toBeVisible();
+  await expect(page.getByText('"まる"を同じ数で分けた"あわ"が、一つだけ残ったね。"まる"は何個になったかな？')).toBeVisible();
+  await expect(page.getByText('魚は何種類いるかな？')).toBeVisible();
+  await expect(page.getByText('人魚にさわると歌をうたってくれるよ。')).toBeVisible();
+  await expect(page.getByTestId('landing-features-ambient')).toBeVisible();
+  await expect(page.getByTestId('landing-flow-ambient')).toBeVisible();
+  await expect(page.getByTestId('landing-final-ambient')).toBeVisible();
+  await expect(page.getByText('© 2026 nozomitaguchi')).toBeVisible();
+  await expect(page.getByTestId('landing-app-preview')).toBeVisible();
+  await expect(page.getByTestId('landing-gameplay-video')).toBeVisible();
+
+  await page.getByTestId('operation-video-add').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('operation-video-add')).toBeVisible();
+  await expect(page.getByTestId('operation-video-subtract')).toBeVisible();
+  await expect(page.getByTestId('operation-video-multiply')).toBeVisible();
+  await expect(page.getByTestId('operation-video-divide')).toBeVisible();
+
+  await page.getByTestId('landing-play-button').click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByLabel('maru logo')).toBeVisible();
+});
+
+test('desktop landing play button opens the framed play page in a new tab', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  await page.goto('/landing');
+
+  const popupPromise = page.waitForEvent('popup');
+  await page.getByTestId('landing-play-button').click();
+  const appPage = await popupPromise;
+  await expect(appPage).toHaveURL(/\/play$/);
+  await appPage.close();
+  await context.close();
+});
+
+test('desktop play page presents the app inside a phone frame', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page = await context.newPage();
+  await page.goto('/play');
+
+  await expect(page.getByTestId('play-page')).toBeVisible();
+  await expect(page.getByTestId('play-frame')).toBeVisible();
+  await expect(page.getByTestId('play-background-fish-clownfish')).toBeVisible();
+  await expect(page.getByTestId('play-background-fish-blue-tang')).toBeVisible();
+  await expect(page.getByTestId('play-background-fish-puffer')).toBeVisible();
+  await expect(page.getByText('© 2026 nozomitaguchi')).toBeVisible();
+  await expect(page.frameLocator('[data-testid="play-frame"]').getByLabel('maru logo')).toBeVisible();
+
+  await context.close();
+});
+
+test('mobile play page redirects to the app itself', async ({ page }) => {
+  await page.goto('/play');
+
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByLabel('maru logo')).toBeVisible();
+});
+
+test('web logos link back to the landing page', async ({ browser }) => {
+  const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const mobilePage = await mobileContext.newPage();
+  await mobilePage.goto('/');
+  await expect(mobilePage.getByLabel('maru logo')).toBeVisible();
+  await expect(mobilePage).not.toHaveURL(/\/landing$/);
+  await mobileContext.close();
+
+  const landingContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const landingPage = await landingContext.newPage();
+  await landingPage.goto('/landing');
+  await landingPage.getByLabel('maru maru calc logo').click();
+  await expect(landingPage).toHaveURL(/\/landing$/);
+  await landingContext.close();
+
+  const desktopContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await desktopContext.addInitScript(() => {
+    window.__mediaPauseCalls = 0;
+    const originalPause = window.HTMLMediaElement.prototype.pause;
+    window.HTMLMediaElement.prototype.pause = function patchedPause() {
+      window.__mediaPauseCalls += 1;
+      return originalPause.call(this);
+    };
+  });
+  const desktopPage = await desktopContext.newPage();
+  await desktopPage.goto('/play');
+  const frameHandle = await desktopPage.locator('[data-testid="play-frame"]').elementHandle();
+  const appFrame = await frameHandle?.contentFrame();
+  if (!appFrame) {
+    throw new Error('play iframe was not available');
+  }
+  await desktopPage.getByLabel('maru maru calc logo').click();
+  await desktopPage.waitForTimeout(25);
+  await expect.poll(() => appFrame.evaluate(() => window.__mediaPauseCalls)).toBeGreaterThan(0);
+  await expect(desktopPage).toHaveURL(/\/landing$/);
+  await desktopContext.close();
+});
+
+test('landing page clicks do not start background music', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__mediaPlayCalls = 0;
+    const originalPlay = window.HTMLMediaElement.prototype.play;
+    window.HTMLMediaElement.prototype.play = function patchedPlay() {
+      window.__mediaPlayCalls += 1;
+      return originalPlay.call(this);
+    };
+  });
+
+  await page.goto('/landing');
+  await page.getByText('すうじ').first().click();
+  await page.getByTestId('landing-app-preview').click();
+
+  await expect.poll(() => page.evaluate(() => window.__mediaPlayCalls)).toBe(0);
+});
 
 test('moves through the depth path into the existing game', async ({ page }) => {
   await page.goto('/');

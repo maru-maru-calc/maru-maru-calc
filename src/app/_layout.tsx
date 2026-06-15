@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { MutableRefObject } from 'react';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { Asset } from 'expo-asset';
 import type { AudioPlayer } from 'expo-audio';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, usePathname } from 'expo-router';
 import { AppState, Platform, StyleSheet, View } from 'react-native';
 
 import { BgmControlContext } from '@/audio/bgm-control';
@@ -12,21 +12,22 @@ const BGM_VOLUME = 0.28;
 const BGM_SYNC_CHECK_MS = 250;
 const BGM_END_TOLERANCE_SECONDS = 0.12;
 const BGM_DRIFT_TOLERANCE_SECONDS = 0.045;
+const BGM_WEB_SWITCH_RESYNC_MS = 90;
 const bgmSource = require('../../assets/audio/bgm.mp3');
 const vocalBgmSource = require('../../assets/audio/bgm-vocal.mp3');
 
 export default function RootLayout() {
+  const pathname = usePathname();
+  const isBgmEnabledOnRoute = pathname === '/';
   const bgmPlayerRef = useRef<AudioPlayer | null>(null);
   const vocalBgmPlayerRef = useRef<AudioPlayer | null>(null);
   const webBgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const webVocalBgmAudioRef = useRef<HTMLAudioElement | null>(null);
+  const webSwitchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const hasUserStartedBgmRef = useRef(false);
   const isAppActiveRef = useRef(true);
   const isVocalEnabledRef = useRef(false);
   const [isVocalEnabled, setIsVocalEnabled] = useState(false);
-  const [fontsLoaded] = useFonts({
-    KiwiMaru: require('../../assets/fonts/KiwiMaru-Regular.ttf'),
-  });
 
   const applyBgmVolumes = useCallback(() => {
     const normalVolume = isVocalEnabledRef.current ? 0 : BGM_VOLUME;
@@ -62,13 +63,16 @@ export default function RootLayout() {
   const playSyncedBgmFromStart = useCallback(() => {
     applyBgmVolumes();
     if (webBgmAudioRef.current && webVocalBgmAudioRef.current) {
+      const activeAudio = getActiveWebBgmAudio(webBgmAudioRef.current, webVocalBgmAudioRef.current, isVocalEnabledRef.current);
+      const inactiveAudio = getInactiveWebBgmAudio(webBgmAudioRef.current, webVocalBgmAudioRef.current, isVocalEnabledRef.current);
       try {
-        webBgmAudioRef.current.currentTime = 0;
-        webVocalBgmAudioRef.current.currentTime = 0;
+        activeAudio.currentTime = 0;
+        inactiveAudio.currentTime = 0;
       } catch {
         // Some browsers can reject seeking before metadata is ready. Playback still starts normally.
       }
-      void Promise.all([webBgmAudioRef.current.play(), webVocalBgmAudioRef.current.play()]).catch(() => {});
+      inactiveAudio.pause();
+      void activeAudio.play().catch(() => {});
       return;
     }
 
@@ -88,25 +92,45 @@ export default function RootLayout() {
   const resumeSyncedBgm = useCallback(() => {
     syncBgmPositionsToCurrentTrack();
     applyBgmVolumes();
+    if (webBgmAudioRef.current && webVocalBgmAudioRef.current) {
+      const activeAudio = getActiveWebBgmAudio(webBgmAudioRef.current, webVocalBgmAudioRef.current, isVocalEnabledRef.current);
+      const inactiveAudio = getInactiveWebBgmAudio(webBgmAudioRef.current, webVocalBgmAudioRef.current, isVocalEnabledRef.current);
+      inactiveAudio.pause();
+      void activeAudio.play().catch(() => {});
+      return;
+    }
+
     bgmPlayerRef.current?.play();
     vocalBgmPlayerRef.current?.play();
-    void webBgmAudioRef.current?.play().catch(() => {});
-    void webVocalBgmAudioRef.current?.play().catch(() => {});
   }, [applyBgmVolumes, syncBgmPositionsToCurrentTrack]);
 
   const startBgmAfterUserAction = useCallback(() => {
-    if (hasUserStartedBgmRef.current || !isAppActiveRef.current) {
+    if (!isBgmEnabledOnRoute || hasUserStartedBgmRef.current || !isAppActiveRef.current) {
       return false;
     }
 
     hasUserStartedBgmRef.current = true;
     playSyncedBgmFromStart();
     return false;
-  }, [playSyncedBgmFromStart]);
+  }, [isBgmEnabledOnRoute, playSyncedBgmFromStart]);
 
   const toggleVocal = useCallback(() => {
-    syncBgmPositionsToCurrentTrack();
     const nextIsVocalEnabled = !isVocalEnabledRef.current;
+    if (webBgmAudioRef.current && webVocalBgmAudioRef.current) {
+      switchWebBgmTrack(
+        webBgmAudioRef.current,
+        webVocalBgmAudioRef.current,
+        isVocalEnabledRef.current,
+        nextIsVocalEnabled,
+        hasUserStartedBgmRef.current && isAppActiveRef.current && isBgmEnabledOnRoute,
+        webSwitchTimeoutRef,
+      );
+      isVocalEnabledRef.current = nextIsVocalEnabled;
+      setIsVocalEnabled(nextIsVocalEnabled);
+      return;
+    }
+
+    syncBgmPositionsToCurrentTrack();
     isVocalEnabledRef.current = nextIsVocalEnabled;
     setIsVocalEnabled(nextIsVocalEnabled);
     syncBgmPositionsToCurrentTrack();
@@ -115,14 +139,22 @@ export default function RootLayout() {
     if (hasUserStartedBgmRef.current && isAppActiveRef.current) {
       resumeSyncedBgm();
     }
-  }, [applyBgmVolumes, resumeSyncedBgm, syncBgmPositionsToCurrentTrack]);
+  }, [applyBgmVolumes, isBgmEnabledOnRoute, resumeSyncedBgm, syncBgmPositionsToCurrentTrack]);
+
+  const pauseBgm = useCallback(() => {
+    bgmPlayerRef.current?.pause();
+    vocalBgmPlayerRef.current?.pause();
+    webBgmAudioRef.current?.pause();
+    webVocalBgmAudioRef.current?.pause();
+  }, []);
 
   const bgmControlValue = useMemo(
     () => ({
       isVocalEnabled,
+      pauseBgm,
       toggleVocal,
     }),
-    [isVocalEnabled, toggleVocal],
+    [isVocalEnabled, pauseBgm, toggleVocal],
   );
 
   useEffect(() => {
@@ -145,6 +177,36 @@ export default function RootLayout() {
       style.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (isBgmEnabledOnRoute) {
+      if (hasUserStartedBgmRef.current && isAppActiveRef.current) {
+        resumeSyncedBgm();
+      }
+      return;
+    }
+
+    pauseBgm();
+  }, [isBgmEnabledOnRoute, pauseBgm, resumeSyncedBgm]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.data?.type !== 'marumaru:pause-bgm') {
+        return;
+      }
+
+      pauseBgm();
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [pauseBgm]);
 
   useEffect(() => {
     let player: AudioPlayer | null = null;
@@ -206,21 +268,24 @@ export default function RootLayout() {
       }
 
       if (hasUserStartedBgmRef.current) {
+        if (!isBgmEnabledOnRoute) {
+          return;
+        }
         resumeSyncedBgm();
       }
     });
 
     const syncInterval = setInterval(() => {
-      if (!hasUserStartedBgmRef.current || !isAppActiveRef.current) {
+      if (!isBgmEnabledOnRoute || !hasUserStartedBgmRef.current || !isAppActiveRef.current) {
         return;
       }
 
       if (webBgmAudioRef.current && webVocalBgmAudioRef.current) {
-        if (areWebTracksBothEnded(webBgmAudioRef.current, webVocalBgmAudioRef.current)) {
+        const activeAudio = getActiveWebBgmAudio(webBgmAudioRef.current, webVocalBgmAudioRef.current, isVocalEnabledRef.current);
+        if (isWebTrackEnded(activeAudio)) {
           playSyncedBgmFromStart();
           return;
         }
-        syncBgmPositionsToCurrentTrack();
         return;
       }
 
@@ -242,6 +307,10 @@ export default function RootLayout() {
         document.removeEventListener('keydown', startBgmFromWebInput);
       }
 
+      if (webSwitchTimeoutRef.current) {
+        clearTimeout(webSwitchTimeoutRef.current);
+        webSwitchTimeoutRef.current = undefined;
+      }
       appStateSubscription.remove();
       clearInterval(syncInterval);
       player?.pause();
@@ -261,11 +330,7 @@ export default function RootLayout() {
       webBgmAudioRef.current = null;
       webVocalBgmAudioRef.current = null;
     };
-  }, [playSyncedBgmFromStart, resumeSyncedBgm, startBgmAfterUserAction]);
-
-  if (!fontsLoaded) {
-    return null;
-  }
+  }, [isBgmEnabledOnRoute, pauseBgm, playSyncedBgmFromStart, resumeSyncedBgm, startBgmAfterUserAction]);
 
   return (
     <BgmControlContext.Provider value={bgmControlValue}>
@@ -282,6 +347,69 @@ export default function RootLayout() {
 
 function areWebTracksBothEnded(left: HTMLAudioElement, right: HTMLAudioElement) {
   return isWebTrackEnded(left) && isWebTrackEnded(right);
+}
+
+function getActiveWebBgmAudio(normalAudio: HTMLAudioElement, vocalAudio: HTMLAudioElement, isVocalEnabled: boolean) {
+  return isVocalEnabled ? vocalAudio : normalAudio;
+}
+
+function getInactiveWebBgmAudio(normalAudio: HTMLAudioElement, vocalAudio: HTMLAudioElement, isVocalEnabled: boolean) {
+  return isVocalEnabled ? normalAudio : vocalAudio;
+}
+
+function switchWebBgmTrack(
+  normalAudio: HTMLAudioElement,
+  vocalAudio: HTMLAudioElement,
+  wasVocalEnabled: boolean,
+  nextIsVocalEnabled: boolean,
+  shouldPlay: boolean,
+  timeoutRef: MutableRefObject<ReturnType<typeof setTimeout> | undefined>,
+) {
+  if (timeoutRef.current) {
+    clearTimeout(timeoutRef.current);
+    timeoutRef.current = undefined;
+  }
+
+  const fromAudio = getActiveWebBgmAudio(normalAudio, vocalAudio, wasVocalEnabled);
+  const toAudio = getActiveWebBgmAudio(normalAudio, vocalAudio, nextIsVocalEnabled);
+  const targetTime = Number.isFinite(fromAudio.currentTime) ? fromAudio.currentTime : 0;
+  const switchStartedAt = Date.now();
+
+  normalAudio.volume = nextIsVocalEnabled ? 0 : BGM_VOLUME;
+  vocalAudio.volume = nextIsVocalEnabled ? BGM_VOLUME : 0;
+
+  if (!shouldPlay) {
+    try {
+      toAudio.currentTime = targetTime;
+    } catch {
+      // Browsers can reject seeks before metadata is ready. The next user start will seek again.
+    }
+    fromAudio.pause();
+    return;
+  }
+
+  try {
+    toAudio.currentTime = targetTime;
+  } catch {
+    // Browsers can reject seeks before metadata is ready. The delayed resync below will retry.
+  }
+
+  void toAudio
+    .play()
+    .then(() => {
+      timeoutRef.current = setTimeout(() => {
+        try {
+          toAudio.currentTime = targetTime + (Date.now() - switchStartedAt) / 1000;
+        } catch {
+          // If Safari rejects this late seek, the initial seek still gives the best available sync.
+        }
+        fromAudio.pause();
+        timeoutRef.current = undefined;
+      }, BGM_WEB_SWITCH_RESYNC_MS);
+    })
+    .catch(() => {
+      fromAudio.pause();
+    });
 }
 
 function syncWebBgmPositions(normalAudio: HTMLAudioElement, vocalAudio: HTMLAudioElement, useVocalAsAnchor: boolean) {
