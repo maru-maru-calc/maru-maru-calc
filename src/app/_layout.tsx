@@ -13,6 +13,12 @@ const BGM_SYNC_CHECK_MS = 250;
 const BGM_END_TOLERANCE_SECONDS = 0.12;
 const BGM_DRIFT_TOLERANCE_SECONDS = 0.045;
 const BGM_WEB_SWITCH_RESYNC_MS = 90;
+const WEB_SITE_URL = 'https://maru-maru-calc.github.io/maru-maru-calc/';
+const WEB_ASSET_BASE_URL = 'https://maru-maru-calc.github.io/maru-maru-calc';
+const WEB_SITE_TITLE = 'まるまる電卓 | すうじをさわる計算あそび';
+const WEB_SITE_DESCRIPTION = 'まるをさわって、動かして。足し算から割り算まで、数を見た目で感じる子ども向け計算あそび。';
+const WEB_SITE_KEYWORDS = 'まるまる電卓,算数,計算,知育アプリ,子ども向け,足し算,引き算,掛け算,割り算';
+const WEB_OGP_IMAGE_URL = `${WEB_ASSET_BASE_URL}/ogp.png`;
 const bgmSource = require('../../assets/audio/bgm.mp3');
 const vocalBgmSource = require('../../assets/audio/bgm-vocal.mp3');
 
@@ -29,6 +35,14 @@ export default function RootLayout() {
   const isAppActiveRef = useRef(true);
   const isVocalEnabledRef = useRef(false);
   const [isVocalEnabled, setIsVocalEnabled] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') {
+      return;
+    }
+
+    syncWebMetadata();
+  }, [pathname]);
 
   const applyBgmVolumes = useCallback(() => {
     const normalVolume = isVocalEnabledRef.current ? 0 : BGM_VOLUME;
@@ -521,6 +535,64 @@ function isNativeTrackEnded(player: AudioPlayer) {
     return false;
   }
   return player.currentTime >= player.duration - BGM_END_TOLERANCE_SECONDS;
+}
+
+function syncWebMetadata() {
+  document.documentElement.lang = 'ja';
+  document.title = WEB_SITE_TITLE;
+
+  setMetaTag('name', 'description', WEB_SITE_DESCRIPTION);
+  setMetaTag('name', 'keywords', WEB_SITE_KEYWORDS);
+  setMetaTag('name', 'robots', 'index,follow');
+  setMetaTag('name', 'theme-color', '#C6E8F4');
+  setMetaTag('name', 'apple-mobile-web-app-title', 'まるまる電卓');
+  setLinkTag('canonical', WEB_SITE_URL);
+  setLinkTag('icon', '/maru-maru-calc/favicon.png', 'image/png');
+  setLinkTag('apple-touch-icon', '/maru-maru-calc/apple-touch-icon.png');
+
+  setMetaTag('property', 'og:type', 'website');
+  setMetaTag('property', 'og:locale', 'ja_JP');
+  setMetaTag('property', 'og:site_name', 'まるまる電卓');
+  setMetaTag('property', 'og:title', WEB_SITE_TITLE);
+  setMetaTag('property', 'og:description', WEB_SITE_DESCRIPTION);
+  setMetaTag('property', 'og:url', WEB_SITE_URL);
+  setMetaTag('property', 'og:image', WEB_OGP_IMAGE_URL);
+  setMetaTag('property', 'og:image:width', '1200');
+  setMetaTag('property', 'og:image:height', '630');
+  setMetaTag('property', 'og:image:alt', 'まるまる電卓の水色の画面と、まるで数を感じる計算あそび');
+
+  setMetaTag('name', 'twitter:card', 'summary_large_image');
+  setMetaTag('name', 'twitter:title', WEB_SITE_TITLE);
+  setMetaTag('name', 'twitter:description', WEB_SITE_DESCRIPTION);
+  setMetaTag('name', 'twitter:image', WEB_OGP_IMAGE_URL);
+}
+
+function setMetaTag(attributeName: 'name' | 'property', attributeValue: string, content: string) {
+  let element = document.head.querySelector(`meta[${attributeName}="${attributeValue}"]`);
+
+  if (!element) {
+    element = document.createElement('meta');
+    element.setAttribute(attributeName, attributeValue);
+    document.head.appendChild(element);
+  }
+
+  element.setAttribute('content', content);
+}
+
+function setLinkTag(rel: string, href: string, type?: string) {
+  let element = document.head.querySelector(`link[rel="${rel}"]`);
+
+  if (!element) {
+    element = document.createElement('link');
+    element.setAttribute('rel', rel);
+    document.head.appendChild(element);
+  }
+
+  element.setAttribute('href', href);
+
+  if (type) {
+    element.setAttribute('type', type);
+  }
 }
 
 const styles = StyleSheet.create({

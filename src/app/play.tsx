@@ -17,7 +17,7 @@ const RADIUS_XL = 24;
 const RADIUS_PILL = 999;
 const DESKTOP_MIN_WIDTH = 900;
 const COPYRIGHT_TEXT = '© 2026 nozomitaguchi';
-const BASE_PATH = process.env.EXPO_BASE_URL ?? '';
+const BASE_PATH = __DEV__ ? '' : process.env.EXPO_BASE_URL ?? '';
 
 export default function PlayPage() {
   const { width } = useWindowDimensions();

@@ -1,7 +1,7 @@
 import { createElement, useEffect, useRef, type ReactNode } from 'react';
 import { Asset } from 'expo-asset';
 import { useRouter } from 'expo-router';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { TextStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -21,12 +21,14 @@ const RADIUS_PILL = 999;
 const COPYRIGHT_TEXT = '© 2026 nozomitaguchi';
 const DESKTOP_MIN_WIDTH = 900;
 const LANDING_DESKTOP_MIN_WIDTH = 1100;
-const BASE_PATH = process.env.EXPO_BASE_URL ?? '';
+const BASE_PATH = __DEV__ ? '' : process.env.EXPO_BASE_URL ?? '';
 const demoVideoSource = require('../../assets/landing/maru-demo-field-wide-short.webm');
 const operationAddVideoSource = require('../../assets/landing/operation-add.webm');
 const operationSubtractVideoSource = require('../../assets/landing/operation-subtract.webm');
 const operationMultiplyVideoSource = require('../../assets/landing/operation-multiply-short.webm');
 const operationDivideVideoSource = require('../../assets/landing/operation-divide-short.webm');
+const modeMarumaruPosterSource = require('../../assets/landing/mode-marumaru-poster.png');
+const modeDentakuPosterSource = require('../../assets/landing/mode-dentaku-poster.png');
 
 type LandingLocale = 'ja' | 'en' | 'zh-hans' | 'zh-hant' | 'ko' | 'de';
 
@@ -51,13 +53,25 @@ const landingCopy = {
     ],
     flowTitleBefore: '４つ',
     flowTitleParticle: 'の',
-    flowTitleAfter: 'さわりかた',
+    flowTitleAfter: 'きごう',
     operationDemos: [
       { label: 'たす', expression: '8 + 5 = 13', description: 'ボウルに一緒に落ちた"まる"が10こを超えると、まとまって少し大きい"まる"になるよ。どんな種類の"まる"があるかな？', source: operationAddVideoSource, testID: 'operation-video-add', playbackRate: 1 },
       { label: 'ひく', expression: '12 - 5 = 7', description: '黒い"まる"は、同じ大きさの"まる"とぶつかると一緒に消えちゃうよ。残った"まる"は何個かな？', source: operationSubtractVideoSource, testID: 'operation-video-subtract', playbackRate: 1 },
       { label: 'かける', expression: '4 × 3 = 12', description: '"まる"をまとめた"あわ"が3つになったね。"あわ"が弾けたあとの"まる"は何個になったかな？', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
       { label: 'わる', expression: '12 ÷ 3 = 4', description: '"まる"を同じ数で分けた"あわ"が、一つだけ残ったね。"まる"は何個になったかな？', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
     ],
+    calculationModeTitleBefore: '２つ',
+    calculationModeTitleParticle: 'の',
+    calculationModeTitleAfter: 'モード',
+    calculationModeLead: '"まる"を動かして数をつくる遊びと、式を見て答える遊び。どちらも、"まる"の動きを見ながらたしかめられるよ。',
+    calculationModeReverseName: 'まるまるモード',
+    calculationModeReverseLabel: 'つくってみる',
+    calculationModeReverseBody: '"まる"ときごうを組み合わせて、ぴったりの数をつくってみよう。どの順番でさわると近づくかな？',
+    calculationModeForwardName: 'でんたくモード',
+    calculationModeForwardLabel: 'こたえてみる',
+    calculationModeForwardBody: '式を見て、数字で答えてみよう。答えたあとに、"まる"がどう動くか見てみよう。',
+    calculationModeKukuLabel: '九九もくり返し',
+    calculationModeKukuBody: '1の段から9の段まで、何度もあそびながら覚えられるよ。',
     finalTitle: 'さがしてごらん',
     finalSegments: [
       { text: '魚は何種類いるかな？' },
@@ -85,13 +99,25 @@ const landingCopy = {
     ],
     flowTitleBefore: '4',
     flowTitleParticle: '',
-    flowTitleAfter: 'ways to play',
+    flowTitleAfter: 'symbols',
     operationDemos: [
       { label: 'Add', expression: '8 + 5 = 13', description: 'When more than 10 maru land in the bowl, they gather into a slightly bigger maru. What kinds can you find?', source: operationAddVideoSource, testID: 'operation-video-add', playbackRate: 1 },
       { label: 'Subtract', expression: '12 - 5 = 7', description: 'Black maru disappear when they meet a matching maru. How many are left?', source: operationSubtractVideoSource, testID: 'operation-video-subtract', playbackRate: 1 },
       { label: 'Multiply', expression: '4 × 3 = 12', description: 'Three bubbles each hold a group of maru. How many maru are there after the bubbles pop?', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
       { label: 'Divide', expression: '12 ÷ 3 = 4', description: 'The maru are split evenly, and one bubble remains. How many maru are inside?', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
     ],
+    calculationModeTitleBefore: 'Two',
+    calculationModeTitleParticle: '',
+    calculationModeTitleAfter: 'modes',
+    calculationModeLead: 'Make a number by moving maru, or read an equation and answer it. Either way, children can check the answer by watching the maru move.',
+    calculationModeReverseName: 'Marumaru mode',
+    calculationModeReverseLabel: 'Make it',
+    calculationModeReverseBody: 'Combine maru and symbols to make the target number. Which order gets you closer?',
+    calculationModeForwardName: 'Calculator mode',
+    calculationModeForwardLabel: 'Answer it',
+    calculationModeForwardBody: 'Read the equation, type the number, then watch how the maru move.',
+    calculationModeKukuLabel: 'Practice tables',
+    calculationModeKukuBody: 'Multiplication-table stages let children repeat the 1-times table through the 9-times table.',
     finalTitle: 'Look around',
     finalSegments: [
       { text: 'How many kinds of fish can you find?' },
@@ -119,13 +145,25 @@ const landingCopy = {
     ],
     flowTitleBefore: '4',
     flowTitleParticle: '',
-    flowTitleAfter: '种玩法',
+    flowTitleAfter: '个符号',
     operationDemos: [
       { label: '加法', expression: '8 + 5 = 13', description: '当落进碗里的圆点超过 10 个时，它们会聚成稍大一点的圆点。你能找到哪些种类？', source: operationAddVideoSource, testID: 'operation-video-add', playbackRate: 1 },
       { label: '减法', expression: '12 - 5 = 7', description: '黑色圆点碰到相同大小的圆点时会一起消失。最后还剩几个？', source: operationSubtractVideoSource, testID: 'operation-video-subtract', playbackRate: 1 },
       { label: '乘法', expression: '4 × 3 = 12', description: '3 个泡泡里各有一组圆点。泡泡破掉以后，一共有几个圆点？', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
       { label: '除法', expression: '12 ÷ 3 = 4', description: '圆点被平均分开，只留下一个泡泡。里面有几个圆点？', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
     ],
+    calculationModeTitleBefore: '两种',
+    calculationModeTitleParticle: '',
+    calculationModeTitleAfter: '模式',
+    calculationModeLead: '可以移动圆点组成数字，也可以看算式输入答案。无论哪一种，都能看着圆点的动作来确认。',
+    calculationModeReverseName: 'Marumaru 模式',
+    calculationModeReverseLabel: '试着组成',
+    calculationModeReverseBody: '把圆点和符号组合起来，试着做出目标数字。按什么顺序会更接近呢？',
+    calculationModeForwardName: '计算器模式',
+    calculationModeForwardLabel: '试着回答',
+    calculationModeForwardBody: '看算式，用数字回答。答完以后，再看看圆点会怎样移动。',
+    calculationModeKukuLabel: '反复练乘法表',
+    calculationModeKukuBody: '从 1 的乘法表到 9 的乘法表，可以一边玩一边练习。',
     finalTitle: '找找看',
     finalSegments: [
       { text: '你能找到几种鱼？' },
@@ -153,13 +191,25 @@ const landingCopy = {
     ],
     flowTitleBefore: '4',
     flowTitleParticle: '',
-    flowTitleAfter: '種玩法',
+    flowTitleAfter: '個符號',
     operationDemos: [
       { label: '加法', expression: '8 + 5 = 13', description: '當落進碗裡的圓點超過 10 個時，它們會聚成稍大一點的圓點。你能找到哪些種類？', source: operationAddVideoSource, testID: 'operation-video-add', playbackRate: 1 },
       { label: '減法', expression: '12 - 5 = 7', description: '黑色圓點碰到相同大小的圓點時會一起消失。最後還剩幾個？', source: operationSubtractVideoSource, testID: 'operation-video-subtract', playbackRate: 1 },
       { label: '乘法', expression: '4 × 3 = 12', description: '3 個泡泡裡各有一組圓點。泡泡破掉以後，一共有幾個圓點？', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
       { label: '除法', expression: '12 ÷ 3 = 4', description: '圓點被平均分開，只留下一個泡泡。裡面有幾個圓點？', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
     ],
+    calculationModeTitleBefore: '兩種',
+    calculationModeTitleParticle: '',
+    calculationModeTitleAfter: '模式',
+    calculationModeLead: '可以移動圓點組成數字，也可以看算式輸入答案。無論哪一種，都能看著圓點的動作來確認。',
+    calculationModeReverseName: 'Marumaru 模式',
+    calculationModeReverseLabel: '試著組成',
+    calculationModeReverseBody: '把圓點和符號組合起來，試著做出目標數字。按什麼順序會更接近呢？',
+    calculationModeForwardName: '計算機模式',
+    calculationModeForwardLabel: '試著回答',
+    calculationModeForwardBody: '看算式，用數字回答。答完以後，再看看圓點會怎樣移動。',
+    calculationModeKukuLabel: '反覆練乘法表',
+    calculationModeKukuBody: '從 1 的乘法表到 9 的乘法表，可以一邊玩一邊練習。',
     finalTitle: '找找看',
     finalSegments: [
       { text: '你能找到幾種魚？' },
@@ -187,13 +237,25 @@ const landingCopy = {
     ],
     flowTitleBefore: '4',
     flowTitleParticle: '',
-    flowTitleAfter: '가지 놀이 방식',
+    flowTitleAfter: '가지 기호',
     operationDemos: [
       { label: '더하기', expression: '8 + 5 = 13', description: '그릇에 들어간 원이 10개를 넘으면 조금 더 큰 원으로 모여요. 어떤 종류의 원이 있을까요?', source: operationAddVideoSource, testID: 'operation-video-add', playbackRate: 1 },
       { label: '빼기', expression: '12 - 5 = 7', description: '검은 원은 같은 크기의 원과 만나면 함께 사라져요. 몇 개가 남았을까요?', source: operationSubtractVideoSource, testID: 'operation-video-subtract', playbackRate: 1 },
       { label: '곱하기', expression: '4 × 3 = 12', description: '3개의 거품 안에 원 묶음이 있어요. 거품이 터지면 원은 모두 몇 개일까요?', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
       { label: '나누기', expression: '12 ÷ 3 = 4', description: '원이 똑같이 나뉘고 거품 하나만 남았어요. 안에는 원이 몇 개 있을까요?', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
     ],
+    calculationModeTitleBefore: '두 가지',
+    calculationModeTitleParticle: '',
+    calculationModeTitleAfter: '모드',
+    calculationModeLead: '원을 움직여 수를 만들 수도 있고, 식을 보고 답할 수도 있어요. 어느 쪽이든 원의 움직임을 보며 확인할 수 있어요.',
+    calculationModeReverseName: '마루마루 모드',
+    calculationModeReverseLabel: '만들어 봐요',
+    calculationModeReverseBody: '원과 기호를 조합해 목표 수를 만들어 봐요. 어떤 순서로 누르면 가까워질까요?',
+    calculationModeForwardName: '계산기 모드',
+    calculationModeForwardLabel: '답해 봐요',
+    calculationModeForwardBody: '식을 보고 숫자로 답해 봐요. 답한 뒤에는 원이 어떻게 움직이는지 볼 수 있어요.',
+    calculationModeKukuLabel: '구구단도 반복',
+    calculationModeKukuBody: '1단부터 9단까지 놀이처럼 반복하며 익힐 수 있어요.',
     finalTitle: '찾아봐요',
     finalSegments: [
       { text: '물고기는 몇 종류가 있을까요?' },
@@ -221,13 +283,25 @@ const landingCopy = {
     ],
     flowTitleBefore: '4',
     flowTitleParticle: '',
-    flowTitleAfter: 'Spielweisen',
+    flowTitleAfter: 'Symbole',
     operationDemos: [
       { label: 'Plus', expression: '8 + 5 = 13', description: 'Wenn mehr als 10 maru im Becken landen, werden sie zu einem etwas größeren maru. Welche Arten findest du?', source: operationAddVideoSource, testID: 'operation-video-add', playbackRate: 1 },
       { label: 'Minus', expression: '12 - 5 = 7', description: 'Schwarze maru verschwinden, wenn sie ein passendes maru treffen. Wie viele bleiben übrig?', source: operationSubtractVideoSource, testID: 'operation-video-subtract', playbackRate: 1 },
       { label: 'Mal', expression: '4 × 3 = 12', description: 'In 3 Blasen steckt jeweils eine Gruppe maru. Wie viele maru sind es, nachdem die Blasen platzen?', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
       { label: 'Geteilt', expression: '12 ÷ 3 = 4', description: 'Die maru werden gleichmäßig aufgeteilt, und eine Blase bleibt übrig. Wie viele maru sind darin?', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
     ],
+    calculationModeTitleBefore: 'Zwei',
+    calculationModeTitleParticle: '',
+    calculationModeTitleAfter: 'Spielmodi',
+    calculationModeLead: 'Kinder können mit maru eine Zahl bauen oder eine Aufgabe lesen und beantworten. In beiden Modi zeigen die Bewegungen, was passiert.',
+    calculationModeReverseName: 'Marumaru-Modus',
+    calculationModeReverseLabel: 'Bau die Zahl',
+    calculationModeReverseBody: 'Kombiniere maru und Rechenzeichen zur Zielzahl. Welche Reihenfolge bringt dich näher?',
+    calculationModeForwardName: 'Rechenmodus',
+    calculationModeForwardLabel: 'Gib Antwort',
+    calculationModeForwardBody: 'Lies die Aufgabe, tippe die Zahl ein und schau, wie sich die maru bewegen.',
+    calculationModeKukuLabel: 'Einmaleins üben',
+    calculationModeKukuBody: 'Die Reihen von 1 bis 9 lassen sich spielerisch wiederholen.',
     finalTitle: 'Schau dich um',
     finalSegments: [
       { text: 'Wie viele Fischarten findest du?' },
@@ -412,6 +486,8 @@ export default function LandingPage() {
         </View>
       </View>
 
+      <CalculationModeSection copy={copy} compact={isCompact} />
+
       <View style={[styles.section, styles.flowSection, styles.decoratedSection]}>
         <LandingSectionAmbient variant="flow" />
         <Text style={styles.sectionTitle}>
@@ -564,6 +640,87 @@ function FeatureCardBackground({ variant, compact }: { variant: FeatureCardVaria
       <View style={[styles.featureStepDot, styles.featureTogetherStepOne]} />
       <View style={[styles.featureStepDot, styles.featureTogetherStepTwo]} />
       <View style={[styles.featureStepDot, styles.featureTogetherStepThree]} />
+    </View>
+  );
+}
+
+function CalculationModeSection({ copy, compact }: { copy: typeof landingCopy[LandingLocale]; compact: boolean }) {
+  const reversePosterUri = Asset.fromModule(modeMarumaruPosterSource).uri;
+  const forwardPosterUri = Asset.fromModule(modeDentakuPosterSource).uri;
+
+  return (
+    <View style={[styles.calculationModeSection, styles.decoratedSection]}>
+      <View pointerEvents="none" style={styles.calculationModeAmbient}>
+        <FloatingBubble size={96} left="8%" top="16%" opacity={0.14} />
+        <FloatingBubble size={38} left="82%" top="12%" opacity={0.22} />
+        <FloatingBubble size={128} left="88%" top="62%" opacity={0.12} />
+        <LandingBlueTang style={styles.calculationModeBlueTang} />
+      </View>
+      <View style={[styles.calculationModeContent, compact && styles.calculationModeContentCompact]}>
+        <View style={[styles.calculationModeCopy, compact && styles.calculationModeCopyCompact]}>
+          <Text style={[styles.sectionTitle, styles.calculationModeTitle, compact && styles.calculationModeTitleCompact]}>
+            {copy.calculationModeTitleBefore}
+            {copy.calculationModeTitleParticle ? <Text style={styles.sectionTitleParticle}>{copy.calculationModeTitleParticle}</Text> : ' '}
+            {copy.calculationModeTitleAfter}
+          </Text>
+          <Text style={styles.calculationModeLead}>{copy.calculationModeLead}</Text>
+        </View>
+        <View style={styles.calculationModeRows}>
+          <ModeFlowRow
+            compact={compact}
+            description={copy.calculationModeReverseBody}
+            expression={copy.calculationModeReverseLabel}
+            imageUri={reversePosterUri}
+            label={copy.calculationModeReverseName}
+            testID="mode-video-marumaru"
+          />
+          <ModeFlowRow
+            compact={compact}
+            description={`${copy.calculationModeForwardBody} ${copy.calculationModeKukuBody}`}
+            expression={copy.calculationModeForwardLabel}
+            imageUri={forwardPosterUri}
+            label={copy.calculationModeForwardName}
+            testID="mode-video-dentaku"
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function ModeFlowRow({
+  label,
+  expression,
+  description,
+  imageUri,
+  testID,
+  compact,
+}: {
+  label: string;
+  expression: string;
+  description: string;
+  imageUri: string;
+  testID: string;
+  compact: boolean;
+}) {
+  return (
+    <View style={[styles.flowRow, styles.calculationModeRow, compact && styles.flowRowCompact]}>
+      <View style={[styles.flowTextGroup, compact && styles.flowTextGroupCompact]}>
+        <View style={styles.modeFlowExpressionLine}>
+          <Text style={styles.flowLabel}>{label}</Text>
+          <Text style={[styles.flowExpression, compact && styles.flowExpressionCompact]}>{expression}</Text>
+        </View>
+        <Text style={styles.flowDescription}>{description}</Text>
+      </View>
+      <ModePoster uri={imageUri} testID={testID} compact={compact} />
+    </View>
+  );
+}
+
+function ModePoster({ uri, testID, compact }: { uri: string; testID: string; compact: boolean }) {
+  return (
+    <View style={[styles.modeVideoFrame, compact && styles.modeVideoFrameCompact]} testID={testID}>
+      <Image accessibilityLabel={testID} source={{ uri }} resizeMode="cover" style={styles.modePosterImage} testID={`${testID}-image`} />
     </View>
   );
 }
@@ -835,9 +992,10 @@ function LandingSectionAmbient({ variant }: { variant: 'features' | 'flow' | 'fi
   return (
     <View pointerEvents="none" testID="landing-final-ambient" style={styles.sectionAmbient}>
       <FloatingBubble size={72} left="78%" top="12%" opacity={0.25} />
-      <FloatingBubble size={124} left="4%" top="18%" opacity={0.14} />
+      <FloatingBubble size={124} left="4%" top="18%" opacity={0.18} />
       <FloatingBubble size={44} left="54%" top="80%" opacity={0.22} />
       <FloatingBubble size={34} left="14%" top="76%" opacity={0.28} />
+      <FloatingBubble size={156} left="92%" top="56%" opacity={0.1} />
       <LandingPuffer style={styles.ambientPufferFinal} />
       <LandingBlueTang style={{ position: 'absolute', right: '10%', bottom: '14%', opacity: 0.48, transform: [{ rotate: '5deg' }] }} />
     </View>
@@ -1624,7 +1782,7 @@ const styles = StyleSheet.create({
     width: 12,
   },
   flowSection: {
-    backgroundColor: WATER_COLOR,
+    backgroundColor: 'rgba(224, 247, 255, 0.64)',
   },
   flowRows: {
     zIndex: 1,
@@ -1678,6 +1836,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: GRID * 2,
   },
+  modeFlowExpressionLine: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: GRID * 0.75,
+  },
   flowLabel: {
     color: TEXT_ACCENT_COLOR,
     fontSize: 18,
@@ -1730,13 +1893,108 @@ const styles = StyleSheet.create({
     maxWidth: '100%',
     height: GRID * 24,
   },
+  modeVideoFrame: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: GRID * 44,
+    width: GRID * 44,
+    height: GRID * 44,
+    minWidth: 0,
+    maxWidth: GRID * 44,
+    aspectRatio: 1,
+    borderRadius: RADIUS_LG,
+    borderWidth: 4,
+    borderColor: 'rgba(224, 247, 255, 0.9)',
+    backgroundColor: 'rgba(198, 232, 244, 0.7)',
+    overflow: 'hidden',
+  },
+  modeVideoFrameCompact: {
+    width: '100%',
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 'auto',
+    maxWidth: '100%',
+    aspectRatio: 1,
+  },
+  modePosterImage: {
+    width: '100%',
+    height: '100%',
+  },
+  calculationModeSection: {
+    position: 'relative',
+    overflow: 'hidden',
+    paddingHorizontal: GRID * 3,
+    paddingVertical: GRID * 8,
+    backgroundColor: WATER_COLOR,
+  },
+  calculationModeAmbient: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+  calculationModeContent: {
+    zIndex: 1,
+    width: '100%',
+    maxWidth: SECTION_CONTENT_WIDTH,
+    alignSelf: 'center',
+    gap: GRID * 5,
+  },
+  calculationModeContentCompact: {
+    gap: GRID * 4,
+  },
+  calculationModeCopy: {
+    width: '100%',
+    maxWidth: GRID * 72,
+    alignSelf: 'center',
+    alignItems: 'center',
+  },
+  calculationModeCopyCompact: {
+    width: '100%',
+    maxWidth: '100%',
+    alignItems: 'center',
+  },
+  calculationModeTitle: {
+    textAlign: 'center',
+  },
+  calculationModeTitleCompact: {
+    textAlign: 'center',
+  },
+  calculationModeLead: {
+    marginTop: GRID * 2,
+    color: TEXT_BASE_COLOR,
+    fontSize: 17,
+    lineHeight: 29,
+    fontWeight: '600',
+    fontFamily: PLAYFUL_FONT_FAMILY,
+    letterSpacing: 0.4,
+    textAlign: 'center',
+  },
+  calculationModeRows: {
+    width: '100%',
+    gap: GRID * 2,
+  },
+  calculationModeRow: {
+    backgroundColor: 'rgba(255, 255, 255, 0.48)',
+    minHeight: GRID * 52,
+  },
+  calculationModeVisualCompact: {
+    width: '100%',
+    maxWidth: GRID * 48,
+    minHeight: GRID * 52,
+  },
+  calculationModeBlueTang: {
+    position: 'absolute',
+    left: '10%',
+    bottom: '16%',
+    opacity: 0.42,
+    transform: [{ rotate: '-6deg' }],
+  },
   finalSection: {
     position: 'relative',
     overflow: 'hidden',
     paddingHorizontal: GRID * 3,
     paddingVertical: GRID * 9,
     alignItems: 'center',
-    backgroundColor: 'rgba(224, 247, 255, 0.72)',
+    backgroundColor: WATER_COLOR,
   },
   finalContent: {
     zIndex: 1,
@@ -1814,7 +2072,7 @@ const styles = StyleSheet.create({
     paddingTop: GRID * 3,
     paddingBottom: GRID * 4,
     alignItems: 'center',
-    backgroundColor: 'rgba(224, 247, 255, 0.72)',
+    backgroundColor: WATER_COLOR,
   },
   copyright: {
     color: 'rgba(18, 51, 74, 0.68)',

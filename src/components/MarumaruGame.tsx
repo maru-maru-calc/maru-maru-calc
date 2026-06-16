@@ -207,6 +207,8 @@ const RADIUS_XL = 24;
 const RADIUS_PILL = 999;
 const HEADER_ACTION_BUTTON_SIZE = 48;
 const MIN_TOUCH_TARGET_SIZE = 88;
+const KUKU_QUESTION_BASE_FONT_SIZE = 38;
+const KUKU_QUESTION_MIN_FONT_SIZE = 14;
 const TAP_DRIFT_TO_BURST_THRESHOLD = 24;
 const DETAILED_RELEASE_BEAD_LIMIT = 10;
 const MULTIPLIER_BUBBLE_X_STEP = 0.34;
@@ -1803,10 +1805,14 @@ function StageGoalTitle({ stageNumber, target, maxWidth }: { stageNumber: number
 
 function KukuGoalTitle({ practice, input, maxWidth }: { practice: DentakuPractice; input: string; maxWidth: number }) {
   const expression = practice.prompt.replace(' = ?', '');
+  const answerText = input || '?';
+  const questionText = `${expression} = ${answerText}`;
+  const titleTextStyle = getKukuQuestionTitleTextStyle(questionText, maxWidth);
+
   return (
     <View style={[styles.kukuGameTitle, { maxWidth }]}>
-      <Text testID="kuku-question-title" style={styles.kukuQuestionText}>
-        {expression} = <Text style={input.length === 0 ? styles.kukuQuestionUnknown : undefined}>{input || '?'}</Text>
+      <Text testID="kuku-question-title" numberOfLines={1} style={[styles.kukuQuestionText, titleTextStyle]}>
+        {expression} = <Text style={input.length === 0 ? styles.kukuQuestionUnknown : undefined}>{answerText}</Text>
       </Text>
     </View>
   );
@@ -4141,6 +4147,36 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
+function getKukuQuestionTitleTextStyle(text: string, maxWidth: number) {
+  const estimatedWidth = estimateKukuQuestionTextWidth(text, KUKU_QUESTION_BASE_FONT_SIZE);
+  const availableWidth = Math.max(80, maxWidth);
+
+  if (estimatedWidth <= availableWidth) {
+    return undefined;
+  }
+
+  const fontSize = Math.max(KUKU_QUESTION_MIN_FONT_SIZE, Math.floor((KUKU_QUESTION_BASE_FONT_SIZE * availableWidth) / estimatedWidth));
+  return {
+    fontSize,
+    lineHeight: Math.ceil(fontSize * 1.12),
+  };
+}
+
+function estimateKukuQuestionTextWidth(text: string, fontSize: number) {
+  return Array.from(text).reduce((width, character) => {
+    if (character === ' ') {
+      return width + fontSize * 0.32;
+    }
+    if (character === '×' || character === '÷' || character === '+' || character === '-' || character === '=') {
+      return width + fontSize * 0.72;
+    }
+    if (character === '(' || character === ')') {
+      return width + fontSize * 0.42;
+    }
+    return width + fontSize * 0.62;
+  }, 0);
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -4262,7 +4298,7 @@ const styles = StyleSheet.create({
   },
   kukuQuestionText: {
     color: TEXT_BASE_COLOR,
-    fontSize: 38,
+    fontSize: KUKU_QUESTION_BASE_FONT_SIZE,
     lineHeight: 42,
     fontWeight: '900',
     fontFamily: LATIN_FONT_FAMILY,

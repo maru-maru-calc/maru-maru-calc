@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Asset } from 'expo-asset';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,6 +13,9 @@ import { NavImageIcon } from '@/components/NavImageIcon';
 import { DENTAKU_STAGES, DENTAKU_WORLDS, DentakuStage, DentakuWorldId } from '@/game/dentaku';
 import { getStageIndexById, STAGE_ISLANDS, STAGES } from '@/game/stages';
 import { Stage } from '@/game/types';
+
+const modeMarumaruPosterSource = require('../../assets/landing/mode-marumaru-poster.png');
+const modeDentakuPosterSource = require('../../assets/landing/mode-dentaku-poster.png');
 
 type AppScreen = 'launch' | 'mode' | 'world' | 'stage' | 'game' | 'dentakuWorld' | 'dentakuStage' | 'dentakuGame';
 type StageStatus = 'done' | 'open' | 'locked';
@@ -38,6 +42,8 @@ type DepthFishSpec = {
 
 const DEPTH_BUBBLE_TICK_MS = 90;
 const DEPTH_CREATURE_REACTION_MS = 920;
+const MAP_NODE_RADIUS = 40;
+const MAP_BOTTOM_SPACE_AFTER_LAST_NODE = 244;
 const PLAYFUL_FONT_FAMILY = 'Noto Sans Japanese';
 const LATIN_FONT_FAMILY = 'Helvetica';
 const TEXT_BASE_COLOR = '#12334A';
@@ -207,6 +213,15 @@ function ModeSelect({
   const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
   const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
   const centerX = mapWidth / 2;
+  const marumaruPosterUri = Asset.fromModule(modeMarumaruPosterSource).uri;
+  const dentakuPosterUri = Asset.fromModule(modeDentakuPosterSource).uri;
+  const modeCardSize = Math.min(300, Math.max(256, mapWidth - GRID * 11));
+  const modeCardGap = GRID * 4;
+  const modeContentHeight = modeCardSize * 2 + modeCardGap;
+  const modeTop = Math.max(GRID * 6, Math.round((viewportHeight - modeContentHeight) / 2 / GRID) * GRID);
+  const marumaruY = modeTop + modeCardSize / 2;
+  const dentakuY = marumaruY + modeCardSize + modeCardGap;
+  const modeLayerHeight = Math.max(viewportHeight, modeTop * 2 + modeContentHeight);
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -219,15 +234,15 @@ function ModeSelect({
           onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
           scrollEventThrottle={16}
         >
-          <View style={styles.modeRouteLayer}>
-            <BubbleRoute from={{ x: centerX - 82, y: 176 }} to={{ x: centerX + 82, y: 344 }} />
-            <ModeDiver variant="boy" style={[styles.modeDiverBoy, { left: Math.max(18, centerX - 178) }]} />
-            <ModeDiver variant="girl" style={[styles.modeDiverGirl, { left: Math.min(mapWidth - 136, centerX + 38) }]} />
+          <View style={[styles.modeRouteLayer, { minHeight: modeLayerHeight }]}>
+            <BubbleRoute from={{ x: centerX, y: marumaruY }} to={{ x: centerX, y: dentakuY }} />
             <ModeNode
               label="marumaru mode"
-              title="? + ? = 10"
-              x={centerX - 82}
-              y={176}
+              title="まるまる"
+              imageUri={marumaruPosterUri}
+              size={modeCardSize}
+              x={centerX}
+              y={marumaruY}
               onPress={() => {
                 playActionSfx();
                 onSelectMarumaru();
@@ -235,9 +250,11 @@ function ModeSelect({
             />
             <ModeNode
               label="dentaku mode"
-              title="4 + 6 = ?"
-              x={centerX + 82}
-              y={344}
+              title="でんたく"
+              imageUri={dentakuPosterUri}
+              size={modeCardSize}
+              x={centerX}
+              y={dentakuY}
               onPress={() => {
                 playActionSfx();
                 onSelectDentaku();
@@ -280,7 +297,23 @@ function ModeDiver({ variant, style }: { variant: 'boy' | 'girl'; style: StylePr
   );
 }
 
-function ModeNode({ label, title, x, y, onPress }: { label: string; title: string; x: number; y: number; onPress: () => void }) {
+function ModeNode({
+  label,
+  title,
+  imageUri,
+  size,
+  x,
+  y,
+  onPress,
+}: {
+  label: string;
+  title: string;
+  imageUri: string;
+  size: number;
+  x: number;
+  y: number;
+  onPress: () => void;
+}) {
   return (
     <Pressable
       accessibilityLabel={label}
@@ -290,17 +323,23 @@ function ModeNode({ label, title, x, y, onPress }: { label: string; title: strin
         styles.bubbleNode,
         styles.modeNode,
         {
-          left: x - 82,
-          top: y - 82,
+          left: x - size / 2,
+          top: y - size / 2,
+          width: size,
+          height: size,
         },
         pressed && styles.pressed,
       ]}
     >
-      <View pointerEvents="none" style={styles.nodeBubbleInnerGlow} />
-      <View pointerEvents="none" style={styles.nodeBubbleShine} />
-      <Text style={styles.modeNodeText}>{title}</Text>
+      <ModeNodePoster uri={imageUri} label={label} />
+      <View pointerEvents="none" style={styles.modeNodeFrame} />
+      {Platform.OS === 'web' ? null : <Text style={styles.modeNodeText}>{title}</Text>}
     </Pressable>
   );
+}
+
+function ModeNodePoster({ uri, label }: { uri: string; label: string }) {
+  return <Image accessibilityLabel={`${label} preview`} source={{ uri }} resizeMode="cover" style={styles.modeNodePoster} />;
 }
 
 function DentakuWorldSelect({
@@ -323,6 +362,7 @@ function DentakuWorldSelect({
   const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
   const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
   const layouts = getDentakuWorldNodeLayouts(mapWidth);
+  const routeLayerHeight = getSelectionMapHeight(layouts);
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -341,12 +381,12 @@ function DentakuWorldSelect({
         </Pressable>
         <ScrollView
           style={styles.worldScroll}
-          contentContainerStyle={styles.dentakuWorldScrollContent}
+          contentContainerStyle={[styles.dentakuWorldScrollContent, { minHeight: routeLayerHeight }]}
           showsVerticalScrollIndicator={false}
           onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
           scrollEventThrottle={16}
         >
-          <View style={styles.dentakuWorldRouteLayer}>
+          <View style={[styles.dentakuWorldRouteLayer, { minHeight: routeLayerHeight }]}>
             {layouts.slice(0, -1).map((layout, index) => (
               <BubbleRoute key={`dentaku-world-route-${index}`} from={layout} to={layouts[index + 1]} />
             ))}
@@ -393,6 +433,7 @@ function WorldSelect({
   const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
   const completedByIsland = (islandId: Stage['islandId']) => STAGES.filter((stage) => stage.islandId === islandId && completedStageIds.has(stage.id)).length;
   const layouts = getWorldNodeLayouts(mapWidth);
+  const routeLayerHeight = getSelectionMapHeight(layouts);
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -411,12 +452,12 @@ function WorldSelect({
         </Pressable>
         <ScrollView
           style={styles.worldScroll}
-          contentContainerStyle={styles.worldScrollContent}
+          contentContainerStyle={[styles.worldScrollContent, { minHeight: routeLayerHeight }]}
           showsVerticalScrollIndicator={false}
           onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
           scrollEventThrottle={16}
         >
-          <View style={styles.routeLayer}>
+          <View style={[styles.routeLayer, { minHeight: routeLayerHeight }]}>
             {layouts.slice(0, -1).map((layout, index) => (
               <BubbleRoute key={`world-route-${index}`} from={layout} to={layouts[index + 1]} />
             ))}
@@ -508,7 +549,7 @@ function DepthBackdrop({
   }, []);
 
   return (
-    <View pointerEvents="none" style={styles.depthBackdrop}>
+    <View pointerEvents="box-none" style={styles.depthBackdrop}>
       <View pointerEvents="none" style={[styles.softPatch, styles.softPatchLeft]} />
       <View pointerEvents="none" style={[styles.softPatch, styles.softPatchBottom]} />
       {bubbles.map((bubble) => {
@@ -929,7 +970,7 @@ function StageSelect({
   const completedStageCountInIsland = stages.filter((stage) => completedStageIds.has(stage.id)).length;
   const openStageCount = Math.min(stages.length, Math.max(3, completedStageCountInIsland + 2));
   const layouts = stages.map((_stage, index) => getStageNodeLayout(index, mapWidth));
-  const mapHeight = Math.max(620, getStageMapHeight(stages.length));
+  const mapHeight = Math.max(620, getSelectionMapHeight(layouts));
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -954,7 +995,6 @@ function StageSelect({
           scrollEventThrottle={16}
         >
           <View style={[styles.stageMap, { height: mapHeight }]}>
-            <SingingMermaid isVocalEnabled={isVocalEnabled} mapWidth={mapWidth} onPress={toggleVocal} />
             {layouts.slice(0, -1).map((layout, index) => (
               <BubbleRoute key={`route-${stages[index].id}`} from={layout} to={layouts[index + 1]} />
             ))}
@@ -974,6 +1014,7 @@ function StageSelect({
                 />
               );
             })}
+            <SingingMermaid isVocalEnabled={isVocalEnabled} mapWidth={mapWidth} onPress={toggleVocal} />
           </View>
         </ScrollView>
       </View>
@@ -1003,7 +1044,7 @@ function DentakuStageSelect({
   const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
   const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
   const layouts = stages.map((_stage, index) => getStageNodeLayout(index, mapWidth));
-  const mapHeight = Math.max(620, getStageMapHeight(stages.length));
+  const mapHeight = Math.max(620, getSelectionMapHeight(layouts));
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -1028,7 +1069,6 @@ function DentakuStageSelect({
           scrollEventThrottle={16}
         >
           <View style={[styles.stageMap, { height: mapHeight }]}>
-            <SingingMermaid isVocalEnabled={isVocalEnabled} mapWidth={mapWidth} onPress={toggleVocal} />
             {layouts.slice(0, -1).map((layout, index) => (
               <BubbleRoute key={`dentaku-route-${stages[index].id}`} from={layout} to={layouts[index + 1]} />
             ))}
@@ -1044,6 +1084,7 @@ function DentakuStageSelect({
                 }}
               />
             ))}
+            <SingingMermaid isVocalEnabled={isVocalEnabled} mapWidth={mapWidth} onPress={toggleVocal} />
           </View>
         </ScrollView>
       </View>
@@ -1238,7 +1279,17 @@ function BubbleRoute({ from, to }: { from: MapNodeLayout; to: MapNodeLayout }) {
   );
 }
 
-function SingingMermaid({ isVocalEnabled, mapWidth, onPress }: { isVocalEnabled: boolean; mapWidth: number; onPress: () => void }) {
+function SingingMermaid({
+  isVocalEnabled,
+  mapWidth,
+  onPress,
+  style,
+}: {
+  isVocalEnabled: boolean;
+  mapWidth: number;
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+}) {
   const left = Math.min(Math.max(16, mapWidth * 0.08), 46);
 
   return (
@@ -1248,15 +1299,13 @@ function SingingMermaid({ isVocalEnabled, mapWidth, onPress }: { isVocalEnabled:
       accessibilityState={{ checked: isVocalEnabled }}
       onPress={onPress}
       testID="singing-mermaid"
-      style={({ pressed }) => [styles.singingMermaid, isVocalEnabled && styles.singingMermaidActive, { left }, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.singingMermaid, { left }, style, pressed && styles.pressed]}
     >
-      <View style={[styles.mermaidSongBubbleOne, isVocalEnabled && styles.mermaidSongBubbleActive]} />
-      <View style={[styles.mermaidSongBubbleTwo, isVocalEnabled && styles.mermaidSongBubbleActive]} />
-      <View style={[styles.mermaidSongBubbleThree, isVocalEnabled && styles.mermaidSongBubbleActiveStrong]} />
+      <View style={styles.mermaidSongBubbleOne} />
+      <View style={styles.mermaidSongBubbleTwo} />
+      <View style={styles.mermaidSongBubbleThree} />
       {isVocalEnabled ? (
         <>
-          <View style={[styles.mermaidSongPulse, styles.mermaidSongPulseOne]} />
-          <View style={[styles.mermaidSongPulse, styles.mermaidSongPulseTwo]} />
           <Text pointerEvents="none" style={[styles.mermaidMusicNote, styles.mermaidMusicNoteOne]}>
             ♪
           </Text>
@@ -1268,21 +1317,21 @@ function SingingMermaid({ isVocalEnabled, mapWidth, onPress }: { isVocalEnabled:
           </Text>
         </>
       ) : null}
-      <View style={[styles.mermaidRockBack, isVocalEnabled && styles.mermaidRockBackActive]} />
-      <View style={[styles.mermaidRockLeft, isVocalEnabled && styles.mermaidRockLeftActive]} />
-      <View style={[styles.mermaidRockRight, isVocalEnabled && styles.mermaidRockRightActive]} />
-      <View style={[styles.mermaidTailFin, isVocalEnabled && styles.mermaidTailFinActive]} />
-      <View style={[styles.mermaidTail, isVocalEnabled && styles.mermaidTailActive]} />
-      <View style={[styles.mermaidBody, isVocalEnabled && styles.mermaidBodyActive]} />
-      <View style={[styles.mermaidArmBack, isVocalEnabled && styles.mermaidSkinActive]} />
-      <View style={[styles.mermaidArmFront, isVocalEnabled && styles.mermaidSkinActive]} />
-      <View style={[styles.mermaidHairBack, isVocalEnabled && styles.mermaidHairActive]} />
-      <View style={[styles.mermaidLongHair, isVocalEnabled && styles.mermaidLongHairActive]} />
-      <View style={[styles.mermaidHead, isVocalEnabled && styles.mermaidHeadActive]} />
-      <View style={[styles.mermaidHairFront, isVocalEnabled && styles.mermaidHairFrontActive]} />
+      <View style={styles.mermaidRockBack} />
+      <View style={styles.mermaidRockLeft} />
+      <View style={styles.mermaidRockRight} />
+      <View style={styles.mermaidTailFin} />
+      <View style={styles.mermaidTail} />
+      <View style={styles.mermaidBody} />
+      <View style={styles.mermaidArmBack} />
+      <View style={styles.mermaidArmFront} />
+      <View style={styles.mermaidHairBack} />
+      <View style={styles.mermaidLongHair} />
+      <View style={styles.mermaidHead} />
+      <View style={styles.mermaidHairFront} />
       <View style={styles.mermaidEye} />
-      <View style={[styles.mermaidMouth, isVocalEnabled && styles.mermaidMouthActive]} />
-      <View style={[styles.mermaidHairShine, isVocalEnabled && styles.mermaidHairShineActive]} />
+      <View style={styles.mermaidMouth} />
+      <View style={styles.mermaidHairShine} />
     </Pressable>
   );
 }
@@ -1365,6 +1414,11 @@ function getStageNodeLayout(index: number, mapWidth: number): MapNodeLayout {
   };
 }
 
+function getSelectionMapHeight(layouts: MapNodeLayout[]) {
+  const lastNodeBottom = layouts.reduce((max, layout) => Math.max(max, layout.y + MAP_NODE_RADIUS), 0);
+  return lastNodeBottom + MAP_BOTTOM_SPACE_AFTER_LAST_NODE;
+}
+
 function getWorldNodeLayouts(mapWidth: number): MapNodeLayout[] {
   const centerX = mapWidth / 2;
   return Array.from({ length: 10 }, (_, index) => {
@@ -1419,10 +1473,6 @@ function getDepthFishSpecs(): DepthFishSpec[] {
   ];
 }
 
-function getStageMapHeight(stageCount: number) {
-  return 180 + Math.max(0, stageCount - 1) * 118;
-}
-
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -1438,7 +1488,8 @@ const styles = StyleSheet.create({
   depthBackdrop: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
-    zIndex: 1,
+    zIndex: 4,
+    elevation: 4,
   },
   depthBackgroundBubble: {
     position: 'absolute',
@@ -2094,12 +2145,12 @@ const styles = StyleSheet.create({
   },
   modeScrollContent: {
     minHeight: 620,
-    paddingTop: GRID * 10,
-    paddingBottom: GRID * 10,
+    paddingTop: 0,
+    paddingBottom: 0,
   },
   modeRouteLayer: {
     position: 'relative',
-    minHeight: 520,
+    minHeight: 620,
   },
   modeDiver: {
     position: 'absolute',
@@ -2108,16 +2159,16 @@ const styles = StyleSheet.create({
     height: 86,
     opacity: 0.82,
     transform: [{ rotate: '-12deg' }],
-    zIndex: 3,
+    zIndex: 7,
   },
   modeDiverGirlFlip: {
     transform: [{ scaleX: -1 }, { rotate: '10deg' }],
   },
   modeDiverBoy: {
-    top: 306,
+    top: 326,
   },
   modeDiverGirl: {
-    top: 126,
+    top: 86,
   },
   modeDiverBody: {
     position: 'absolute',
@@ -2276,6 +2327,20 @@ const styles = StyleSheet.create({
   dentakuWorldRouteLayer: {
     position: 'relative',
     minHeight: 1050,
+  },
+  dentakuWorldMermaid: {
+    left: 0,
+    top: 458,
+    bottom: 'auto',
+    opacity: 0.68,
+    transform: [{ scale: 0.78 }],
+  },
+  dentakuStageMermaid: {
+    left: 0,
+    top: 458,
+    bottom: 'auto',
+    opacity: 0.62,
+    transform: [{ scale: 0.72 }],
   },
   singingMermaid: {
     position: 'absolute',
@@ -2645,14 +2710,31 @@ const styles = StyleSheet.create({
   },
   modeNode: {
     position: 'absolute',
-    width: 164,
-    height: 164,
-    borderRadius: 82,
+    width: 272,
+    height: 272,
+    borderRadius: 28,
     borderWidth: 4,
+    borderColor: 'rgba(125, 211, 252, 0.78)',
+    backgroundColor: 'rgba(224, 247, 255, 0.58)',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
     elevation: 5,
     zIndex: 5,
+  },
+  modeNodeFrame: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.72)',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+  },
+  modeNodePoster: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+    opacity: 0.92,
   },
   modeNodeText: {
     color: TEXT_BASE_COLOR,

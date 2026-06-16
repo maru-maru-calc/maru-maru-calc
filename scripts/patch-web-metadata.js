@@ -3,7 +3,6 @@ const path = require('path');
 
 const distDir = path.join(__dirname, '..', 'dist');
 const publicDir = path.join(__dirname, '..', 'public');
-const indexPath = path.join(distDir, 'index.html');
 
 const siteUrl = 'https://maru-maru-calc.github.io/maru-maru-calc/';
 const title = 'まるまる電卓 | すうじをさわる計算あそび';
@@ -20,8 +19,6 @@ for (const fileName of ['favicon.png', 'apple-touch-icon.png', 'ogp.png']) {
     fs.copyFileSync(source, destination);
   }
 }
-
-let html = fs.readFileSync(indexPath, 'utf8');
 
 const metadata = `    <title>${title}</title>
     <meta name="description" content="${description}" />
@@ -47,9 +44,37 @@ const metadata = `    <title>${title}</title>
     <meta name="twitter:description" content="${description}" />
     <meta name="twitter:image" content="${ogpImageUrl}" />`;
 
-html = html
-  .replace(/<html lang="[^"]*">/, '<html lang="ja">')
-  .replace(/    <title>[\s\S]*?<\/title>/, metadata)
-  .replace(/\n\s*<link rel="icon" href="\/maru-maru-calc\/favicon\.ico" \/><\/head>/, '\n  </head>');
+for (const htmlPath of findHtmlFiles(distDir)) {
+  let html = fs.readFileSync(htmlPath, 'utf8');
 
-fs.writeFileSync(indexPath, html);
+  html = html
+    .replace(/<html lang="[^"]*">/, '<html lang="ja">')
+    .replace(/    <title>[\s\S]*?<\/title>/, metadata)
+    .replace(/\n\s*<link rel="icon" href="\/maru-maru-calc\/favicon\.ico" \/><\/head>/, '\n  </head>');
+
+  fs.writeFileSync(htmlPath, html);
+}
+
+function findHtmlFiles(directory) {
+  if (!fs.existsSync(directory)) {
+    return [];
+  }
+
+  const entries = fs.readdirSync(directory, { withFileTypes: true });
+  const files = [];
+
+  for (const entry of entries) {
+    const entryPath = path.join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      files.push(...findHtmlFiles(entryPath));
+      continue;
+    }
+
+    if (entry.isFile() && entry.name.endsWith('.html')) {
+      files.push(entryPath);
+    }
+  }
+
+  return files;
+}
