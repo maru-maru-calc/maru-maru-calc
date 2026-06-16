@@ -24,6 +24,8 @@ import {
 import { findMergeCluster, getTotalValue, hasMergeableCount } from '@/game/merge';
 import { getStage } from '@/game/stages';
 import { BeadRole, BeadSign, BeadSnapshot, MergeCluster, OperatorUsageLimit, OperatorUsageLimits, PlaceValue } from '@/game/types';
+import type { Stage } from '@/game/types';
+import type { DentakuOperator } from '@/game/dentaku';
 
 type BeadEntity = {
   id: string;
@@ -40,6 +42,16 @@ type PendingBubble = {
   count: number;
   x: number;
   y: number;
+};
+
+type DentakuPractice = {
+  questionKey: string;
+  operands: number[];
+  operators: DentakuOperator[];
+  answer: number;
+  prompt: string;
+  autoAdvance: boolean;
+  onNextQuestion: () => void;
 };
 
 type MergeAnimation = {
@@ -215,6 +227,7 @@ export function MarumaruGame({
   mode = 'stage',
   onComplete,
   onLogoPress,
+  dentakuPractice,
 }: {
   initialStageIndex?: number;
   onBack?: () => void;
@@ -222,12 +235,13 @@ export function MarumaruGame({
   mode?: 'stage' | 'launch';
   onComplete?: () => void;
   onLogoPress?: () => void;
+  dentakuPractice?: DentakuPractice;
 }) {
   const { width, height } = useWindowDimensions();
   const fieldWidth = Math.max(240, width - FIELD_MARGIN * 2);
   const fieldHeight = Math.max(360, height - HEADER_HEIGHT - FOOTER_HEIGHT - OPERATOR_TABS_HEIGHT - 20);
   const [stageIndex, setStageIndex] = useState(initialStageIndex);
-  const stage = getStage(stageIndex);
+  const stage = useMemo(() => (dentakuPractice ? createDentakuPracticeStage(dentakuPractice) : getStage(stageIndex)), [dentakuPractice, stageIndex]);
   const target = mode === 'launch' ? LAUNCH_TARGET : stage.target;
   const stageNumberInIsland = useMemo(() => getStageNumberInIsland(stageIndex), [stageIndex]);
   const [selectedOperator, setSelectedOperator] = useState<OperatorSymbol>('+');
@@ -248,6 +262,8 @@ export function MarumaruGame({
   const [bubbleBurstAnimations, setBubbleBurstAnimations] = useState<BubbleBurstAnimation[]>([]);
   const [message, setMessage] = useState('あわをさわると まるがでるよ');
   const [operatorUsage, setOperatorUsage] = useState<OperatorUsageLimits>(() => getInitialOperatorUsage(getStage(initialStageIndex), mode));
+  const [kukuInput, setKukuInput] = useState('');
+  const [kukuInputState, setKukuInputState] = useState<'input' | 'wrong' | 'running'>('input');
   const [hasReleasedBubble, setHasReleasedBubble] = useState(false);
   const [isClear, setIsClear] = useState(false);
   const [clearedStageId, setClearedStageId] = useState<string | undefined>(undefined);
@@ -259,6 +275,13 @@ export function MarumaruGame({
   const engineRef = useRef<Matter.Engine | null>(null);
   const entitiesRef = useRef<BeadEntity[]>([]);
   const consumedPendingBubbleIdsRef = useRef<Set<string>>(new Set());
+  const pendingBubblesRef = useRef<PendingBubble[]>([]);
+  const mergeAnimationRef = useRef<MergeAnimation | undefined>(undefined);
+  const annihilationAnimationRef = useRef<AnnihilationAnimation | undefined>(undefined);
+  const divisionSplitAnimationRef = useRef<DivisionSplitAnimation | undefined>(undefined);
+  const divisionFailedAnimationRef = useRef<DivisionFailedAnimation | undefined>(undefined);
+  const multiplicationExpansionAnimationRef = useRef<MultiplicationExpansionAnimation | undefined>(undefined);
+  const dentakuAutomationRunRef = useRef(0);
   const draggingBeadIdRef = useRef<string | undefined>(undefined);
   const [draggingBeadId, setDraggingBeadId] = useState<string | undefined>(undefined);
   const idRef = useRef(0);
@@ -414,6 +437,30 @@ export function MarumaruGame({
   }, [expressionTokens]);
 
   useEffect(() => {
+    pendingBubblesRef.current = pendingBubbles;
+  }, [pendingBubbles]);
+
+  useEffect(() => {
+    mergeAnimationRef.current = mergeAnimation;
+  }, [mergeAnimation]);
+
+  useEffect(() => {
+    annihilationAnimationRef.current = annihilationAnimation;
+  }, [annihilationAnimation]);
+
+  useEffect(() => {
+    divisionSplitAnimationRef.current = divisionSplitAnimation;
+  }, [divisionSplitAnimation]);
+
+  useEffect(() => {
+    divisionFailedAnimationRef.current = divisionFailedAnimation;
+  }, [divisionFailedAnimation]);
+
+  useEffect(() => {
+    multiplicationExpansionAnimationRef.current = multiplicationExpansionAnimation;
+  }, [multiplicationExpansionAnimation]);
+
+  useEffect(() => {
     selectedOperatorRef.current = selectedOperator;
   }, [selectedOperator]);
 
@@ -431,6 +478,16 @@ export function MarumaruGame({
   }, [stage.id]);
 
   useEffect(() => {
+    if (!dentakuPractice) {
+      return;
+    }
+
+    dentakuAutomationRunRef.current += 1;
+    setKukuInput('');
+    setKukuInputState('input');
+  }, [dentakuPractice]);
+
+  useEffect(() => {
     if (!isClear || clearedStageId === undefined || reportedClearStageIdRef.current === clearedStageId) {
       return;
     }
@@ -446,6 +503,20 @@ export function MarumaruGame({
 
     reportedCompleteRef.current = true;
   }, [isClear, mode, onComplete]);
+
+  useEffect(() => {
+    if (!dentakuPractice || !dentakuPractice.autoAdvance || !isClear) {
+      return undefined;
+    }
+
+    const timeout = setTimeout(() => {
+      fadeOutResultSfx();
+      markBubbleInteraction();
+      dentakuPractice.onNextQuestion();
+    }, 1350);
+
+    return () => clearTimeout(timeout);
+  }, [fadeOutResultSfx, isClear, dentakuPractice, markBubbleInteraction]);
 
   useEffect(() => {
     if (isClear || !isStageReadyForResult(pendingBubbles) || mergeAnimation || annihilationAnimation || divisionSplitAnimation || divisionFailedAnimation || multiplicationExpansionAnimation) {
@@ -474,6 +545,10 @@ export function MarumaruGame({
       return;
     }
 
+    if (dentakuPractice && kukuInputState === 'running') {
+      return;
+    }
+
     if (!isFailed && !hasMergeableCount(beads) && !mergeAnimation) {
       setIsFailed(true);
       setFailedAt(Date.now());
@@ -481,7 +556,7 @@ export function MarumaruGame({
     }
 
     return undefined;
-  }, [annihilationAnimation, beads, divisionFailedAnimation, divisionSplitAnimation, isClear, isFailed, mergeAnimation, multiplicationExpansionAnimation, pendingBubbles, stage.id, target]);
+  }, [annihilationAnimation, beads, dentakuPractice, divisionFailedAnimation, divisionSplitAnimation, isClear, isFailed, kukuInputState, mergeAnimation, multiplicationExpansionAnimation, pendingBubbles, stage.id, target]);
 
   const addBead = useCallback(
     (
@@ -873,6 +948,10 @@ export function MarumaruGame({
         consumedPendingBubbleIdsRef.current.delete(bubble.id);
         return;
       }
+      if (hasPriorValue && (activeOperator === '×' || activeOperator === '÷') && isBoardBusyForPriorityOperation()) {
+        consumedPendingBubbleIdsRef.current.delete(bubble.id);
+        return;
+      }
 
       if (hasPriorValue && activeOperator === '×') {
         consumeOperatorUsage(activeOperator);
@@ -952,9 +1031,26 @@ export function MarumaruGame({
     setHasReleasedBubble(false);
   };
 
+  const isBoardBusyForPriorityOperation = () => {
+    const snapshots = toSnapshots(entitiesRef.current);
+    return Boolean(
+      mergeAnimationRef.current ||
+      annihilationAnimationRef.current ||
+      divisionSplitAnimationRef.current ||
+      divisionFailedAnimationRef.current ||
+      multiplicationExpansionAnimationRef.current ||
+      hasPendingSamePlaceCancellation(snapshots) ||
+      hasMergeableCount(snapshots) ||
+      snapshots.some((bead) => bead.sign < 0),
+    );
+  };
+
   const selectOperator = useCallback(
     (operator: OperatorButtonSymbol) => {
       markBubbleInteraction();
+      if ((operator === '×' || operator === '÷') && isBoardBusyForPriorityOperation()) {
+        return;
+      }
       if (!canUseOperator(operatorUsage[operator])) {
         return;
       }
@@ -992,6 +1088,114 @@ export function MarumaruGame({
     },
     [markBubbleInteraction, operatorUsage, playUiActionSfx, selectedOperator, wrapMultiplicandForMultiplication],
   );
+
+  const appendKukuDigit = (digit: string) => {
+    if (!dentakuPractice || kukuInputState !== 'input' || isClear || isFailed) {
+      return;
+    }
+    playUiActionSfx();
+    setKukuInput((current) => {
+      if (current.length >= 2) {
+        return current;
+      }
+      if (current === '0') {
+        return current;
+      }
+      return `${current}${digit}`;
+    });
+  };
+
+  const deleteKukuDigit = () => {
+    if (!dentakuPractice || kukuInputState !== 'input' || isClear || isFailed) {
+      return;
+    }
+    playUiActionSfx();
+    setKukuInput((current) => current.slice(0, -1));
+  };
+
+  const waitForDentakuAutomationIdle = async (runId: number) => {
+    let stableSince: number | undefined;
+    const startedAt = Date.now();
+
+    while (dentakuAutomationRunRef.current === runId && Date.now() - startedAt < 8000) {
+      const snapshots = toSnapshots(entitiesRef.current);
+      const isBusy = Boolean(
+        mergeAnimationRef.current ||
+        annihilationAnimationRef.current ||
+        divisionSplitAnimationRef.current ||
+        divisionFailedAnimationRef.current ||
+        multiplicationExpansionAnimationRef.current ||
+        hasPendingSamePlaceCancellation(snapshots) ||
+        hasMergeableCount(snapshots) ||
+        snapshots.some((bead) => bead.sign < 0),
+      );
+
+      if (!isBusy) {
+        stableSince ??= Date.now();
+        if (Date.now() - stableSince >= 520) {
+          return true;
+        }
+      } else {
+        stableSince = undefined;
+      }
+
+      await delay(120);
+    }
+
+    return dentakuAutomationRunRef.current === runId;
+  };
+
+  const runDentakuAutomation = async (practice: DentakuPractice, runId: number) => {
+    const remainingBubbles = [...pendingBubblesRef.current];
+
+    for (let index = 0; index < practice.operands.length; index += 1) {
+      if (dentakuAutomationRunRef.current !== runId) {
+        return;
+      }
+
+      if (index > 0) {
+        const isReady = await waitForDentakuAutomationIdle(runId);
+        if (!isReady) {
+          return;
+        }
+
+        const operator = practice.operators[index - 1];
+        selectOperator(operator);
+        await delay(650);
+      }
+
+      const operand = practice.operands[index];
+      const bubbleIndex = remainingBubbles.findIndex((bubble) => bubble.count === operand);
+      const bubble = bubbleIndex >= 0 ? remainingBubbles.splice(bubbleIndex, 1)[0] : undefined;
+      if (!bubble) {
+        return;
+      }
+
+      burstBubble(bubble);
+      await delay(350);
+    }
+  };
+
+  const submitKukuAnswer = () => {
+    if (!dentakuPractice || kukuInputState !== 'input' || isClear || isFailed || kukuInput.length === 0) {
+      return;
+    }
+
+    if (Number(kukuInput) !== dentakuPractice.answer) {
+      playFailSfx();
+      setKukuInputState('wrong');
+      setTimeout(() => {
+        setKukuInput('');
+        setKukuInputState('input');
+      }, 560);
+      return;
+    }
+
+    setKukuInputState('running');
+    const runId = dentakuAutomationRunRef.current + 1;
+    dentakuAutomationRunRef.current = runId;
+    void runDentakuAutomation(dentakuPractice, runId);
+  };
 
   useEffect(() => {
     if (!isStageReadyForResult(pendingBubbles)) {
@@ -1368,6 +1572,10 @@ export function MarumaruGame({
     playUiActionSfx();
     fadeOutResultSfx();
     markBubbleInteraction();
+    if (dentakuPractice) {
+      dentakuPractice.onNextQuestion();
+      return;
+    }
     setStageIndex((current) => current + 1);
   };
   const retryStage = () => {
@@ -1397,7 +1605,7 @@ export function MarumaruGame({
               <NavImageIcon kind="back" size={29} />
             </Pressable>
           ) : null}
-          {mode !== 'launch' || isClear ? (
+          {(!dentakuPractice && (mode !== 'launch' || isClear)) || (dentakuPractice && isClear && !dentakuPractice.autoAdvance) ? (
             <Pressable
               accessibilityLabel={isClear ? 'next stage' : 'retry'}
               accessibilityRole="button"
@@ -1419,6 +1627,8 @@ export function MarumaruGame({
           <View style={styles.headerMainTitleShift}>
             {mode === 'launch' ? (
               <LaunchLogo onPress={onLogoPress} />
+            ) : dentakuPractice ? (
+              <KukuGoalTitle practice={dentakuPractice} input={kukuInput} maxWidth={Math.max(168, fieldWidth - 132)} />
             ) : (
               <StageGoalTitle stageNumber={stageNumberInIsland} target={target} maxWidth={Math.max(168, fieldWidth - 132)} />
             )}
@@ -1496,8 +1706,8 @@ export function MarumaruGame({
                 isMultiplier={activePendingOperator === '×'}
                 isDivider={activePendingOperator === '÷'}
                 isHinting={shouldPulsePendingBubbles}
-                onBurst={burstBubble}
-                onMove={moveBubble}
+                onBurst={dentakuPractice ? () => undefined : burstBubble}
+                onMove={dentakuPractice ? () => undefined : moveBubble}
               />
             );
           })}
@@ -1531,6 +1741,15 @@ export function MarumaruGame({
           <ExpressionDisplay tokens={mode === 'launch' && pendingBubbles.length > 0 ? [String(LAUNCH_INITIAL_TOTAL), '+'] : expressionTokens} />
         </View>
       </View>
+      {dentakuPractice && !isClear && kukuInputState !== 'running' ? (
+        <KukuAnswerPad
+          state={kukuInputState}
+          canSubmit={kukuInput.length > 0 && kukuInputState === 'input' && !isFailed}
+          onDigit={appendKukuDigit}
+          onDelete={deleteKukuDigit}
+          onSubmit={submitKukuAnswer}
+        />
+      ) : null}
       {isFailed ? <View pointerEvents="none" style={[styles.failedScreenVeil, { opacity: failedProgress }]} /> : null}
       <BackgroundBubbleLayer
         bubbles={backgroundBubbles}
@@ -1579,6 +1798,64 @@ function StageGoalTitle({ stageNumber, target, maxWidth }: { stageNumber: number
         <Text testID="stage-goal-target" style={styles.stageGameTarget}>{target}</Text>
       </View>
     </View>
+  );
+}
+
+function KukuGoalTitle({ practice, input, maxWidth }: { practice: DentakuPractice; input: string; maxWidth: number }) {
+  const expression = practice.prompt.replace(' = ?', '');
+  return (
+    <View style={[styles.kukuGameTitle, { maxWidth }]}>
+      <Text testID="kuku-question-title" style={styles.kukuQuestionText}>
+        {expression} = <Text style={input.length === 0 ? styles.kukuQuestionUnknown : undefined}>{input || '?'}</Text>
+      </Text>
+    </View>
+  );
+}
+
+function KukuAnswerPad({
+  state,
+  canSubmit,
+  onDigit,
+  onDelete,
+  onSubmit,
+}: {
+  state: 'input' | 'wrong' | 'running';
+  canSubmit: boolean;
+  onDigit: (digit: string) => void;
+  onDelete: () => void;
+  onSubmit: () => void;
+}) {
+  return (
+    <View style={[styles.kukuAnswerPad, state === 'wrong' && styles.kukuAnswerPadWrong, state === 'running' && styles.kukuAnswerPadRunning]} testID="kuku-keypad">
+      <View style={styles.kukuKeyGrid}>
+        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+          <KukuKey key={digit} label={digit} disabled={state !== 'input'} onPress={() => onDigit(digit)} />
+        ))}
+        <KukuKey label="delete" disabled={state !== 'input'} onPress={onDelete} />
+        <KukuKey label="0" disabled={state !== 'input'} onPress={() => onDigit('0')} />
+        <KukuKey label="submit" testIDLabel="submit" accent disabled={!canSubmit} onPress={onSubmit} />
+      </View>
+    </View>
+  );
+}
+
+function KukuKey({ label, testIDLabel = label, accent = false, disabled = false, onPress }: { label: string; testIDLabel?: string; accent?: boolean; disabled?: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      testID={`kuku-key-${testIDLabel}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.kukuKey, accent && styles.kukuKeyAccent, disabled && styles.kukuKeyDisabled, pressed && styles.pressedButton]}
+    >
+      {label === 'delete' ? (
+        <Text>⌫</Text>
+      ) : label === 'submit' ? (
+        <Text>↵</Text>
+      ) : (
+        <Text style={styles.kukuKeyText}>{label}</Text>
+      )}
+    </Pressable>
   );
 }
 
@@ -2192,7 +2469,7 @@ function OperatorRail({
   );
 }
 
-function getInitialOperatorUsage(stage: ReturnType<typeof getStage>, mode: 'stage' | 'launch'): OperatorUsageLimits {
+function getInitialOperatorUsage(stage: Stage, mode: 'stage' | 'launch'): OperatorUsageLimits {
   const base: OperatorUsageLimits = getDefaultOperatorUsage(stage, mode);
 
   return {
@@ -2201,7 +2478,7 @@ function getInitialOperatorUsage(stage: ReturnType<typeof getStage>, mode: 'stag
   };
 }
 
-function getDefaultOperatorUsage(stage: ReturnType<typeof getStage>, mode: 'stage' | 'launch'): OperatorUsageLimits {
+function getDefaultOperatorUsage(stage: Stage, mode: 'stage' | 'launch'): OperatorUsageLimits {
   if (mode === 'launch' || stage.islandId === 'addition') {
     return { '+': 'infinite', '-': 0, '×': 0, '÷': 0 };
   }
@@ -2212,6 +2489,31 @@ function getDefaultOperatorUsage(stage: ReturnType<typeof getStage>, mode: 'stag
     return { '+': 'infinite', '-': 'infinite', '×': 'infinite', '÷': 'infinite' };
   }
   return { '+': 0, '-': 0, '×': 0, '÷': 0 };
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function createDentakuPracticeStage(practice: DentakuPractice): Stage {
+  const operatorLimits: Partial<OperatorUsageLimits> = {
+    '+': practice.operators.includes('+') ? 'infinite' : 0,
+    '-': practice.operators.includes('-') ? 'infinite' : 0,
+    '×': practice.operators.includes('×') ? 'infinite' : 0,
+    '÷': practice.operators.includes('÷') ? 'infinite' : 0,
+  };
+
+  return {
+    id: `dentaku-practice-${practice.questionKey}`,
+    title: practice.prompt.replace(' = ?', ''),
+    target: practice.answer,
+    allowedValues: [1],
+    islandId: 'multiplication',
+    islandTitle: 'dentaku',
+    setTitle: 'dentaku',
+    bubbleCounts: practice.operands,
+    operatorLimits,
+  };
 }
 
 function getInitialSelectedOperator(_operatorUsage: OperatorUsageLimits): OperatorButtonSymbol {
@@ -3862,7 +4164,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   headerMainTitleShift: {
-    transform: [{ translateY: GRID * 1.5 }],
+    transform: [{ translateY: 0 }],
   },
   backButton: {
     position: 'absolute',
@@ -3952,6 +4254,22 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontFamily: LATIN_FONT_FAMILY,
     includeFontPadding: false,
+  },
+  kukuGameTitle: {
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kukuQuestionText: {
+    color: TEXT_BASE_COLOR,
+    fontSize: 38,
+    lineHeight: 42,
+    fontWeight: '900',
+    fontFamily: LATIN_FONT_FAMILY,
+    includeFontPadding: false,
+  },
+  kukuQuestionUnknown: {
+    color: 'rgba(71, 85, 105, 0.45)',
   },
   headerGoalParts: {
     minWidth: 34,
@@ -4810,6 +5128,59 @@ const styles = StyleSheet.create({
   },
   expressionPlaceholder: {
     color: TEXT_ACCENT_COLOR,
+  },
+  kukuAnswerPad: {
+    position: 'absolute',
+    zIndex: 8,
+    left: FIELD_MARGIN + GRID * 3,
+    right: FIELD_MARGIN + GRID * 3,
+    bottom: GRID * 2,
+    padding: GRID * 0.6,
+    borderRadius: RADIUS_LG,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.56)',
+    backgroundColor: 'rgba(224, 247, 255, 0.58)',
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  kukuAnswerPadWrong: {
+    borderColor: 'rgba(71, 85, 105, 0.34)',
+    backgroundColor: 'rgba(148, 163, 184, 0.32)',
+  },
+  kukuAnswerPadRunning: {},
+  kukuKeyGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: GRID * 0.5,
+    justifyContent: 'space-between',
+  },
+  kukuKey: {
+    width: '32%',
+    minWidth: 66,
+    height: 48,
+    borderRadius: RADIUS_LG,
+    borderWidth: 2,
+    borderColor: 'rgba(224, 247, 255, 0.95)',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kukuKeyAccent: {
+    backgroundColor: '#7DD3FC',
+    borderColor: '#38BDF8',
+  },
+  kukuKeyDisabled: {
+    opacity: 0.42,
+  },
+  kukuKeyText: {
+    color: TEXT_BASE_COLOR,
+    fontSize: 17,
+    lineHeight: 20,
+    fontWeight: '900',
+    fontFamily: LATIN_FONT_FAMILY,
+    includeFontPadding: false,
   },
   pressedButton: {
     transform: [{ scale: 0.98 }],

@@ -6,13 +6,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBgmControl } from '@/audio/bgm-control';
 import { SFX } from '@/audio/sfx';
 import { useOneShotAudio } from '@/audio/use-one-shot-audio';
+import { DentakuGame } from '@/components/DentakuGame';
 import { MarumaruGame } from '@/components/MarumaruGame';
 import { NavImageIcon } from '@/components/NavImageIcon';
+import { DENTAKU_STAGES, DENTAKU_WORLDS, DentakuStage, DentakuWorldId } from '@/game/dentaku';
 import { getStageIndexById, STAGE_ISLANDS, STAGES } from '@/game/stages';
 import { Stage } from '@/game/types';
 
-type AppScreen = 'launch' | 'world' | 'stage' | 'game';
+type AppScreen = 'launch' | 'mode' | 'world' | 'stage' | 'game' | 'dentakuWorld' | 'dentakuStage' | 'dentakuGame';
 type StageStatus = 'done' | 'open' | 'locked';
+type WorldId = Stage['islandId'];
 type DepthBubbleSpec = {
   id: string;
   xRatio: number;
@@ -47,20 +50,39 @@ const RADIUS_PILL = 999;
 export default function IndexScreen() {
   const { width, height } = useWindowDimensions();
   const [screen, setScreen] = useState<AppScreen>('launch');
-  const [selectedIslandId, setSelectedIslandId] = useState<Stage['islandId']>('addition');
+  const [selectedWorldId, setSelectedWorldId] = useState<WorldId>('addition');
+  const [selectedDentakuWorldId, setSelectedDentakuWorldId] = useState<DentakuWorldId>('kuku');
   const [playingStageIndex, setPlayingStageIndex] = useState(0);
+  const [playingDentakuStage, setPlayingDentakuStage] = useState<DentakuStage>(DENTAKU_STAGES[0]);
   const [completedStageIds, setCompletedStageIds] = useState<Set<string>>(() => new Set());
+  const [completedDentakuStageIds, setCompletedDentakuStageIds] = useState<Set<string>>(() => new Set());
 
+  const selectedIslandId = selectedWorldId;
   const selectedIsland = STAGE_ISLANDS.find((island) => island.id === selectedIslandId) ?? STAGE_ISLANDS[0];
   const selectedStages = useMemo(() => STAGES.filter((stage) => stage.islandId === selectedIslandId), [selectedIslandId]);
+  const selectedDentakuStages = useMemo(() => DENTAKU_STAGES.filter((stage) => stage.worldId === selectedDentakuWorldId), [selectedDentakuWorldId]);
   const mapWidth = Math.max(320, width);
 
   const startStage = (stage: Stage) => {
     setPlayingStageIndex(getStageIndexById(stage.id));
     setScreen('game');
   };
+
+  const startDentakuStage = (stage: DentakuStage) => {
+    setPlayingDentakuStage(stage);
+    setScreen('dentakuGame');
+  };
+  const startNextDentakuStage = () => {
+    const currentIndex = selectedDentakuStages.findIndex((stage) => stage.id === playingDentakuStage.id);
+    const nextStage = selectedDentakuStages[currentIndex + 1];
+    if (nextStage) {
+      setPlayingDentakuStage(nextStage);
+      return;
+    }
+    setScreen('dentakuStage');
+  };
   if (screen === 'launch') {
-    return <MarumaruGame mode="launch" onComplete={() => setScreen('world')} />;
+    return <MarumaruGame mode="launch" onComplete={() => setScreen('mode')} />;
   }
 
   if (screen === 'game') {
@@ -70,6 +92,23 @@ export default function IndexScreen() {
         onBack={() => setScreen('stage')}
         onStageClear={(stageId) => {
           setCompletedStageIds((current) => {
+            const next = new Set(current);
+            next.add(stageId);
+            return next;
+          });
+        }}
+      />
+    );
+  }
+
+  if (screen === 'dentakuGame') {
+    return (
+      <DentakuGame
+        stage={playingDentakuStage}
+        onBack={() => setScreen('dentakuStage')}
+        onNextStage={startNextDentakuStage}
+        onStageClear={(stageId) => {
+          setCompletedDentakuStageIds((current) => {
             const next = new Set(current);
             next.add(stageId);
             return next;
@@ -94,17 +133,242 @@ export default function IndexScreen() {
     );
   }
 
+  if (screen === 'dentakuStage') {
+    return (
+      <DentakuStageSelect
+        stages={selectedDentakuStages}
+        completedStageIds={completedDentakuStageIds}
+        mapWidth={mapWidth}
+        viewportWidth={width}
+        viewportHeight={height}
+        onBack={() => setScreen('dentakuWorld')}
+        onStartStage={startDentakuStage}
+      />
+    );
+  }
+
+  if (screen === 'dentakuWorld') {
+    return (
+      <DentakuWorldSelect
+        completedStageIds={completedDentakuStageIds}
+        mapWidth={mapWidth}
+        viewportWidth={width}
+        viewportHeight={height}
+        onBack={() => setScreen('mode')}
+        onSelectWorld={(worldId) => {
+          setSelectedDentakuWorldId(worldId);
+          setScreen('dentakuStage');
+        }}
+      />
+    );
+  }
+
+  if (screen === 'mode') {
+    return (
+      <ModeSelect
+        mapWidth={mapWidth}
+        viewportWidth={width}
+        viewportHeight={height}
+        onSelectMarumaru={() => setScreen('world')}
+        onSelectDentaku={() => setScreen('dentakuWorld')}
+      />
+    );
+  }
+
   return (
     <WorldSelect
       completedStageIds={completedStageIds}
       mapWidth={mapWidth}
       viewportWidth={width}
       viewportHeight={height}
-      onSelectIsland={(islandId) => {
-        setSelectedIslandId(islandId);
+      onBack={() => setScreen('mode')}
+      onSelectWorld={(worldId) => {
+        setSelectedWorldId(worldId);
         setScreen('stage');
       }}
     />
+  );
+}
+
+function ModeSelect({
+  mapWidth,
+  viewportWidth,
+  viewportHeight,
+  onSelectMarumaru,
+  onSelectDentaku,
+}: {
+  mapWidth: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  onSelectMarumaru: () => void;
+  onSelectDentaku: () => void;
+}) {
+  const [scrollDepth, setScrollDepth] = useState(0);
+  const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
+  const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
+  const centerX = mapWidth / 2;
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <View testID="mode-select" style={styles.depthScene}>
+        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <ScrollView
+          style={styles.worldScroll}
+          contentContainerStyle={styles.modeScrollContent}
+          showsVerticalScrollIndicator={false}
+          onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
+          scrollEventThrottle={16}
+        >
+          <View style={styles.modeRouteLayer}>
+            <BubbleRoute from={{ x: centerX - 82, y: 176 }} to={{ x: centerX + 82, y: 344 }} />
+            <ModeDiver variant="boy" style={[styles.modeDiverBoy, { left: Math.max(18, centerX - 178) }]} />
+            <ModeDiver variant="girl" style={[styles.modeDiverGirl, { left: Math.min(mapWidth - 136, centerX + 38) }]} />
+            <ModeNode
+              label="marumaru mode"
+              title="? + ? = 10"
+              x={centerX - 82}
+              y={176}
+              onPress={() => {
+                playActionSfx();
+                onSelectMarumaru();
+              }}
+            />
+            <ModeNode
+              label="dentaku mode"
+              title="4 + 6 = ?"
+              x={centerX + 82}
+              y={344}
+              onPress={() => {
+                playActionSfx();
+                onSelectDentaku();
+              }}
+            />
+          </View>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function ModeDiver({ variant, style }: { variant: 'boy' | 'girl'; style: StyleProp<ViewStyle> }) {
+  const isGirl = variant === 'girl';
+
+  return (
+    <View pointerEvents="none" style={[styles.modeDiver, style, isGirl && styles.modeDiverGirlFlip]}>
+      <View style={styles.modeDiverTrailBubbleLarge} />
+      <View style={styles.modeDiverTrailBubbleSmall} />
+      <View style={[styles.modeDiverArm, styles.modeDiverArmFront]} />
+      <View style={[styles.modeDiverArm, styles.modeDiverArmBack]} />
+      <View style={styles.modeDiverBody}>
+        <View style={styles.modeDiverTank} />
+        <View style={styles.modeDiverSuitBand} />
+      </View>
+      <View style={[styles.modeDiverLeg, styles.modeDiverLegTop]}>
+        <View style={styles.modeDiverFin} />
+      </View>
+      <View style={[styles.modeDiverLeg, styles.modeDiverLegBottom]}>
+        <View style={styles.modeDiverFin} />
+      </View>
+      <View style={styles.modeDiverHead}>
+        {isGirl ? <View style={styles.modeDiverPonytail} /> : null}
+        <View style={styles.modeDiverHair} />
+        <View style={styles.modeDiverMask}>
+          <View style={styles.modeDiverMaskGlass} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function ModeNode({ label, title, x, y, onPress }: { label: string; title: string; x: number; y: number; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.bubbleNode,
+        styles.modeNode,
+        {
+          left: x - 82,
+          top: y - 82,
+        },
+        pressed && styles.pressed,
+      ]}
+    >
+      <View pointerEvents="none" style={styles.nodeBubbleInnerGlow} />
+      <View pointerEvents="none" style={styles.nodeBubbleShine} />
+      <Text style={styles.modeNodeText}>{title}</Text>
+    </Pressable>
+  );
+}
+
+function DentakuWorldSelect({
+  completedStageIds,
+  mapWidth,
+  viewportWidth,
+  viewportHeight,
+  onBack,
+  onSelectWorld,
+}: {
+  completedStageIds: Set<string>;
+  mapWidth: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  onBack: () => void;
+  onSelectWorld: (worldId: DentakuWorldId) => void;
+}) {
+  const [scrollDepth, setScrollDepth] = useState(0);
+  const { isVocalEnabled, toggleVocal } = useBgmControl();
+  const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
+  const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
+  const layouts = getDentakuWorldNodeLayouts(mapWidth);
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <View testID="dentaku-world-select" style={styles.depthScene}>
+        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <Pressable
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+          onPress={() => {
+            playActionSfx();
+            onBack();
+          }}
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+        >
+          <NavImageIcon kind="back" size={29} />
+        </Pressable>
+        <ScrollView
+          style={styles.worldScroll}
+          contentContainerStyle={styles.dentakuWorldScrollContent}
+          showsVerticalScrollIndicator={false}
+          onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
+          scrollEventThrottle={16}
+        >
+          <View style={styles.dentakuWorldRouteLayer}>
+            {layouts.slice(0, -1).map((layout, index) => (
+              <BubbleRoute key={`dentaku-world-route-${index}`} from={layout} to={layouts[index + 1]} />
+            ))}
+            {DENTAKU_WORLDS.map((world, index) => (
+              <DentakuWorldNode
+                key={world.id}
+                worldId={world.id}
+                label={world.label}
+                isDone={DENTAKU_STAGES.some((stage) => stage.worldId === world.id && completedStageIds.has(stage.id))}
+                x={layouts[index].x}
+                y={layouts[index].y}
+                onPress={() => {
+                  playActionSfx();
+                  onSelectWorld(world.id);
+                }}
+              />
+            ))}
+            <SingingMermaid isVocalEnabled={isVocalEnabled} mapWidth={mapWidth} onPress={toggleVocal} />
+          </View>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -113,13 +377,15 @@ function WorldSelect({
   mapWidth,
   viewportWidth,
   viewportHeight,
-  onSelectIsland,
+  onBack,
+  onSelectWorld,
 }: {
   completedStageIds: Set<string>;
   mapWidth: number;
   viewportWidth: number;
   viewportHeight: number;
-  onSelectIsland: (islandId: Stage['islandId']) => void;
+  onBack: () => void;
+  onSelectWorld: (worldId: WorldId) => void;
 }) {
   const [scrollDepth, setScrollDepth] = useState(0);
   const { isVocalEnabled, toggleVocal } = useBgmControl();
@@ -132,6 +398,17 @@ function WorldSelect({
     <SafeAreaView style={styles.screen}>
       <View testID="world-select" style={styles.depthScene}>
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <Pressable
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+          onPress={() => {
+            playActionSfx();
+            onBack();
+          }}
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+        >
+          <NavImageIcon kind="back" size={29} />
+        </Pressable>
         <ScrollView
           style={styles.worldScroll}
           contentContainerStyle={styles.worldScrollContent}
@@ -152,7 +429,7 @@ function WorldSelect({
               y={layouts[0].y}
               onPress={() => {
                 playActionSfx();
-                onSelectIsland('addition');
+                onSelectWorld('addition');
               }}
             />
             <WorldNode
@@ -164,7 +441,7 @@ function WorldSelect({
               y={layouts[1].y}
               onPress={() => {
                 playActionSfx();
-                onSelectIsland('subtraction');
+                onSelectWorld('subtraction');
               }}
             />
             <WorldNode
@@ -176,7 +453,7 @@ function WorldSelect({
               y={layouts[2].y}
               onPress={() => {
                 playActionSfx();
-                onSelectIsland('multiplication');
+                onSelectWorld('multiplication');
               }}
             />
             <WorldNode
@@ -188,15 +465,15 @@ function WorldSelect({
               y={layouts[3].y}
               onPress={() => {
                 playActionSfx();
-                onSelectIsland('division');
+                onSelectWorld('division');
               }}
             />
-            <MixedWorldNode label="mixed-3" count={3} x={layouts[4].x} y={layouts[4].y} onPress={() => { playActionSfx(); onSelectIsland('mixed3'); }} />
-            <MixedWorldNode label="mixed-3-free" count={3} x={layouts[5].x} y={layouts[5].y} free onPress={() => { playActionSfx(); onSelectIsland('mixed3Free'); }} />
-            <MixedWorldNode label="mixed-4" count={4} x={layouts[6].x} y={layouts[6].y} onPress={() => { playActionSfx(); onSelectIsland('mixed4'); }} />
-            <MixedWorldNode label="mixed-4-free" count={4} x={layouts[7].x} y={layouts[7].y} free onPress={() => { playActionSfx(); onSelectIsland('mixed4Free'); }} />
-            <MixedWorldNode label="mixed-5" count={5} x={layouts[8].x} y={layouts[8].y} onPress={() => { playActionSfx(); onSelectIsland('mixed5'); }} />
-            <MixedWorldNode label="mixed-5-free" count={5} x={layouts[9].x} y={layouts[9].y} free onPress={() => { playActionSfx(); onSelectIsland('mixed5Free'); }} />
+            <MixedWorldNode label="mixed-3" count={3} x={layouts[4].x} y={layouts[4].y} onPress={() => { playActionSfx(); onSelectWorld('mixed3'); }} />
+            <MixedWorldNode label="mixed-3-free" count={3} x={layouts[5].x} y={layouts[5].y} free onPress={() => { playActionSfx(); onSelectWorld('mixed3Free'); }} />
+            <MixedWorldNode label="mixed-4" count={4} x={layouts[6].x} y={layouts[6].y} onPress={() => { playActionSfx(); onSelectWorld('mixed4'); }} />
+            <MixedWorldNode label="mixed-4-free" count={4} x={layouts[7].x} y={layouts[7].y} free onPress={() => { playActionSfx(); onSelectWorld('mixed4Free'); }} />
+            <MixedWorldNode label="mixed-5" count={5} x={layouts[8].x} y={layouts[8].y} onPress={() => { playActionSfx(); onSelectWorld('mixed5'); }} />
+            <MixedWorldNode label="mixed-5-free" count={5} x={layouts[9].x} y={layouts[9].y} free onPress={() => { playActionSfx(); onSelectWorld('mixed5Free'); }} />
             <SingingMermaid isVocalEnabled={isVocalEnabled} mapWidth={mapWidth} onPress={toggleVocal} />
           </View>
         </ScrollView>
@@ -231,7 +508,7 @@ function DepthBackdrop({
   }, []);
 
   return (
-    <View pointerEvents="box-none" style={styles.depthBackdrop}>
+    <View pointerEvents="none" style={styles.depthBackdrop}>
       <View pointerEvents="none" style={[styles.softPatch, styles.softPatchLeft]} />
       <View pointerEvents="none" style={[styles.softPatch, styles.softPatchBottom]} />
       {bubbles.map((bubble) => {
@@ -575,6 +852,57 @@ function MixedWorldNode({
   );
 }
 
+function DentakuWorldNode({
+  worldId,
+  label,
+  isDone,
+  x,
+  y,
+  onPress,
+}: {
+  worldId: DentakuWorldId;
+  label: string;
+  isDone: boolean;
+  x: number;
+  y: number;
+  onPress: () => void;
+}) {
+  const displayLabel = label === '9×9' ? '9 × 9' : label;
+  const mixedCount = worldId === 'mixed2' ? 2 : worldId === 'mixed3' ? 3 : worldId === 'mixed4' ? 4 : undefined;
+
+  return (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.bubbleNode,
+        styles.dentakuWorldNode,
+        isDone && styles.stageNodeDone,
+        {
+          left: x - 40,
+          top: y - 40,
+        },
+        pressed && styles.pressed,
+      ]}
+    >
+      <View pointerEvents="none" style={styles.nodeBubbleInnerGlow} />
+      <View pointerEvents="none" style={styles.nodeBubbleShine} />
+      {mixedCount ? (
+        <>
+          <Text style={styles.mixedWorldSymbols}>+ −</Text>
+          <Text style={styles.mixedWorldSymbols}>× ÷</Text>
+          <View style={styles.mixedCountBadge}>
+            <Text style={styles.mixedCountText}>{mixedCount}</Text>
+          </View>
+        </>
+      ) : (
+        <Text style={styles.dentakuWorldSymbol}>{displayLabel}</Text>
+      )}
+    </Pressable>
+  );
+}
+
 function StageSelect({
   island,
   stages,
@@ -650,6 +978,115 @@ function StageSelect({
         </ScrollView>
       </View>
     </SafeAreaView>
+  );
+}
+
+function DentakuStageSelect({
+  stages,
+  completedStageIds,
+  mapWidth,
+  viewportWidth,
+  viewportHeight,
+  onBack,
+  onStartStage,
+}: {
+  stages: DentakuStage[];
+  completedStageIds: Set<string>;
+  mapWidth: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  onBack: () => void;
+  onStartStage: (stage: DentakuStage) => void;
+}) {
+  const [scrollDepth, setScrollDepth] = useState(0);
+  const { isVocalEnabled, toggleVocal } = useBgmControl();
+  const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
+  const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
+  const layouts = stages.map((_stage, index) => getStageNodeLayout(index, mapWidth));
+  const mapHeight = Math.max(620, getStageMapHeight(stages.length));
+
+  return (
+    <SafeAreaView style={styles.screen}>
+      <View style={styles.depthScene}>
+        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <Pressable
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+          onPress={() => {
+            playActionSfx();
+            onBack();
+          }}
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+        >
+          <NavImageIcon kind="back" size={29} />
+        </Pressable>
+        <ScrollView
+          style={styles.stageScroll}
+          contentContainerStyle={[styles.stageScrollContent, { height: mapHeight }]}
+          showsVerticalScrollIndicator={false}
+          onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
+          scrollEventThrottle={16}
+        >
+          <View style={[styles.stageMap, { height: mapHeight }]}>
+            <SingingMermaid isVocalEnabled={isVocalEnabled} mapWidth={mapWidth} onPress={toggleVocal} />
+            {layouts.slice(0, -1).map((layout, index) => (
+              <BubbleRoute key={`dentaku-route-${stages[index].id}`} from={layout} to={layouts[index + 1]} />
+            ))}
+            {stages.map((stage, index) => (
+              <DentakuStageNode
+                key={stage.id}
+                stage={stage}
+                layout={layouts[index]}
+                isDone={completedStageIds.has(stage.id)}
+                onPress={() => {
+                  playActionSfx();
+                  onStartStage(stage);
+                }}
+              />
+            ))}
+          </View>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function DentakuStageNode({
+  stage,
+  layout,
+  isDone,
+  onPress,
+}: {
+  stage: DentakuStage;
+  layout: MapNodeLayout;
+  isDone: boolean;
+  onPress: () => void;
+}) {
+  const stageLabel = stage.label;
+
+  return (
+    <Pressable
+      accessibilityLabel={stage.title}
+      accessibilityRole="button"
+      testID={`kuku-stage-${stage.id}`}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.bubbleNode,
+        styles.stageNode,
+        styles.kukuStageNode,
+        {
+          left: layout.x - 40,
+          top: layout.y - 40,
+        },
+        isDone && styles.stageNodeDone,
+        pressed && styles.pressed,
+      ]}
+    >
+      <View pointerEvents="none" style={styles.nodeBubbleInnerGlow} />
+      <View pointerEvents="none" style={styles.nodeBubbleShine} />
+      <Text style={styles.kukuStageMainLabel}>{stageLabel}</Text>
+      {isDone ? <StageDoneStarfish /> : null}
+    </Pressable>
   );
 }
 
@@ -940,6 +1377,18 @@ function getWorldNodeLayouts(mapWidth: number): MapNodeLayout[] {
   });
 }
 
+function getDentakuWorldNodeLayouts(mapWidth: number): MapNodeLayout[] {
+  const centerX = mapWidth / 2;
+  return Array.from({ length: DENTAKU_WORLDS.length }, (_, index) => {
+    const spiral = index * 0.92 - Math.PI / 2;
+    const radius = Math.min(112, 24 + index * 15, mapWidth * 0.31);
+    return {
+      x: centerX + Math.cos(spiral) * radius,
+      y: 104 + index * 132,
+    };
+  });
+}
+
 function getDepthBubbleSpecs(width: number): DepthBubbleSpec[] {
   const wideOffset = width > 520 ? 0.04 : 0;
   return [
@@ -989,7 +1438,7 @@ const styles = StyleSheet.create({
   depthBackdrop: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
-    zIndex: 3,
+    zIndex: 1,
   },
   depthBackgroundBubble: {
     position: 'absolute',
@@ -1643,6 +2092,191 @@ const styles = StyleSheet.create({
     position: 'relative',
     minHeight: 1580,
   },
+  modeScrollContent: {
+    minHeight: 620,
+    paddingTop: GRID * 10,
+    paddingBottom: GRID * 10,
+  },
+  modeRouteLayer: {
+    position: 'relative',
+    minHeight: 520,
+  },
+  modeDiver: {
+    position: 'absolute',
+    top: 262,
+    width: 124,
+    height: 86,
+    opacity: 0.82,
+    transform: [{ rotate: '-12deg' }],
+    zIndex: 3,
+  },
+  modeDiverGirlFlip: {
+    transform: [{ scaleX: -1 }, { rotate: '10deg' }],
+  },
+  modeDiverBoy: {
+    top: 306,
+  },
+  modeDiverGirl: {
+    top: 126,
+  },
+  modeDiverBody: {
+    position: 'absolute',
+    left: 43,
+    top: 30,
+    width: 42,
+    height: 24,
+    borderRadius: 999,
+    backgroundColor: 'rgba(71, 85, 105, 0.74)',
+    borderWidth: 2,
+    borderColor: 'rgba(224, 247, 255, 0.58)',
+  },
+  modeDiverTank: {
+    position: 'absolute',
+    left: 7,
+    top: -9,
+    width: 28,
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(226, 232, 240, 0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(71, 85, 105, 0.24)',
+  },
+  modeDiverSuitBand: {
+    position: 'absolute',
+    right: 7,
+    top: 2,
+    width: 7,
+    height: 20,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.54)',
+  },
+  modeDiverHead: {
+    position: 'absolute',
+    left: 20,
+    top: 28,
+    width: 27,
+    height: 24,
+    borderRadius: 999,
+    backgroundColor: 'rgba(253, 224, 197, 0.78)',
+  },
+  modeDiverHair: {
+    position: 'absolute',
+    left: -2,
+    top: -3,
+    width: 22,
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(120, 53, 15, 0.66)',
+    transform: [{ rotate: '-18deg' }],
+  },
+  modeDiverPonytail: {
+    position: 'absolute',
+    left: -13,
+    top: -5,
+    width: 22,
+    height: 15,
+    borderRadius: 999,
+    backgroundColor: 'rgba(120, 53, 15, 0.58)',
+    transform: [{ rotate: '-28deg' }],
+  },
+  modeDiverMask: {
+    position: 'absolute',
+    left: -1,
+    top: 7,
+    width: 23,
+    height: 13,
+    borderRadius: 999,
+    borderWidth: 3,
+    borderColor: 'rgba(244, 114, 182, 0.72)',
+    backgroundColor: 'rgba(224, 247, 255, 0.42)',
+  },
+  modeDiverMaskGlass: {
+    position: 'absolute',
+    left: 5,
+    top: 3,
+    width: 9,
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+  },
+  modeDiverArm: {
+    position: 'absolute',
+    width: 28,
+    height: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(253, 224, 197, 0.7)',
+  },
+  modeDiverArmFront: {
+    left: 3,
+    top: 52,
+    transform: [{ rotate: '-28deg' }],
+  },
+  modeDiverArmBack: {
+    left: 49,
+    top: 56,
+    transform: [{ rotate: '24deg' }],
+  },
+  modeDiverLeg: {
+    position: 'absolute',
+    width: 34,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(30, 41, 59, 0.68)',
+  },
+  modeDiverLegTop: {
+    left: 80,
+    top: 31,
+    transform: [{ rotate: '-28deg' }],
+  },
+  modeDiverLegBottom: {
+    left: 78,
+    top: 53,
+    transform: [{ rotate: '18deg' }],
+  },
+  modeDiverFin: {
+    position: 'absolute',
+    right: -16,
+    top: -5,
+    width: 20,
+    height: 17,
+    borderTopWidth: 8,
+    borderBottomWidth: 8,
+    borderLeftWidth: 18,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent',
+    borderLeftColor: 'rgba(250, 204, 21, 0.78)',
+  },
+  modeDiverTrailBubbleLarge: {
+    position: 'absolute',
+    left: 4,
+    top: 12,
+    width: 9,
+    height: 9,
+    borderRadius: 999,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.78)',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  modeDiverTrailBubbleSmall: {
+    position: 'absolute',
+    left: 18,
+    top: 2,
+    width: 6,
+    height: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.72)',
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+  },
+  dentakuWorldScrollContent: {
+    minHeight: 1050,
+    paddingTop: GRID * 10,
+    paddingBottom: GRID * 12,
+  },
+  dentakuWorldRouteLayer: {
+    position: 'relative',
+    minHeight: 1050,
+  },
   singingMermaid: {
     position: 'absolute',
     bottom: 14,
@@ -2009,12 +2643,43 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     elevation: 5,
   },
+  modeNode: {
+    position: 'absolute',
+    width: 164,
+    height: 164,
+    borderRadius: 82,
+    borderWidth: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
+    zIndex: 5,
+  },
+  modeNodeText: {
+    color: TEXT_BASE_COLOR,
+    fontSize: 23,
+    lineHeight: 30,
+    fontWeight: '900',
+    fontFamily: LATIN_FONT_FAMILY,
+    textAlign: 'center',
+  },
   worldNodeActive: {
     borderColor: '#0EA5E9',
     backgroundColor: '#FFFFFF',
   },
   mixedWorldNode: {
     gap: 0,
+  },
+  dentakuWorldNode: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.42)',
+    borderColor: 'rgba(56, 189, 248, 0.46)',
+    elevation: 4,
   },
   worldSymbol: {
     color: TEXT_BASE_COLOR,
@@ -2036,6 +2701,13 @@ const styles = StyleSheet.create({
     color: TEXT_BASE_COLOR,
   },
   mixedWorldSymbols: {
+    color: TEXT_BASE_COLOR,
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '900',
+    fontFamily: LATIN_FONT_FAMILY,
+  },
+  dentakuWorldSymbol: {
     color: TEXT_BASE_COLOR,
     fontSize: 18,
     lineHeight: 22,
@@ -2133,6 +2805,9 @@ const styles = StyleSheet.create({
   stageNodeDone: {
     backgroundColor: 'rgba(255, 255, 255, 0.7)',
   },
+  kukuStageNode: {
+    backgroundColor: 'rgba(255, 255, 255, 0.42)',
+  },
   stageNumber: {
     color: TEXT_ACCENT_COLOR,
     fontSize: 13,
@@ -2144,6 +2819,13 @@ const styles = StyleSheet.create({
     color: TEXT_BASE_COLOR,
     fontSize: 24,
     lineHeight: 28,
+    fontWeight: '900',
+    fontFamily: LATIN_FONT_FAMILY,
+  },
+  kukuStageMainLabel: {
+    color: TEXT_BASE_COLOR,
+    fontSize: 18,
+    lineHeight: 22,
     fontWeight: '900',
     fontFamily: LATIN_FONT_FAMILY,
   },
