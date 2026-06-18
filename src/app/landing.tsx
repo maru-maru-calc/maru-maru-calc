@@ -720,7 +720,20 @@ function ModeFlowRow({
 function ModePoster({ uri, testID, compact }: { uri: string; testID: string; compact: boolean }) {
   return (
     <View style={[styles.modeVideoFrame, compact && styles.modeVideoFrameCompact]} testID={testID}>
-      <Image accessibilityLabel={testID} source={{ uri }} resizeMode="cover" style={styles.modePosterImage} testID={`${testID}-image`} />
+      {Platform.OS === 'web'
+        ? createElement('img', {
+            alt: testID,
+            src: uri,
+            'data-testid': `${testID}-image`,
+            style: {
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              display: 'block',
+              backgroundColor: WATER_COLOR,
+            },
+          })
+        : <Image accessibilityLabel={testID} source={{ uri }} resizeMode="contain" style={styles.modePosterImage} testID={`${testID}-image`} />}
     </View>
   );
 }
@@ -956,6 +969,7 @@ function AutoPlayVideo({
       height: '100%',
       objectFit: compact ? 'contain' : 'cover',
       display: 'block',
+      backgroundColor: WATER_COLOR,
       borderRadius,
       pointerEvents: 'none',
     },
@@ -1881,8 +1895,8 @@ const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
     borderRadius: RADIUS_LG,
     borderWidth: 4,
-    borderColor: 'rgba(224, 247, 255, 0.9)',
-    backgroundColor: 'rgba(198, 232, 244, 0.7)',
+    borderColor: 'rgba(198, 232, 244, 0.95)',
+    backgroundColor: WATER_COLOR,
     overflow: 'hidden',
   },
   operationVideoFrameCompact: {
@@ -1904,21 +1918,23 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     borderRadius: RADIUS_LG,
     borderWidth: 4,
-    borderColor: 'rgba(224, 247, 255, 0.9)',
-    backgroundColor: 'rgba(198, 232, 244, 0.7)',
+    borderColor: 'rgba(198, 232, 244, 0.95)',
+    backgroundColor: WATER_COLOR,
     overflow: 'hidden',
   },
   modeVideoFrameCompact: {
-    width: '100%',
+    width: GRID * 32,
+    height: GRID * 32,
     flexGrow: 0,
     flexShrink: 0,
     flexBasis: 'auto',
     maxWidth: '100%',
-    aspectRatio: 1,
+    alignSelf: 'center',
   },
   modePosterImage: {
     width: '100%',
     height: '100%',
+    backgroundColor: WATER_COLOR,
   },
   calculationModeSection: {
     position: 'relative',

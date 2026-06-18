@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Asset } from 'expo-asset';
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -13,9 +12,6 @@ import { NavImageIcon } from '@/components/NavImageIcon';
 import { DENTAKU_STAGES, DENTAKU_WORLDS, DentakuStage, DentakuWorldId } from '@/game/dentaku';
 import { getStageIndexById, STAGE_ISLANDS, STAGES } from '@/game/stages';
 import { Stage } from '@/game/types';
-
-const modeMarumaruPosterSource = require('../../assets/landing/mode-marumaru-poster.png');
-const modeDentakuPosterSource = require('../../assets/landing/mode-dentaku-poster.png');
 
 type AppScreen = 'launch' | 'mode' | 'world' | 'stage' | 'game' | 'dentakuWorld' | 'dentakuStage' | 'dentakuGame';
 type StageStatus = 'done' | 'open' | 'locked';
@@ -213,15 +209,9 @@ function ModeSelect({
   const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
   const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
   const centerX = mapWidth / 2;
-  const marumaruPosterUri = Asset.fromModule(modeMarumaruPosterSource).uri;
-  const dentakuPosterUri = Asset.fromModule(modeDentakuPosterSource).uri;
-  const modeCardSize = Math.min(300, Math.max(256, mapWidth - GRID * 11));
-  const modeCardGap = GRID * 4;
-  const modeContentHeight = modeCardSize * 2 + modeCardGap;
-  const modeTop = Math.max(GRID * 6, Math.round((viewportHeight - modeContentHeight) / 2 / GRID) * GRID);
-  const marumaruY = modeTop + modeCardSize / 2;
-  const dentakuY = marumaruY + modeCardSize + modeCardGap;
-  const modeLayerHeight = Math.max(viewportHeight, modeTop * 2 + modeContentHeight);
+  const modeNodeOffset = Math.min(82, Math.max(58, mapWidth * 0.21));
+  const marumaruY = 176;
+  const dentakuY = 344;
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -234,14 +224,14 @@ function ModeSelect({
           onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
           scrollEventThrottle={16}
         >
-          <View style={[styles.modeRouteLayer, { minHeight: modeLayerHeight }]}>
-            <BubbleRoute from={{ x: centerX, y: marumaruY }} to={{ x: centerX, y: dentakuY }} />
+          <View style={styles.modeRouteLayer}>
+            <BubbleRoute from={{ x: centerX - modeNodeOffset, y: marumaruY }} to={{ x: centerX + modeNodeOffset, y: dentakuY }} />
+            <ModeDiver variant="boy" style={[styles.modeDiverBoy, { left: Math.max(18, centerX - 178) }]} />
+            <ModeDiver variant="girl" style={[styles.modeDiverGirl, { left: Math.min(mapWidth - 136, centerX + 38) }]} />
             <ModeNode
               label="marumaru mode"
-              title="まるまる"
-              imageUri={marumaruPosterUri}
-              size={modeCardSize}
-              x={centerX}
+              kind="marumaru"
+              x={centerX - modeNodeOffset}
               y={marumaruY}
               onPress={() => {
                 playActionSfx();
@@ -250,10 +240,8 @@ function ModeSelect({
             />
             <ModeNode
               label="dentaku mode"
-              title="でんたく"
-              imageUri={dentakuPosterUri}
-              size={modeCardSize}
-              x={centerX}
+              kind="dentaku"
+              x={centerX + modeNodeOffset}
               y={dentakuY}
               onPress={() => {
                 playActionSfx();
@@ -299,17 +287,13 @@ function ModeDiver({ variant, style }: { variant: 'boy' | 'girl'; style: StylePr
 
 function ModeNode({
   label,
-  title,
-  imageUri,
-  size,
+  kind,
   x,
   y,
   onPress,
 }: {
   label: string;
-  title: string;
-  imageUri: string;
-  size: number;
+  kind: 'marumaru' | 'dentaku';
   x: number;
   y: number;
   onPress: () => void;
@@ -323,23 +307,39 @@ function ModeNode({
         styles.bubbleNode,
         styles.modeNode,
         {
-          left: x - size / 2,
-          top: y - size / 2,
-          width: size,
-          height: size,
+          left: x - 82,
+          top: y - 82,
         },
         pressed && styles.pressed,
       ]}
     >
-      <ModeNodePoster uri={imageUri} label={label} />
-      <View pointerEvents="none" style={styles.modeNodeFrame} />
-      {Platform.OS === 'web' ? null : <Text style={styles.modeNodeText}>{title}</Text>}
+      <View pointerEvents="none" style={styles.nodeBubbleInnerGlow} />
+      <View pointerEvents="none" style={styles.nodeBubbleShine} />
+      {kind === 'marumaru' ? <ModeMarumaruTitle /> : <ModeDentakuTitle />}
     </Pressable>
   );
 }
 
-function ModeNodePoster({ uri, label }: { uri: string; label: string }) {
-  return <Image accessibilityLabel={`${label} preview`} source={{ uri }} resizeMode="cover" style={styles.modeNodePoster} />;
+function ModeMarumaruTitle() {
+  return (
+    <View pointerEvents="none" style={styles.modeTitleLine}>
+      <View style={[styles.modeTitleBead, styles.modeTitleBeadBlue]}>
+        <View style={styles.modeTitleBeadHighlight} />
+      </View>
+      <View style={[styles.modeTitleBead, styles.modeTitleBeadGold]}>
+        <View style={styles.modeTitleBeadHighlight} />
+      </View>
+      <Text style={styles.modeNodeText}> = 10</Text>
+    </View>
+  );
+}
+
+function ModeDentakuTitle() {
+  return (
+    <Text pointerEvents="none" style={styles.modeNodeText}>
+      4 + 6 = <Text style={styles.modeNodeUnknown}>?</Text>
+    </Text>
+  );
 }
 
 function DentakuWorldSelect({
@@ -2710,39 +2710,61 @@ const styles = StyleSheet.create({
   },
   modeNode: {
     position: 'absolute',
-    width: 272,
-    height: 272,
-    borderRadius: 28,
-    borderWidth: 4,
-    borderColor: 'rgba(125, 211, 252, 0.78)',
-    backgroundColor: 'rgba(224, 247, 255, 0.58)',
+    width: 164,
+    height: 164,
+    borderRadius: 82,
+    borderWidth: 3,
+    borderColor: 'rgba(56, 189, 248, 0.55)',
+    backgroundColor: 'rgba(255, 255, 255, 0.42)',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
     elevation: 5,
     zIndex: 5,
   },
-  modeNodeFrame: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.72)',
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-  },
-  modeNodePoster: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-    borderRadius: 24,
-    opacity: 0.92,
-  },
   modeNodeText: {
     color: TEXT_BASE_COLOR,
-    fontSize: 23,
+    fontSize: 24,
     lineHeight: 30,
     fontWeight: '900',
     fontFamily: LATIN_FONT_FAMILY,
     textAlign: 'center',
+  },
+  modeNodeUnknown: {
+    color: 'rgba(71, 85, 105, 0.42)',
+  },
+  modeTitleLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ translateX: -2 }],
+  },
+  modeTitleBead: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    marginRight: 3,
+    shadowColor: '#0284C7',
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  modeTitleBeadBlue: {
+    borderColor: 'rgba(20, 184, 166, 0.74)',
+    backgroundColor: 'rgba(153, 246, 228, 0.62)',
+  },
+  modeTitleBeadGold: {
+    borderColor: 'rgba(202, 138, 4, 0.58)',
+    backgroundColor: 'rgba(254, 240, 138, 0.58)',
+  },
+  modeTitleBeadHighlight: {
+    position: 'absolute',
+    left: 4,
+    top: 3,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.74)',
   },
   worldNodeActive: {
     borderColor: '#0EA5E9',
