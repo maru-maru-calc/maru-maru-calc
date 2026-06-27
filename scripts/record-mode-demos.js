@@ -10,6 +10,12 @@ const VIEWPORT = { width: 720, height: 720 };
 
 async function main() {
   const browser = await chromium.launch({ channel: 'chrome' });
+  if (process.argv.includes('--long-form-poster')) {
+    await captureLongFormPoster(browser);
+    await browser.close();
+    return;
+  }
+
   await recordMarumaruMode(browser);
   await recordDentakuMode(browser);
   await browser.close();
@@ -149,6 +155,37 @@ async function recordDentakuMode(browser) {
   await page.waitForTimeout(2800);
 
   await saveRecording(context, page, rawPath, outputPath, { start: 4.8, duration: 24 });
+}
+
+async function captureLongFormPoster(browser) {
+  const context = await browser.newContext({
+    viewport: VIEWPORT,
+    deviceScaleFactor: 1,
+  });
+  const page = await context.newPage();
+  await page.goto(`${BASE_URL}/game`, { waitUntil: 'networkidle' });
+  await hideDevChrome(page);
+  await clearLaunch(page);
+  await page.getByLabel('long form mode', { exact: true }).click();
+  await page.getByLabel('+', { exact: true }).click();
+  await page.getByTestId('kuku-stage-long-form-addition-4').click();
+  await page.getByTestId('long-form-panel').waitFor({ state: 'visible', timeout: 6000 });
+
+  const prompt = await page.getByTestId('long-form-question-prompt').innerText();
+  const match = prompt.match(/(\d{2}) \+ (\d{1,2}) = \?/);
+  if (!match) {
+    throw new Error(`Unexpected long-form prompt: ${prompt}`);
+  }
+
+  const leftOnes = Number(match[1]) % 10;
+  const rightOnes = Number(match[2]) % 10;
+  await answer(page, String(leftOnes + rightOnes));
+  await page.waitForTimeout(900);
+
+  const outputPath = path.join(OUTPUT_DIR, 'mode-long-form-poster.png');
+  await page.screenshot({ path: outputPath });
+  await context.close();
+  console.log(`saved ${outputPath}`);
 }
 
 async function clickBubble(page, count) {

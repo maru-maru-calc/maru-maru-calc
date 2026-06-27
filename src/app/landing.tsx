@@ -29,6 +29,7 @@ const operationMultiplyVideoSource = require('../../assets/landing/operation-mul
 const operationDivideVideoSource = require('../../assets/landing/operation-divide-short.webm');
 const modeMarumaruPosterSource = require('../../assets/landing/mode-marumaru-poster.png');
 const modeDentakuPosterSource = require('../../assets/landing/mode-dentaku-poster.png');
+const modeLongFormPosterSource = require('../../assets/landing/mode-long-form-poster.png');
 
 type LandingLocale = 'ja' | 'en' | 'zh-hans' | 'zh-hant' | 'ko' | 'de';
 
@@ -60,10 +61,10 @@ const landingCopy = {
       { label: 'かける', expression: '4 × 3 = 12', description: '"まる"をまとめた"あわ"が3つになったね。"あわ"が弾けたあとの"まる"は何個になったかな？', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
       { label: 'わる', expression: '12 ÷ 3 = 4', description: '"まる"を同じ数で分けた"あわ"が、一つだけ残ったね。"まる"は何個になったかな？', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
     ],
-    calculationModeTitleBefore: '２つ',
+    calculationModeTitleBefore: '３つ',
     calculationModeTitleParticle: 'の',
     calculationModeTitleAfter: 'モード',
-    calculationModeLead: '"まる"を動かして数をつくる遊びと、式を見て答える遊び。どちらも、"まる"の動きを見ながらたしかめられるよ。',
+    calculationModeLead: '"まる"を動かして数をつくる遊び、式を見て答える遊び、筆算を順番に解く遊び。"まる"の動きを見ながらたしかめられるよ。',
     calculationModeReverseName: 'まるまるモード',
     calculationModeReverseLabel: 'つくってみる',
     calculationModeReverseBody: '"まる"ときごうを組み合わせて、ぴったりの数をつくってみよう。どの順番でさわると近づくかな？',
@@ -72,6 +73,9 @@ const landingCopy = {
     calculationModeForwardBody: '式を見て、数字で答えてみよう。答えたあとに、"まる"がどう動くか見てみよう。',
     calculationModeKukuLabel: '九九もくり返し',
     calculationModeKukuBody: '1の段から9の段まで、何度もあそびながら覚えられるよ。',
+    calculationModeLongFormName: '筆算モード',
+    calculationModeLongFormLabel: '順番にとく',
+    calculationModeLongFormBody: '一の位、十の位のように、筆算の順番を見ながら答えてみよう。最後に"まる"の動きでたしかめられるよ。',
     finalTitle: 'さがしてごらん',
     finalSegments: [
       { text: '魚は何種類いるかな？' },
@@ -106,10 +110,10 @@ const landingCopy = {
       { label: 'Multiply', expression: '4 × 3 = 12', description: 'Three bubbles each hold a group of maru. How many maru are there after the bubbles pop?', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
       { label: 'Divide', expression: '12 ÷ 3 = 4', description: 'The maru are split evenly, and one bubble remains. How many maru are inside?', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
     ],
-    calculationModeTitleBefore: 'Two',
+    calculationModeTitleBefore: 'Three',
     calculationModeTitleParticle: '',
     calculationModeTitleAfter: 'modes',
-    calculationModeLead: 'Make a number by moving maru, or read an equation and answer it. Either way, children can check the answer by watching the maru move.',
+    calculationModeLead: 'Make a number with maru, answer an equation, or solve written arithmetic step by step. Children can check each answer by watching the maru move.',
     calculationModeReverseName: 'Marumaru mode',
     calculationModeReverseLabel: 'Make it',
     calculationModeReverseBody: 'Combine maru and symbols to make the target number. Which order gets you closer?',
@@ -118,6 +122,9 @@ const landingCopy = {
     calculationModeForwardBody: 'Read the equation, type the number, then watch how the maru move.',
     calculationModeKukuLabel: 'Practice tables',
     calculationModeKukuBody: 'Multiplication-table stages let children repeat the 1-times table through the 9-times table.',
+    calculationModeLongFormName: 'Written arithmetic mode',
+    calculationModeLongFormLabel: 'Step through it',
+    calculationModeLongFormBody: 'Work through ones, tens, partial products, and division steps in order, then check the result with maru.',
     finalTitle: 'Look around',
     finalSegments: [
       { text: 'How many kinds of fish can you find?' },
@@ -152,10 +159,10 @@ const landingCopy = {
       { label: '乘法', expression: '4 × 3 = 12', description: '3 个泡泡里各有一组圆点。泡泡破掉以后，一共有几个圆点？', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
       { label: '除法', expression: '12 ÷ 3 = 4', description: '圆点被平均分开，只留下一个泡泡。里面有几个圆点？', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
     ],
-    calculationModeTitleBefore: '两种',
+    calculationModeTitleBefore: '三种',
     calculationModeTitleParticle: '',
     calculationModeTitleAfter: '模式',
-    calculationModeLead: '可以移动圆点组成数字，也可以看算式输入答案。无论哪一种，都能看着圆点的动作来确认。',
+    calculationModeLead: '可以移动圆点组成数字，也可以看算式输入答案，还可以按步骤解竖式。都能看着圆点的动作来确认。',
     calculationModeReverseName: 'Marumaru 模式',
     calculationModeReverseLabel: '试着组成',
     calculationModeReverseBody: '把圆点和符号组合起来，试着做出目标数字。按什么顺序会更接近呢？',
@@ -164,6 +171,9 @@ const landingCopy = {
     calculationModeForwardBody: '看算式，用数字回答。答完以后，再看看圆点会怎样移动。',
     calculationModeKukuLabel: '反复练乘法表',
     calculationModeKukuBody: '从 1 的乘法表到 9 的乘法表，可以一边玩一边练习。',
+    calculationModeLongFormName: '竖式模式',
+    calculationModeLongFormLabel: '按步骤解',
+    calculationModeLongFormBody: '按个位、十位、部分积和除法步骤的顺序来回答，最后用圆点的动作确认。',
     finalTitle: '找找看',
     finalSegments: [
       { text: '你能找到几种鱼？' },
@@ -198,10 +208,10 @@ const landingCopy = {
       { label: '乘法', expression: '4 × 3 = 12', description: '3 個泡泡裡各有一組圓點。泡泡破掉以後，一共有幾個圓點？', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
       { label: '除法', expression: '12 ÷ 3 = 4', description: '圓點被平均分開，只留下一個泡泡。裡面有幾個圓點？', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
     ],
-    calculationModeTitleBefore: '兩種',
+    calculationModeTitleBefore: '三種',
     calculationModeTitleParticle: '',
     calculationModeTitleAfter: '模式',
-    calculationModeLead: '可以移動圓點組成數字，也可以看算式輸入答案。無論哪一種，都能看著圓點的動作來確認。',
+    calculationModeLead: '可以移動圓點組成數字，也可以看算式輸入答案，還可以一步一步解直式。都能看著圓點的動作來確認。',
     calculationModeReverseName: 'Marumaru 模式',
     calculationModeReverseLabel: '試著組成',
     calculationModeReverseBody: '把圓點和符號組合起來，試著做出目標數字。按什麼順序會更接近呢？',
@@ -210,6 +220,9 @@ const landingCopy = {
     calculationModeForwardBody: '看算式，用數字回答。答完以後，再看看圓點會怎樣移動。',
     calculationModeKukuLabel: '反覆練乘法表',
     calculationModeKukuBody: '從 1 的乘法表到 9 的乘法表，可以一邊玩一邊練習。',
+    calculationModeLongFormName: '直式模式',
+    calculationModeLongFormLabel: '按步驟解',
+    calculationModeLongFormBody: '按照個位、十位、部分積和除法步驟回答，最後用圓點的動作確認。',
     finalTitle: '找找看',
     finalSegments: [
       { text: '你能找到幾種魚？' },
@@ -244,10 +257,10 @@ const landingCopy = {
       { label: '곱하기', expression: '4 × 3 = 12', description: '3개의 거품 안에 원 묶음이 있어요. 거품이 터지면 원은 모두 몇 개일까요?', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
       { label: '나누기', expression: '12 ÷ 3 = 4', description: '원이 똑같이 나뉘고 거품 하나만 남았어요. 안에는 원이 몇 개 있을까요?', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
     ],
-    calculationModeTitleBefore: '두 가지',
+    calculationModeTitleBefore: '세 가지',
     calculationModeTitleParticle: '',
     calculationModeTitleAfter: '모드',
-    calculationModeLead: '원을 움직여 수를 만들 수도 있고, 식을 보고 답할 수도 있어요. 어느 쪽이든 원의 움직임을 보며 확인할 수 있어요.',
+    calculationModeLead: '원을 움직여 수를 만들고, 식을 보고 답하고, 세로셈을 차례대로 풀 수 있어요. 원의 움직임으로 답을 확인해요.',
     calculationModeReverseName: '마루마루 모드',
     calculationModeReverseLabel: '만들어 봐요',
     calculationModeReverseBody: '원과 기호를 조합해 목표 수를 만들어 봐요. 어떤 순서로 누르면 가까워질까요?',
@@ -256,6 +269,9 @@ const landingCopy = {
     calculationModeForwardBody: '식을 보고 숫자로 답해 봐요. 답한 뒤에는 원이 어떻게 움직이는지 볼 수 있어요.',
     calculationModeKukuLabel: '구구단도 반복',
     calculationModeKukuBody: '1단부터 9단까지 놀이처럼 반복하며 익힐 수 있어요.',
+    calculationModeLongFormName: '세로셈 모드',
+    calculationModeLongFormLabel: '차례대로 풀기',
+    calculationModeLongFormBody: '일의 자리, 십의 자리, 부분곱, 나눗셈 단계를 순서대로 풀고 원의 움직임으로 확인해요.',
     finalTitle: '찾아봐요',
     finalSegments: [
       { text: '물고기는 몇 종류가 있을까요?' },
@@ -290,10 +306,10 @@ const landingCopy = {
       { label: 'Mal', expression: '4 × 3 = 12', description: 'In 3 Blasen steckt jeweils eine Gruppe maru. Wie viele maru sind es, nachdem die Blasen platzen?', source: operationMultiplyVideoSource, testID: 'operation-video-multiply', playbackRate: 1 },
       { label: 'Geteilt', expression: '12 ÷ 3 = 4', description: 'Die maru werden gleichmäßig aufgeteilt, und eine Blase bleibt übrig. Wie viele maru sind darin?', source: operationDivideVideoSource, testID: 'operation-video-divide', playbackRate: 1 },
     ],
-    calculationModeTitleBefore: 'Zwei',
+    calculationModeTitleBefore: 'Drei',
     calculationModeTitleParticle: '',
     calculationModeTitleAfter: 'Spielmodi',
-    calculationModeLead: 'Kinder können mit maru eine Zahl bauen oder eine Aufgabe lesen und beantworten. In beiden Modi zeigen die Bewegungen, was passiert.',
+    calculationModeLead: 'Kinder können mit maru eine Zahl bauen, eine Aufgabe beantworten oder schriftlich Schritt für Schritt rechnen. Die Bewegungen zeigen, was passiert.',
     calculationModeReverseName: 'Marumaru-Modus',
     calculationModeReverseLabel: 'Bau die Zahl',
     calculationModeReverseBody: 'Kombiniere maru und Rechenzeichen zur Zielzahl. Welche Reihenfolge bringt dich näher?',
@@ -302,6 +318,9 @@ const landingCopy = {
     calculationModeForwardBody: 'Lies die Aufgabe, tippe die Zahl ein und schau, wie sich die maru bewegen.',
     calculationModeKukuLabel: 'Einmaleins üben',
     calculationModeKukuBody: 'Die Reihen von 1 bis 9 lassen sich spielerisch wiederholen.',
+    calculationModeLongFormName: 'Schriftlich-Modus',
+    calculationModeLongFormLabel: 'Schrittweise lösen',
+    calculationModeLongFormBody: 'Löse Einer, Zehner, Teilprodukte und Divisionsschritte der Reihe nach und prüfe das Ergebnis mit maru.',
     finalTitle: 'Schau dich um',
     finalSegments: [
       { text: 'Wie viele Fischarten findest du?' },
@@ -647,6 +666,7 @@ function FeatureCardBackground({ variant, compact }: { variant: FeatureCardVaria
 function CalculationModeSection({ copy, compact }: { copy: typeof landingCopy[LandingLocale]; compact: boolean }) {
   const reversePosterUri = Asset.fromModule(modeMarumaruPosterSource).uri;
   const forwardPosterUri = Asset.fromModule(modeDentakuPosterSource).uri;
+  const longFormPosterUri = Asset.fromModule(modeLongFormPosterSource).uri;
 
   return (
     <View style={[styles.calculationModeSection, styles.decoratedSection]}>
@@ -681,6 +701,14 @@ function CalculationModeSection({ copy, compact }: { copy: typeof landingCopy[La
             imageUri={forwardPosterUri}
             label={copy.calculationModeForwardName}
             testID="mode-video-dentaku"
+          />
+          <ModeFlowRow
+            compact={compact}
+            description={copy.calculationModeLongFormBody}
+            expression={copy.calculationModeLongFormLabel}
+            imageUri={longFormPosterUri}
+            label={copy.calculationModeLongFormName}
+            testID="mode-video-long-form"
           />
         </View>
       </View>

@@ -50,9 +50,15 @@ type DentakuPractice = {
   operators: DentakuOperator[];
   answer: number;
   prompt: string;
+  stageLabel: string;
+  questionNumber?: number;
+  questionTotal?: number;
   autoAdvance: boolean;
+  longFormMode?: boolean;
   onNextQuestion: () => void;
 };
+
+type DentakuAutomationPractice = Pick<DentakuPractice, 'operands' | 'operators'>;
 
 type MergeAnimation = {
   id: string;
@@ -266,6 +272,8 @@ export function MarumaruGame({
   const [operatorUsage, setOperatorUsage] = useState<OperatorUsageLimits>(() => getInitialOperatorUsage(getStage(initialStageIndex), mode));
   const [kukuInput, setKukuInput] = useState('');
   const [kukuInputState, setKukuInputState] = useState<'input' | 'wrong' | 'running'>('input');
+  const [longFormStepIndex, setLongFormStepIndex] = useState(0);
+  const [longFormQuestionChangedAt, setLongFormQuestionChangedAt] = useState(() => Date.now());
   const [hasReleasedBubble, setHasReleasedBubble] = useState(false);
   const [isClear, setIsClear] = useState(false);
   const [clearedStageId, setClearedStageId] = useState<string | undefined>(undefined);
@@ -319,6 +327,13 @@ export function MarumaruGame({
     idleHintTick - lastBubbleInteractionAtRef.current >= 2200;
   const shouldPulsePendingBubbles =
     shouldHintPendingBubbles && Math.floor((idleHintTick - lastBubbleInteractionAtRef.current - 2200) / 720) % 2 === 0;
+  const footerExpressionTokens = getFooterExpressionTokens({
+    dentakuPractice,
+    expressionTokens,
+    isClear,
+    mode,
+    pendingBubbles,
+  });
 
   const { fadeOut: fadeOutClearSfx, play: playClearSfx } = useOneShotAudio(SFX.clear.source, SFX.clear.volume);
   const { fadeOut: fadeOutFailSfx, play: playFailSfx } = useOneShotAudio(SFX.fail.source, SFX.fail.volume);
@@ -332,6 +347,13 @@ export function MarumaruGame({
     fadeOutClearSfx();
     fadeOutFailSfx();
   }, [fadeOutClearSfx, fadeOutFailSfx]);
+  const completeCurrentStage = useCallback(() => {
+    setClearedStageId(stage.id);
+    setIsClear(true);
+    setIsFailed(false);
+    setFailedAt(undefined);
+    setMessage('できた!');
+  }, [stage.id]);
 
   useEffect(() => {
     if (!isClear) {
@@ -487,6 +509,8 @@ export function MarumaruGame({
     dentakuAutomationRunRef.current += 1;
     setKukuInput('');
     setKukuInputState('input');
+    setLongFormStepIndex(0);
+    setLongFormQuestionChangedAt(Date.now());
   }, [dentakuPractice]);
 
   useEffect(() => {
@@ -539,11 +563,7 @@ export function MarumaruGame({
 
     const currentTotal = getTotalValue(beads);
     if (currentTotal === target) {
-      setClearedStageId(stage.id);
-      setIsClear(true);
-      setIsFailed(false);
-      setFailedAt(undefined);
-      setMessage('できた!');
+      completeCurrentStage();
       return;
     }
 
@@ -558,7 +578,7 @@ export function MarumaruGame({
     }
 
     return undefined;
-  }, [annihilationAnimation, beads, dentakuPractice, divisionFailedAnimation, divisionSplitAnimation, isClear, isFailed, kukuInputState, mergeAnimation, multiplicationExpansionAnimation, pendingBubbles, stage.id, target]);
+  }, [annihilationAnimation, beads, completeCurrentStage, dentakuPractice, divisionFailedAnimation, divisionSplitAnimation, isClear, isFailed, kukuInputState, mergeAnimation, multiplicationExpansionAnimation, pendingBubbles, target]);
 
   const addBead = useCallback(
     (
@@ -1096,8 +1116,9 @@ export function MarumaruGame({
       return;
     }
     playUiActionSfx();
+    const maxInputLength = getLongFormStep(dentakuPractice, longFormStepIndex)?.maxInputLength ?? 2;
     setKukuInput((current) => {
-      if (current.length >= 2) {
+      if (current.length >= maxInputLength) {
         return current;
       }
       if (current === '0') {
@@ -1147,7 +1168,7 @@ export function MarumaruGame({
     return dentakuAutomationRunRef.current === runId;
   };
 
-  const runDentakuAutomation = async (practice: DentakuPractice, runId: number) => {
+  const runDentakuAutomation = async (practice: DentakuAutomationPractice, runId: number, shouldWaitBetweenOperands = true) => {
     const remainingBubbles = [...pendingBubblesRef.current];
 
     for (let index = 0; index < practice.operands.length; index += 1) {
@@ -1155,10 +1176,17 @@ export function MarumaruGame({
         return;
       }
 
+      const operand = practice.operands[index];
+      if (operand === 0 && index > 0) {
+        continue;
+      }
+
       if (index > 0) {
-        const isReady = await waitForDentakuAutomationIdle(runId);
-        if (!isReady) {
-          return;
+        if (shouldWaitBetweenOperands) {
+          const isReady = await waitForDentakuAutomationIdle(runId);
+          if (!isReady) {
+            return;
+          }
         }
 
         const operator = practice.operators[index - 1];
@@ -1166,7 +1194,17 @@ export function MarumaruGame({
         await delay(650);
       }
 
-      const operand = practice.operands[index];
+      if (operand === 0) {
+        const nextTokens = addNumberToExpression(expressionTokensRef.current, 0, selectedOperatorRef.current, expressionTotalRef.current);
+        expressionTokensRef.current = nextTokens;
+        expressionHistoryRef.current = stripExpressionResult(nextTokens);
+        setExpressionTokens(nextTokens);
+        setMessage('0から はじめるよ');
+        resetOperatorSelection();
+        await delay(220);
+        continue;
+      }
+
       const bubbleIndex = remainingBubbles.findIndex((bubble) => bubble.count === operand);
       const bubble = bubbleIndex >= 0 ? remainingBubbles.splice(bubbleIndex, 1)[0] : undefined;
       if (!bubble) {
@@ -1178,12 +1216,44 @@ export function MarumaruGame({
     }
   };
 
+  const runLongFormStepAutomation = async (practice: DentakuPractice, stepIndex: number, runId: number, shouldWaitForFinalIdle = true) => {
+    const automationPractice = getLongFormStepAutomation(practice, stepIndex);
+    if (!automationPractice) {
+      return false;
+    }
+
+    const stepBubbles = getLongFormStepPendingBubbles(practice, stepIndex, fieldWidth);
+    if (stepBubbles) {
+      consumedPendingBubbleIdsRef.current.clear();
+      pendingBubblesRef.current = stepBubbles;
+      setPendingBubbles(stepBubbles);
+      await delay(120);
+    }
+
+    await runDentakuAutomation(automationPractice, runId, shouldWaitForFinalIdle);
+    const isIdle = shouldWaitForFinalIdle ? await waitForDentakuAutomationIdle(runId) : dentakuAutomationRunRef.current === runId;
+
+    if (isIdle && stepIndex <= 0) {
+      const nextStepBubbles = getLongFormStepPendingBubbles(practice, stepIndex + 1, fieldWidth);
+      if (nextStepBubbles) {
+        consumedPendingBubbleIdsRef.current.clear();
+        pendingBubblesRef.current = nextStepBubbles;
+        setPendingBubbles(nextStepBubbles);
+      }
+    }
+
+    return isIdle;
+  };
+
   const submitKukuAnswer = () => {
     if (!dentakuPractice || kukuInputState !== 'input' || isClear || isFailed || kukuInput.length === 0) {
       return;
     }
 
-    if (Number(kukuInput) !== dentakuPractice.answer) {
+    const longFormStep = getLongFormStep(dentakuPractice, longFormStepIndex);
+    const expectedAnswer = longFormStep?.expectedAnswer ?? dentakuPractice.answer;
+
+    if (Number(kukuInput) !== expectedAnswer) {
       playFailSfx();
       setKukuInputState('wrong');
       setTimeout(() => {
@@ -1193,9 +1263,61 @@ export function MarumaruGame({
       return;
     }
 
+    if (longFormStep && !longFormStep.isFinal) {
+      if (isLongFormPlaceValuePractice(dentakuPractice)) {
+        setLongFormStepIndex((current) => current + 1);
+        setKukuInput('');
+        setKukuInputState('input');
+        return;
+      }
+
+      setKukuInputState('running');
+      const runId = dentakuAutomationRunRef.current + 1;
+      dentakuAutomationRunRef.current = runId;
+      const currentStepIndex = longFormStepIndex;
+      void (async () => {
+        await runLongFormStepAutomation(dentakuPractice, currentStepIndex, runId);
+        if (dentakuAutomationRunRef.current !== runId) {
+          return;
+        }
+        setLongFormStepIndex(currentStepIndex + 1);
+        setKukuInput('');
+        setKukuInputState('input');
+      })();
+      return;
+    }
+
     setKukuInputState('running');
     const runId = dentakuAutomationRunRef.current + 1;
     dentakuAutomationRunRef.current = runId;
+    if (longFormStep) {
+      if (isLongFormPlaceValuePractice(dentakuPractice)) {
+        void (async () => {
+          const problem = getLongFormProblem(dentakuPractice);
+          const shouldWaitForOnesIdle = problem?.operator !== '-';
+          const onesIsIdle = await runLongFormStepAutomation(dentakuPractice, 0, runId, shouldWaitForOnesIdle);
+          if (dentakuAutomationRunRef.current !== runId || !onesIsIdle) {
+            return;
+          }
+          await delay(260);
+          await runLongFormStepAutomation(dentakuPractice, 1, runId, false);
+          if (dentakuAutomationRunRef.current !== runId) {
+            return;
+          }
+          completeCurrentStage();
+        })();
+        return;
+      }
+
+      const automationPractice = getLongFormStepAutomation(dentakuPractice, longFormStepIndex);
+      if (automationPractice) {
+        void runLongFormStepAutomation(dentakuPractice, longFormStepIndex, runId);
+      } else {
+        void runDentakuAutomation(dentakuPractice, runId);
+      }
+      return;
+    }
+
     void runDentakuAutomation(dentakuPractice, runId);
   };
 
@@ -1597,6 +1719,10 @@ export function MarumaruGame({
   const failedActionPulse = isFailed ? 1 + Math.sin(backgroundBubbleTick / 155) * (0.04 + failedProgress * 0.09) : 1;
   const clearEquation = `${formatResultExpression(expressionTokens, target)} = ${target}`;
   const failedEquation = `${total} ≠ ${target}`;
+  const longFormProblem = dentakuPractice?.longFormMode ? getLongFormProblem(dentakuPractice) : undefined;
+  const longFormQuestionTransition = dentakuPractice?.longFormMode
+    ? 1 - clamp((backgroundBubbleTick - longFormQuestionChangedAt) / 420, 0, 1)
+    : 0;
 
   return (
     <View style={styles.screen}>
@@ -1740,13 +1866,18 @@ export function MarumaruGame({
 
       <View style={[styles.footer, { width: fieldWidth }]}>
         <View style={styles.footerControls}>
-          <ExpressionDisplay tokens={mode === 'launch' && pendingBubbles.length > 0 ? [String(LAUNCH_INITIAL_TOTAL), '+'] : expressionTokens} />
+          <ExpressionDisplay tokens={footerExpressionTokens} />
         </View>
       </View>
       {dentakuPractice && !isClear && kukuInputState !== 'running' ? (
         <KukuAnswerPad
           state={kukuInputState}
           canSubmit={kukuInput.length > 0 && kukuInputState === 'input' && !isFailed}
+          longFormProblem={longFormProblem}
+          longFormStepIndex={longFormStepIndex}
+          longFormQuestionTransition={longFormQuestionTransition}
+          longFormFeedbackTick={backgroundBubbleTick}
+          input={kukuInput}
           onDigit={appendKukuDigit}
           onDelete={deleteKukuDigit}
           onSubmit={submitKukuAnswer}
@@ -1804,6 +1935,10 @@ function StageGoalTitle({ stageNumber, target, maxWidth }: { stageNumber: number
 }
 
 function KukuGoalTitle({ practice, input, maxWidth }: { practice: DentakuPractice; input: string; maxWidth: number }) {
+  if (practice.longFormMode) {
+    return <LongFormStageTitle label={practice.stageLabel} questionNumber={practice.questionNumber} questionTotal={practice.questionTotal} maxWidth={maxWidth} />;
+  }
+
   const expression = practice.prompt.replace(' = ?', '');
   const answerText = input || '?';
   const questionText = `${expression} = ${answerText}`;
@@ -1818,21 +1953,850 @@ function KukuGoalTitle({ practice, input, maxWidth }: { practice: DentakuPractic
   );
 }
 
+function LongFormStageTitle({ label, questionNumber, questionTotal, maxWidth }: { label: string; questionNumber?: number; questionTotal?: number; maxWidth: number }) {
+  const progressText = questionNumber !== undefined && questionTotal !== undefined ? ` ${questionNumber}/${questionTotal}` : '';
+  return (
+    <View style={[styles.kukuGameTitle, { maxWidth }]}>
+      <Text testID="kuku-question-title" numberOfLines={1} style={styles.kukuQuestionText}>
+        {label}{progressText}
+      </Text>
+    </View>
+  );
+}
+
+type LongFormProblem = {
+  left: number;
+  right: number;
+  operator: DentakuOperator;
+  answer: number;
+};
+
+function LongFormGoalTitle({
+  problem,
+  input,
+  stepIndex,
+  transition,
+  isWrong,
+  feedbackTick,
+  maxWidth,
+}: {
+  problem: LongFormProblem;
+  input: string;
+  stepIndex: number;
+  transition: number;
+  isWrong: boolean;
+  feedbackTick: number;
+  maxWidth: number;
+}) {
+  const answerText = input || '?';
+  const hasInput = input.length > 0;
+  const promptText = `${problem.left} ${problem.operator} ${problem.right} = ${answerText}`;
+  const rows = buildLongFormRows(problem, answerText, hasInput, stepIndex);
+  const columnCount = Math.max(...rows.map((row) => row.cells.length), 1);
+  const cellSize = Math.max(24, Math.min(30, Math.floor((maxWidth - 58) / Math.max(columnCount, 3))));
+  const transitionScale = 1 + transition * 0.045;
+  const transitionOpacity = 0.78 + (1 - transition) * 0.22;
+  const wrongOffset = isWrong ? Math.sin(feedbackTick / 34) * 3 : 0;
+
+  return (
+    <View testID="long-form-panel" style={[styles.longFormPanel, { maxWidth }]}>
+      <Text testID="long-form-question-prompt" style={styles.hiddenMetric}>{promptText}</Text>
+      <View style={[styles.longFormBody, { opacity: transitionOpacity, transform: [{ translateX: -11 }, { scale: transitionScale }] }]}>
+        {rows.map((row) => (
+          <View key={row.id} style={styles.longFormRow}>
+            <View style={[
+              styles.longFormOperatorSlot,
+              row.isDivisionBar && styles.longFormDivisionOperatorSlot,
+              row.hasDivider && styles.longFormDividerOperatorSlot,
+            ]}>
+              <Text style={[
+                styles.longFormOperatorText,
+                row.isDivisionBar && styles.longFormDivisionOperatorText,
+                row.isGuide && styles.longFormGuideText,
+              ]}>{row.operatorLabel ?? ''}</Text>
+            </View>
+            <View style={[
+              styles.longFormDigits,
+              row.hasTopDivider && styles.longFormTopDivider,
+              row.isDivisionBar && styles.longFormDivisionTopDivider,
+              row.hasDivider && styles.longFormDivider,
+              { width: cellSize * columnCount },
+            ]}>
+              {padLongFormCells(row.cells, columnCount).map((cell, index) => (
+                <View
+                  key={`${row.id}-${index}`}
+                  style={[
+                    styles.longFormCell,
+                    { width: cellSize, height: row.isGuide ? Math.max(16, cellSize * 0.66) : cellSize },
+                    cell.isActive && styles.longFormActiveCell,
+                    cell.isActive && cell.isUnknown && styles.longFormActiveUnknownCell,
+                    cell.isActive && isWrong && styles.longFormWrongCell,
+                    cell.isActive && isWrong && { transform: [{ translateX: wrongOffset }] },
+                  ]}
+                >
+                  <Text style={[
+                    styles.longFormDigit,
+                    row.isGuide && styles.longFormGuideText,
+                    cell.isUnknown && styles.longFormUnknownText,
+                  ]}>
+                    {cell.value}
+                  </Text>
+                  {cell.isStruck ? <View pointerEvents="none" style={styles.longFormStrike} /> : null}
+                </View>
+              ))}
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+type LongFormCell = {
+  value: string;
+  isActive?: boolean;
+  isUnknown?: boolean;
+  isStruck?: boolean;
+};
+
+type LongFormRow = {
+  id: string;
+  cells: LongFormCell[];
+  operatorLabel?: string;
+  hasDivider?: boolean;
+  hasTopDivider?: boolean;
+  isDivisionBar?: boolean;
+  isGuide?: boolean;
+};
+
+function getLongFormProblem(practice: DentakuPractice): LongFormProblem | undefined {
+  if (practice.autoAdvance || practice.operators.length !== 1 || practice.operands.length !== 2) {
+    return undefined;
+  }
+
+  const operator = practice.operators[0];
+  if (operator !== '+' && operator !== '-' && operator !== '×' && operator !== '÷') {
+    return undefined;
+  }
+
+  return {
+    left: practice.operands[0],
+    right: practice.operands[1],
+    operator,
+    answer: practice.answer,
+  };
+}
+
+type LongFormStep = {
+  expectedAnswer: number;
+  isFinal: boolean;
+  maxInputLength: number;
+};
+
+function getLongFormStep(practice: DentakuPractice, stepIndex: number): LongFormStep | undefined {
+  const problem = practice.longFormMode ? getLongFormProblem(practice) : undefined;
+  if (!problem || (problem.operator !== '+' && problem.operator !== '-' && problem.operator !== '×' && problem.operator !== '÷')) {
+    return undefined;
+  }
+
+  if (problem.operator === '×') {
+    return getLongFormMultiplicationStep(problem, stepIndex);
+  }
+
+  if (problem.operator === '÷') {
+    return getLongFormDivisionStep(problem, stepIndex);
+  }
+
+  const placeStep = getLongFormPlaceStep(problem);
+  if (!placeStep) {
+    return undefined;
+  }
+
+  if (stepIndex <= 0) {
+    return {
+      expectedAnswer: placeStep.onesAnswer,
+      isFinal: false,
+      maxInputLength: 2,
+    };
+  }
+
+  return {
+    expectedAnswer: placeStep.tensAnswer,
+    isFinal: true,
+    maxInputLength: String(placeStep.tensAnswer).length,
+  };
+}
+
+function isLongFormPlaceValuePractice(practice: DentakuPractice) {
+  const problem = practice.longFormMode ? getLongFormProblem(practice) : undefined;
+  return problem?.operator === '+' || problem?.operator === '-';
+}
+
+function getLongFormStepAutomation(practice: DentakuPractice, stepIndex: number): DentakuAutomationPractice | undefined {
+  const problem = practice.longFormMode ? getLongFormProblem(practice) : undefined;
+  const parts = problem ? getLongFormPlaceParts(problem) : undefined;
+  if (!problem || !parts || (problem.operator !== '+' && problem.operator !== '-')) {
+    return undefined;
+  }
+
+  if (stepIndex <= 0) {
+    return {
+      operands: [parts.onesLeft, parts.onesRight],
+      operators: [problem.operator],
+    };
+  }
+
+  return {
+    operands: [parts.tensLeft, parts.tensRight],
+    operators: [problem.operator],
+  };
+}
+
+function getLongFormStepPendingBubbles(practice: DentakuPractice, stepIndex: number, fieldWidth: number): PendingBubble[] | undefined {
+  const problem = practice.longFormMode ? getLongFormProblem(practice) : undefined;
+  const parts = problem ? getLongFormPlaceParts(problem) : undefined;
+  if (!parts || (problem?.operator !== '+' && problem?.operator !== '-')) {
+    return undefined;
+  }
+
+  const counts = stepIndex <= 0
+    ? [parts.onesLeft, parts.onesRight]
+    : [parts.tensLeft, parts.tensRight];
+
+  return createPendingBubbles(fieldWidth, counts.filter((count) => count > 0));
+}
+
+function getLongFormPlaceStep(problem: LongFormProblem) {
+  if (problem.operator === '+') {
+    const onesAnswer = problem.left % 10 + problem.right % 10;
+    const carry = Math.floor(onesAnswer / 10);
+    const tensAnswer = Math.floor(problem.left / 10) + Math.floor(problem.right / 10) + carry;
+    return { onesAnswer, tensAnswer };
+  }
+
+  if (problem.operator === '-') {
+    const needsBorrow = problem.left % 10 < problem.right % 10;
+    const onesAnswer = (needsBorrow ? problem.left % 10 + 10 : problem.left % 10) - (problem.right % 10);
+    const tensAnswer = Math.floor(problem.left / 10) - (needsBorrow ? 1 : 0) - Math.floor(problem.right / 10);
+    return { onesAnswer, tensAnswer };
+  }
+
+  return undefined;
+}
+
+function getLongFormPlaceParts(problem: LongFormProblem) {
+  if (problem.operator === '+') {
+    return {
+      onesLeft: problem.left % 10,
+      onesRight: problem.right % 10,
+      tensLeft: Math.floor(problem.left / 10) * 10,
+      tensRight: Math.floor(problem.right / 10) * 10,
+    };
+  }
+
+  if (problem.operator === '-') {
+    return {
+      onesLeft: problem.left % 10,
+      onesRight: problem.right % 10,
+      tensLeft: Math.floor(problem.left / 10) * 10,
+      tensRight: Math.floor(problem.right / 10) * 10,
+    };
+  }
+
+    return undefined;
+}
+
+function getLongFormMultiplicationStep(problem: LongFormProblem, stepIndex: number): LongFormStep | undefined {
+  const state = getLongFormMultiplicationState(problem);
+  if (!state) {
+    return undefined;
+  }
+
+  const partial = state.partialProducts[stepIndex];
+  if (partial) {
+    return {
+      expectedAnswer: partial.inputValue,
+      isFinal: false,
+      maxInputLength: String(partial.inputValue).length,
+    };
+  }
+
+  const additionStep = state.additionSteps[stepIndex - state.partialProducts.length];
+  if (!additionStep) {
+    return undefined;
+  }
+
+  return {
+    expectedAnswer: additionStep.expectedAnswer,
+    isFinal: stepIndex - state.partialProducts.length >= state.additionSteps.length - 1,
+    maxInputLength: String(additionStep.expectedAnswer).length,
+  };
+}
+
+function getLongFormMultiplicationState(problem: LongFormProblem) {
+  if (problem.operator !== '×' || problem.left < 10 || problem.left > 99 || problem.right < 10 || problem.right > 99) {
+    return undefined;
+  }
+
+  const leftTens = Math.floor(problem.left / 10);
+  const leftOnes = problem.left % 10;
+  const rightTens = Math.floor(problem.right / 10);
+  const rightOnes = problem.right % 10;
+  const partialProducts = [
+    { inputValue: leftOnes * rightOnes, value: leftOnes * rightOnes, leftColumn: 1, rightColumn: 1 },
+    { inputValue: leftTens * rightOnes, value: leftTens * 10 * rightOnes, leftColumn: 0, rightColumn: 1 },
+    { inputValue: leftOnes * rightTens, value: leftOnes * rightTens * 10, leftColumn: 1, rightColumn: 0 },
+    { inputValue: leftTens * rightTens, value: leftTens * 10 * rightTens * 10, leftColumn: 0, rightColumn: 0 },
+  ];
+  const partialValues = partialProducts.map((partial) => partial.value);
+  const answerWidth = Math.max(String(problem.answer).length, ...partialValues.map((value) => String(value).length), 3);
+  const additionSteps = buildLongFormColumnAdditionSteps(partialValues, answerWidth);
+
+  return {
+    answerWidth,
+    partialProducts,
+    additionSteps,
+  };
+}
+
+function buildLongFormColumnAdditionSteps(values: number[], width: number) {
+  const steps: { column: number; expectedAnswer: number; carryIn: number }[] = [];
+  let carry = 0;
+
+  for (let column = width - 1; column >= 0; column -= 1) {
+    const place = 10 ** (width - 1 - column);
+    const expectedAnswer = values.reduce((sum, value) => sum + Math.floor(value / place) % 10, carry);
+    steps.push({ column, expectedAnswer, carryIn: carry });
+    carry = Math.floor(expectedAnswer / 10);
+  }
+
+  while (steps.length > 1 && steps[steps.length - 1].expectedAnswer === 0 && steps[steps.length - 1].carryIn === 0) {
+    steps.pop();
+  }
+
+  return steps;
+}
+
+function getLongFormDivisionStep(problem: LongFormProblem, stepIndex: number): LongFormStep | undefined {
+  const state = getLongFormDivisionState(problem);
+  const step = state?.steps[stepIndex];
+  if (!step) {
+    return undefined;
+  }
+
+  return {
+    expectedAnswer: step.expectedAnswer,
+    isFinal: stepIndex >= state.steps.length - 1,
+    maxInputLength: String(step.expectedAnswer).length,
+  };
+}
+
+function getLongFormDivisionState(problem: LongFormProblem) {
+  if (problem.operator !== '÷' || problem.left < 10 || problem.left > 99 || problem.right < 2 || problem.right > 9 || !Number.isInteger(problem.answer) || problem.answer < 10 || problem.answer > 99) {
+    return undefined;
+  }
+
+  const dividendTens = Math.floor(problem.left / 10);
+  const dividendOnes = problem.left % 10;
+  const quotientTens = Math.floor(problem.answer / 10);
+  const quotientOnes = problem.answer % 10;
+  const firstProduct = problem.right * quotientTens;
+  const firstRemainder = dividendTens - firstProduct;
+  const loweredValue = firstRemainder * 10 + dividendOnes;
+  const secondProduct = problem.right * quotientOnes;
+  const finalRemainder = loweredValue - secondProduct;
+
+  if (quotientTens <= 0 || firstProduct > dividendTens || finalRemainder !== 0) {
+    return undefined;
+  }
+
+  return {
+    dividendOnes,
+    dividendTens,
+    finalRemainder,
+    firstProduct,
+    firstRemainder,
+    loweredValue,
+    quotientOnes,
+    quotientTens,
+    secondProduct,
+    steps: [
+      { expectedAnswer: quotientTens },
+      { expectedAnswer: firstProduct },
+      { expectedAnswer: firstRemainder },
+      { expectedAnswer: quotientOnes },
+      { expectedAnswer: secondProduct },
+      { expectedAnswer: finalRemainder },
+    ],
+  };
+}
+
+function getFooterExpressionTokens({
+  dentakuPractice,
+  expressionTokens,
+  isClear,
+  mode,
+  pendingBubbles,
+}: {
+  dentakuPractice?: DentakuPractice;
+  expressionTokens: string[];
+  isClear: boolean;
+  mode: 'stage' | 'launch';
+  pendingBubbles: PendingBubble[];
+}) {
+  const problem = dentakuPractice?.longFormMode ? getLongFormProblem(dentakuPractice) : undefined;
+  if (problem && isClear) {
+    return [String(problem.left), problem.operator, String(problem.right), '=', String(problem.answer)];
+  }
+
+  if (mode === 'launch' && pendingBubbles.length > 0) {
+    return [String(LAUNCH_INITIAL_TOTAL), '+'];
+  }
+
+  return expressionTokens;
+}
+
+function buildLongFormRows(problem: LongFormProblem, answerText: string, showGuideRows: boolean, stepIndex: number): LongFormRow[] {
+  if (problem.operator === '÷') {
+    return buildDivisionLongFormRows(problem, answerText, stepIndex);
+  }
+
+  if (problem.operator === '×') {
+    return buildMultiplicationLongFormRows(problem, answerText, stepIndex);
+  }
+
+  const operandWidth = Math.max(String(problem.left).length, String(problem.right).length, String(problem.answer).length);
+  const shouldShowGuideRows = (problem.operator === '+' || problem.operator === '-')
+    ? stepIndex > 0
+    : showGuideRows;
+  const guideRows = shouldShowGuideRows ? buildPlaceValueGuideRows(problem, operandWidth) : [];
+  const answerCells = buildLongFormAnswerCells(problem, answerText, operandWidth, stepIndex);
+  const activePlaceColumn = getLongFormActivePlaceColumn(problem, operandWidth, stepIndex);
+  const leftCells = activePlaceColumn == null
+    ? formatLongFormNumber(problem.left)
+    : formatLongFormPlaceNumber(problem.left, operandWidth, activePlaceColumn);
+  const displayedLeftCells = markLongFormBorrowedTensCell(problem, leftCells, operandWidth, stepIndex);
+  const rightCells = activePlaceColumn == null
+    ? formatLongFormNumber(problem.right)
+    : formatLongFormPlaceNumber(problem.right, operandWidth, activePlaceColumn);
+
+  return [
+    ...guideRows,
+    { id: 'left', cells: displayedLeftCells },
+    { id: 'right', operatorLabel: problem.operator, hasDivider: true, cells: rightCells },
+    { id: 'answer', cells: answerCells },
+  ];
+}
+
+function buildMultiplicationLongFormRows(problem: LongFormProblem, answerText: string, stepIndex: number): LongFormRow[] {
+  const state = getLongFormMultiplicationState(problem);
+  if (!state) {
+    return [
+      { id: 'left', cells: formatLongFormNumber(problem.left) },
+      { id: 'right', operatorLabel: problem.operator, hasDivider: true, cells: formatLongFormNumber(problem.right) },
+      { id: 'answer', cells: formatLongFormNumber(answerText, { unknown: answerText === '?' }) },
+    ];
+  }
+
+  const width = state.answerWidth;
+  const activeOperandColumns = getMultiplicationActiveOperandColumns(state, stepIndex);
+  const leftCells = activeOperandColumns.left == null
+    ? padLongFormCells(formatLongFormNumber(problem.left), width)
+    : formatLongFormPlaceNumber(problem.left, width, activeOperandColumns.left);
+  const rightCells = activeOperandColumns.right == null
+    ? padLongFormCells(formatLongFormNumber(problem.right), width)
+    : formatLongFormPlaceNumber(problem.right, width, activeOperandColumns.right);
+  const additionGuideRows = buildMultiplicationAdditionGuideRows(state, stepIndex);
+  const partialRows = buildMultiplicationPartialRows(state, answerText, stepIndex);
+  const answerCells = buildMultiplicationAnswerCells(problem, state, answerText, stepIndex);
+  const isAdditionStage = stepIndex >= state.partialProducts.length;
+
+  return [
+    { id: 'left', cells: leftCells },
+    { id: 'right', operatorLabel: problem.operator, hasDivider: true, cells: rightCells },
+    ...additionGuideRows,
+    ...partialRows.map((row, index) => ({
+      id: `partial-${index}`,
+      cells: row,
+      operatorLabel: isAdditionStage && index === state.partialProducts.length - 1 ? '+' : undefined,
+      hasDivider: isAdditionStage && index === state.partialProducts.length - 1,
+    })),
+    ...(isAdditionStage ? [{ id: 'answer', cells: answerCells }] : []),
+  ];
+}
+
+function getMultiplicationActiveOperandColumns(state: NonNullable<ReturnType<typeof getLongFormMultiplicationState>>, stepIndex: number) {
+  const partial = state.partialProducts[stepIndex];
+  if (!partial) {
+    return {};
+  }
+
+  return {
+    left: state.answerWidth - 2 + partial.leftColumn,
+    right: state.answerWidth - 2 + partial.rightColumn,
+  };
+}
+
+function buildMultiplicationAdditionGuideRows(state: NonNullable<ReturnType<typeof getLongFormMultiplicationState>>, stepIndex: number): LongFormRow[] {
+  const additionStep = state.additionSteps[stepIndex - state.partialProducts.length];
+  if (!additionStep || additionStep.carryIn <= 0) {
+    return [];
+  }
+
+  return [{
+    id: 'multiply-addition-carry',
+    isGuide: true,
+    cells: placeLongFormGuideCell(state.answerWidth, additionStep.column, String(additionStep.carryIn)),
+  }];
+}
+
+function buildMultiplicationPartialRows(state: NonNullable<ReturnType<typeof getLongFormMultiplicationState>>, answerText: string, stepIndex: number): LongFormCell[][] {
+  const width = state.answerWidth;
+  const rows: LongFormCell[][] = [];
+  const visibleRowCount = stepIndex >= state.partialProducts.length ? state.partialProducts.length : stepIndex + 1;
+  const additionStep = state.additionSteps[stepIndex - state.partialProducts.length];
+
+  for (let index = 0; index < visibleRowCount; index += 1) {
+    const partial = state.partialProducts[index];
+    if (index < stepIndex || stepIndex >= state.partialProducts.length) {
+      rows.push(markActiveLongFormColumn(formatLongFormNumberToWidth(partial.value, width), additionStep?.column));
+      continue;
+    }
+
+    const placeMultiplier = getMultiplicationPartialPlaceMultiplier(partial);
+    const visibleValue = answerText === '?' ? getMultiplicationPartialPlaceholder(placeMultiplier) : String(Number(answerText) * placeMultiplier);
+    rows.push(placeInputTextInLongFormCells(width, width - 1, visibleValue, true));
+  }
+
+  return rows;
+}
+
+function markActiveLongFormColumn(cells: LongFormCell[], activeColumn: number | undefined): LongFormCell[] {
+  if (activeColumn == null) {
+    return cells;
+  }
+
+  return cells.map((cell, index) => ({
+    ...cell,
+    isActive: cell.value !== '' && index === activeColumn,
+  }));
+}
+
+function getMultiplicationPartialPlaceMultiplier(partial: { leftColumn: number; rightColumn: number }) {
+  return 10 ** ((1 - partial.leftColumn) + (1 - partial.rightColumn));
+}
+
+function getMultiplicationPartialPlaceholder(placeMultiplier: number) {
+  const zeroCount = Math.max(0, String(placeMultiplier).length - 1);
+  return `${'?'}${'0'.repeat(zeroCount)}`;
+}
+
+function buildMultiplicationAnswerCells(problem: LongFormProblem, state: NonNullable<ReturnType<typeof getLongFormMultiplicationState>>, answerText: string, stepIndex: number): LongFormCell[] {
+  const width = state.answerWidth;
+  if (stepIndex < state.partialProducts.length) {
+    return placeLongFormGuideCell(width, width - 1, '?').map((cell) => ({
+      ...cell,
+      isActive: false,
+      isUnknown: cell.value === '?',
+    }));
+  }
+
+  const completedDigits = String(problem.answer).padStart(width, ' ').split('');
+  const activeColumn = state.additionSteps[stepIndex - state.partialProducts.length]?.column ?? 0;
+  const currentAnswerText = answerText === '?' ? '?' : answerText;
+  return Array.from({ length: width }, (_, index) => {
+    if (index < activeColumn) {
+      return { value: '' };
+    }
+    if (index === activeColumn) {
+      return {
+        value: currentAnswerText,
+        isActive: true,
+        isUnknown: currentAnswerText === '?',
+      };
+    }
+    const value = completedDigits[index] === ' ' ? '' : completedDigits[index];
+    return { value };
+  });
+}
+
+function markLongFormBorrowedTensCell(problem: LongFormProblem, cells: LongFormCell[], width: number, stepIndex: number) {
+  if (problem.operator !== '-' || stepIndex <= 0 || width < 2 || problem.left % 10 >= problem.right % 10) {
+    return cells;
+  }
+
+  return cells.map((cell, index) => (
+    index === width - 2
+      ? { ...cell, isStruck: true }
+      : cell
+  ));
+}
+
+function getLongFormActivePlaceColumn(problem: LongFormProblem, width: number, stepIndex: number) {
+  if (problem.operator !== '+' && problem.operator !== '-') {
+    return undefined;
+  }
+
+  if (stepIndex <= 0) {
+    return width - 1;
+  }
+
+  return width >= 2 ? width - 2 : undefined;
+}
+
+function buildLongFormAnswerCells(problem: LongFormProblem, answerText: string, width: number, stepIndex: number): LongFormCell[] {
+  if (problem.operator !== '+' && problem.operator !== '-') {
+    return formatLongFormNumber(answerText, { unknown: answerText === '?' });
+  }
+
+  if (stepIndex > 0) {
+    const placeStep = getLongFormPlaceStep(problem);
+    const onesDigit = placeStep ? placeStep.onesAnswer % 10 : 0;
+    const placeAnswerText = answerText === '?' ? '?' : answerText;
+    const answerPrefixCells = formatLongFormNumber(placeAnswerText, {
+      active: true,
+      unknown: answerText === '?',
+    });
+    const maxPrefixWidth = Math.max(1, width - 1);
+    const trimmedPrefixCells = answerPrefixCells.slice(-maxPrefixWidth);
+    return [
+      ...Array.from({ length: Math.max(0, width - 1 - trimmedPrefixCells.length) }, () => ({ value: '' })),
+      ...trimmedPrefixCells,
+      { value: String(onesDigit) },
+    ];
+  }
+
+  if (answerText !== '?') {
+    return formatLongFormNumber(answerText);
+  }
+
+  if (stepIndex <= 0) {
+    return placeLongFormGuideCell(width, width - 1, '?').map((cell) => ({
+      ...cell,
+      isActive: cell.value === '?',
+      isUnknown: cell.value === '?',
+    }));
+  }
+
+  return formatLongFormNumber(answerText, { unknown: answerText === '?' });
+}
+
+function buildDivisionLongFormRows(problem: LongFormProblem, answerText: string, stepIndex: number): LongFormRow[] {
+  const state = getLongFormDivisionState(problem);
+  if (state) {
+    return buildStructuredDivisionLongFormRows(problem, state, answerText, stepIndex);
+  }
+
+  return [
+    {
+      id: 'division-question',
+      cells: [
+        ...formatLongFormNumber(problem.left),
+        { value: '÷' },
+        ...formatLongFormNumber(problem.right),
+      ],
+    },
+    {
+      id: 'division-answer',
+      operatorLabel: '=',
+      hasDivider: true,
+      cells: formatLongFormNumber(answerText, { unknown: answerText === '?' }),
+    },
+  ];
+}
+
+function buildStructuredDivisionLongFormRows(problem: LongFormProblem, state: NonNullable<ReturnType<typeof getLongFormDivisionState>>, answerText: string, stepIndex: number): LongFormRow[] {
+  const width = 2;
+  const quotientCells = buildDivisionQuotientCells(problem, state, answerText, stepIndex);
+  const dividendCells = markActiveLongFormColumn(formatLongFormNumberToWidth(problem.left, width), stepIndex <= 0 ? 0 : undefined);
+  const rows: LongFormRow[] = [
+    { id: 'division-quotient', cells: quotientCells },
+    { id: 'division-dividend', operatorLabel: `${problem.right})`, hasTopDivider: true, isDivisionBar: true, cells: dividendCells },
+  ];
+
+  if (stepIndex >= 1) {
+    rows.push({ id: 'division-first-product', operatorLabel: '-', hasDivider: true, cells: buildDivisionStepCells(width, 0, state.firstProduct, answerText, 1, stepIndex) });
+  }
+
+  if (stepIndex >= 2) {
+    rows.push({ id: 'division-first-remainder', cells: buildDivisionFirstRemainderCells(state, answerText, stepIndex) });
+  }
+
+  if (stepIndex >= 4) {
+    rows.push({ id: 'division-second-product', operatorLabel: '-', hasDivider: true, cells: buildDivisionStepCells(width, 1, state.secondProduct, answerText, 4, stepIndex) });
+  }
+
+  if (stepIndex >= 5) {
+    rows.push({ id: 'division-final-remainder', cells: buildDivisionStepCells(width, 1, state.finalRemainder, answerText, 5, stepIndex) });
+  }
+
+  return rows;
+}
+
+function buildDivisionQuotientCells(problem: LongFormProblem, state: NonNullable<ReturnType<typeof getLongFormDivisionState>>, answerText: string, stepIndex: number): LongFormCell[] {
+  if (stepIndex <= 0) {
+    return placeInputTextInLongFormCells(2, 0, answerText, true);
+  }
+
+  if (stepIndex <= 3) {
+    return [
+      { value: String(state.quotientTens) },
+      { value: stepIndex === 3 ? answerText : '', isActive: stepIndex === 3, isUnknown: stepIndex === 3 && answerText === '?' },
+    ];
+  }
+
+  return formatLongFormNumberToWidth(problem.answer, 2);
+}
+
+function buildDivisionStepCells(width: number, endColumn: number, completedValue: number, answerText: string, activeStep: number, stepIndex: number): LongFormCell[] {
+  if (stepIndex < activeStep) {
+    return placeInputTextInLongFormCells(width, endColumn, '?', false);
+  }
+
+  if (stepIndex === activeStep) {
+    return placeInputTextInLongFormCells(width, endColumn, answerText, true);
+  }
+
+  return placeInputTextInLongFormCells(width, endColumn, String(completedValue), false);
+}
+
+function buildDivisionFirstRemainderCells(state: NonNullable<ReturnType<typeof getLongFormDivisionState>>, answerText: string, stepIndex: number): LongFormCell[] {
+  if (stepIndex < 2) {
+    return placeInputTextInLongFormCells(2, 0, '?', false);
+  }
+
+  if (stepIndex === 2) {
+    return placeInputTextInLongFormCells(2, 0, answerText, true);
+  }
+
+  return [
+    { value: String(state.firstRemainder) },
+    { value: String(state.dividendOnes) },
+  ];
+}
+
+function buildPlaceValueGuideRows(problem: LongFormProblem, width: number): LongFormRow[] {
+  if (problem.operator === '+') {
+    const onesSum = problem.left % 10 + problem.right % 10;
+    if (onesSum >= 10 && width >= 2) {
+      return [{ id: 'carry', isGuide: true, cells: placeLongFormGuideCell(width, width - 2, '1') }];
+    }
+    return [];
+  }
+
+  if (problem.operator === '-') {
+    const needsBorrow = problem.left >= 10 && problem.left % 10 < problem.right % 10;
+    if (needsBorrow && width >= 2) {
+      const tensAfterBorrow = Math.floor(problem.left / 10) - 1;
+      return [{ id: 'borrow', isGuide: true, cells: placeLongFormGuideCell(width, width - 2, String(tensAfterBorrow)) }];
+    }
+  }
+
+  return [];
+}
+
+function formatLongFormNumber(value: number | string, options: { active?: boolean; unknown?: boolean } = {}): LongFormCell[] {
+  return Array.from(String(value)).map((digit) => ({
+    value: digit,
+    isActive: options.active,
+    isUnknown: options.unknown || digit === '?',
+  }));
+}
+
+function formatLongFormNumberToWidth(value: number | string, width: number, options: { active?: boolean; unknown?: boolean } = {}): LongFormCell[] {
+  return padLongFormCells(formatLongFormNumber(value, options), width);
+}
+
+function placeInputTextInLongFormCells(width: number, endColumn: number, value: string, active: boolean): LongFormCell[] {
+  const text = value || '?';
+  const digits = Array.from(text);
+  const cells: LongFormCell[] = Array.from({ length: width }, () => ({ value: '' }));
+  const firstColumn = Math.max(0, endColumn - digits.length + 1);
+
+  digits.forEach((digit, index) => {
+    const column = firstColumn + index;
+    if (column > endColumn || column >= width) {
+      return;
+    }
+    cells[column] = {
+      value: digit,
+      isActive: active,
+      isUnknown: digit === '?',
+    };
+  });
+
+  return cells;
+}
+
+function formatLongFormPlaceNumber(value: number | string, width: number, activeColumn: number): LongFormCell[] {
+  const digits = Array.from(String(value));
+  const leadingBlankCount = Math.max(0, width - digits.length);
+  return Array.from({ length: width }, (_, cellIndex) => {
+    const digitIndex = cellIndex - leadingBlankCount;
+    const digit = digitIndex >= 0 ? digits[digitIndex] : '';
+    return {
+      value: digit,
+      isActive: digit !== '' && cellIndex === activeColumn,
+    };
+  });
+}
+
+function padLongFormCells(cells: LongFormCell[], width: number): LongFormCell[] {
+  if (cells.length >= width) {
+    return cells;
+  }
+
+  return [
+    ...Array.from({ length: width - cells.length }, () => ({ value: '' })),
+    ...cells,
+  ];
+}
+
+function placeLongFormGuideCell(width: number, index: number, value: string): LongFormCell[] {
+  return Array.from({ length: width }, (_, cellIndex) => ({
+    value: cellIndex === index ? value : '',
+    isActive: cellIndex === index,
+  }));
+}
+
 function KukuAnswerPad({
   state,
   canSubmit,
+  longFormProblem,
+  longFormStepIndex,
+  longFormQuestionTransition,
+  longFormFeedbackTick,
+  input,
   onDigit,
   onDelete,
   onSubmit,
 }: {
   state: 'input' | 'wrong' | 'running';
   canSubmit: boolean;
+  longFormProblem?: LongFormProblem;
+  longFormStepIndex: number;
+  longFormQuestionTransition: number;
+  longFormFeedbackTick: number;
+  input: string;
   onDigit: (digit: string) => void;
   onDelete: () => void;
   onSubmit: () => void;
 }) {
   return (
-    <View style={[styles.kukuAnswerPad, state === 'wrong' && styles.kukuAnswerPadWrong, state === 'running' && styles.kukuAnswerPadRunning]} testID="kuku-keypad">
+    <View style={[styles.kukuAnswerPad, longFormProblem && styles.kukuAnswerPadWithLongForm, state === 'wrong' && styles.kukuAnswerPadWrong, state === 'running' && styles.kukuAnswerPadRunning]} testID="kuku-keypad">
+      {longFormProblem ? (
+        <View pointerEvents="none" style={styles.kukuPadLongFormArea}>
+          <LongFormGoalTitle
+            problem={longFormProblem}
+            input={input}
+            stepIndex={longFormStepIndex}
+            transition={longFormQuestionTransition}
+            isWrong={state === 'wrong'}
+            feedbackTick={longFormFeedbackTick}
+            maxWidth={280}
+          />
+        </View>
+      ) : null}
       <View style={styles.kukuKeyGrid}>
         {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
           <KukuKey key={digit} label={digit} disabled={state !== 'input'} onPress={() => onDigit(digit)} />
@@ -2503,7 +3467,7 @@ function delay(ms: number) {
 
 function createDentakuPracticeStage(practice: DentakuPractice): Stage {
   const operatorLimits: Partial<OperatorUsageLimits> = {
-    '+': practice.operators.includes('+') ? 'infinite' : 0,
+    '+': practice.operators.includes('+') || (practice.longFormMode && practice.operators.includes('-')) ? 'infinite' : 0,
     '-': practice.operators.includes('-') ? 'infinite' : 0,
     '×': practice.operators.includes('×') ? 'infinite' : 0,
     '÷': practice.operators.includes('÷') ? 'infinite' : 0,
@@ -4307,6 +5271,113 @@ const styles = StyleSheet.create({
   kukuQuestionUnknown: {
     color: 'rgba(71, 85, 105, 0.45)',
   },
+  longFormPanel: {
+    minHeight: 104,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  longFormBody: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    transform: [{ translateX: -11 }],
+  },
+  longFormRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'flex-end',
+  },
+  longFormOperatorSlot: {
+    width: 22,
+    minHeight: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  longFormDivisionOperatorSlot: {
+    width: 34,
+    alignItems: 'flex-end',
+    paddingRight: 2,
+  },
+  longFormDividerOperatorSlot: {
+    justifyContent: 'flex-end',
+    paddingBottom: 3,
+  },
+  longFormOperatorText: {
+    color: TEXT_BASE_COLOR,
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '900',
+    fontFamily: LATIN_FONT_FAMILY,
+    includeFontPadding: false,
+  },
+  longFormDivisionOperatorText: {
+    fontSize: 24,
+    lineHeight: 28,
+  },
+  longFormDigits: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  longFormTopDivider: {
+    borderTopWidth: 3,
+    borderTopColor: 'rgba(18, 51, 74, 0.76)',
+  },
+  longFormDivisionTopDivider: {
+    marginLeft: -3,
+  },
+  longFormDivider: {
+    borderBottomWidth: 3,
+    borderBottomColor: 'rgba(18, 51, 74, 0.76)',
+  },
+  longFormCell: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADIUS_SM,
+    position: 'relative',
+  },
+  longFormActiveCell: {
+    backgroundColor: 'rgba(250, 204, 21, 0.32)',
+    borderWidth: 2,
+    borderColor: 'rgba(2, 132, 199, 0.42)',
+    shadowColor: 'rgba(2, 132, 199, 0.28)',
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  longFormActiveUnknownCell: {
+    backgroundColor: 'rgba(250, 204, 21, 0.46)',
+    borderColor: 'rgba(2, 132, 199, 0.62)',
+  },
+  longFormWrongCell: {
+    backgroundColor: 'rgba(251, 113, 133, 0.34)',
+    borderColor: 'rgba(225, 29, 72, 0.62)',
+    shadowColor: 'rgba(225, 29, 72, 0.3)',
+  },
+  longFormDigit: {
+    color: TEXT_BASE_COLOR,
+    fontSize: 24,
+    lineHeight: 28,
+    fontWeight: '900',
+    fontFamily: LATIN_FONT_FAMILY,
+    includeFontPadding: false,
+  },
+  longFormGuideText: {
+    color: TEXT_ACCENT_COLOR,
+    fontSize: 15,
+    lineHeight: 18,
+  },
+  longFormUnknownText: {
+    color: 'rgba(71, 85, 105, 0.45)',
+  },
+  longFormStrike: {
+    position: 'absolute',
+    width: 28,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(18, 51, 74, 0.78)',
+    transform: [{ rotate: '-28deg' }],
+  },
   headerGoalParts: {
     minWidth: 34,
     height: 42,
@@ -5180,6 +6251,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
+  },
+  kukuAnswerPadWithLongForm: {
+    paddingTop: GRID,
+  },
+  kukuPadLongFormArea: {
+    width: '100%',
+    alignItems: 'center',
+    paddingHorizontal: GRID,
+    paddingBottom: GRID,
+    marginBottom: GRID * 0.75,
+    borderBottomWidth: 2,
+    borderBottomColor: 'rgba(255, 255, 255, 0.48)',
   },
   kukuAnswerPadWrong: {
     borderColor: 'rgba(71, 85, 105, 0.34)',

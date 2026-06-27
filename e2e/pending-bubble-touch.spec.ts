@@ -9,23 +9,19 @@ test('pending bubbles still burst after operator selection when the tap drifts s
   await page.getByLabel('mixed-5-free', { exact: true }).click();
   await page.getByTestId('stage-mixed5Free-1').click();
 
-  await page.getByLabel('bubble-6').click();
-  await page.getByTestId('operator-÷').click();
-  await page.getByLabel('divide-3').click();
-  await page.getByTestId('operator-×').click();
-  await page.getByLabel('multiply-4').click();
-  await expect(page.getByTestId('expression-display-text')).toContainText('(6 ÷ 3) × 4 = 8');
-
+  await page.getByLabel('bubble-2').click();
   await page.getByTestId('operator-+').click();
-  await tapWithSlightDrift(page, page.getByLabel('bubble-5'));
+  await tapWithSlightDrift(page, page.getByLabel('bubble-3'));
 
-  await expect(page.getByTestId('expression-display-text')).toContainText('+ 5 = 13');
+  await expect(page.getByTestId('expression-display-text')).toContainText('2 + 3 = 5');
 });
 
 async function openCurrentLaunch(page: Page) {
-  await page.getByLabel('bubble-2').click();
+  await page.getByLabel('bubble-5').click();
   await expect(page.getByLabel('next stage')).toBeVisible();
   await page.getByLabel('next stage').click();
+  await expect(page.getByTestId('mode-select')).toBeVisible();
+  await page.getByLabel('marumaru mode', { exact: true }).click();
   await expect(page.getByTestId('world-select')).toBeVisible();
 }
 

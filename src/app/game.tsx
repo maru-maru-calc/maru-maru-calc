@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBgmControl } from '@/audio/bgm-control';
 import { SFX } from '@/audio/sfx';
 import { useOneShotAudio } from '@/audio/use-one-shot-audio';
+import { BrandLogo } from '@/components/BrandLogo';
 import { DentakuGame } from '@/components/DentakuGame';
 import { MarumaruGame } from '@/components/MarumaruGame';
 import { NavImageIcon } from '@/components/NavImageIcon';
@@ -13,7 +14,7 @@ import { DENTAKU_STAGES, DENTAKU_WORLDS, DentakuStage, DentakuWorldId } from '@/
 import { getStageIndexById, STAGE_ISLANDS, STAGES } from '@/game/stages';
 import { Stage } from '@/game/types';
 
-type AppScreen = 'launch' | 'mode' | 'world' | 'stage' | 'game' | 'dentakuWorld' | 'dentakuStage' | 'dentakuGame';
+type AppScreen = 'launch' | 'mode' | 'world' | 'stage' | 'game' | 'dentakuWorld' | 'dentakuStage' | 'dentakuGame' | 'longFormWorld' | 'longFormStage' | 'longFormGame';
 type StageStatus = 'done' | 'open' | 'locked';
 type WorldId = Stage['islandId'];
 type DepthBubbleSpec = {
@@ -48,21 +49,55 @@ const GRID = 8;
 const RADIUS_SM = 8;
 const RADIUS_LG = 16;
 const RADIUS_PILL = 999;
+const LONG_FORM_WORLDS = DENTAKU_WORLDS.filter((world) => world.id === 'addition' || world.id === 'subtraction' || world.id === 'multiplication' || world.id === 'division');
+const LONG_FORM_STAGES: DentakuStage[] = [
+  ...createLongFormStageSet('addition', '+', [
+    '2けた + 1けた',
+    'くり上がり',
+    '2けた + 2けた',
+    '一のくらいでくり上がり',
+    '百のくらいへ',
+    '足し算まとめ',
+  ]),
+  ...createLongFormStageSet('subtraction', '-', [
+    '2けた - 1けた',
+    'くり下がり',
+    '2けた - 2けた',
+    '2けたのくり下がり',
+    '引き算まとめ',
+  ]),
+  ...createLongFormStageSet('multiplication', '×', [
+    '部分積',
+    '位取りの0',
+    '部分積の足し算',
+    '掛け算まとめ',
+  ]),
+  ...createLongFormStageSet('division', '÷', [
+    '商を立てる',
+    'かけて引く',
+    '次の位を下ろす',
+    '割り算まとめ',
+  ]),
+];
 
 export default function IndexScreen() {
   const { width, height } = useWindowDimensions();
   const [screen, setScreen] = useState<AppScreen>('launch');
   const [selectedWorldId, setSelectedWorldId] = useState<WorldId>('addition');
   const [selectedDentakuWorldId, setSelectedDentakuWorldId] = useState<DentakuWorldId>('kuku');
+  const [selectedLongFormWorldId, setSelectedLongFormWorldId] = useState<DentakuWorldId>('addition');
   const [playingStageIndex, setPlayingStageIndex] = useState(0);
   const [playingDentakuStage, setPlayingDentakuStage] = useState<DentakuStage>(DENTAKU_STAGES[0]);
+  const [playingLongFormStage, setPlayingLongFormStage] = useState<DentakuStage>(LONG_FORM_STAGES[0]);
   const [completedStageIds, setCompletedStageIds] = useState<Set<string>>(() => new Set());
   const [completedDentakuStageIds, setCompletedDentakuStageIds] = useState<Set<string>>(() => new Set());
+  const [completedLongFormStageIds, setCompletedLongFormStageIds] = useState<Set<string>>(() => new Set());
 
   const selectedIslandId = selectedWorldId;
   const selectedIsland = STAGE_ISLANDS.find((island) => island.id === selectedIslandId) ?? STAGE_ISLANDS[0];
   const selectedStages = useMemo(() => STAGES.filter((stage) => stage.islandId === selectedIslandId), [selectedIslandId]);
   const selectedDentakuStages = useMemo(() => DENTAKU_STAGES.filter((stage) => stage.worldId === selectedDentakuWorldId), [selectedDentakuWorldId]);
+  const selectedLongFormStages = useMemo(() => LONG_FORM_STAGES.filter((stage) => stage.worldId === selectedLongFormWorldId), [selectedLongFormWorldId]);
   const mapWidth = Math.max(320, width);
 
   const startStage = (stage: Stage) => {
@@ -74,6 +109,10 @@ export default function IndexScreen() {
     setPlayingDentakuStage(stage);
     setScreen('dentakuGame');
   };
+  const startLongFormStage = (stage: DentakuStage) => {
+    setPlayingLongFormStage(stage);
+    setScreen('longFormGame');
+  };
   const startNextDentakuStage = () => {
     const currentIndex = selectedDentakuStages.findIndex((stage) => stage.id === playingDentakuStage.id);
     const nextStage = selectedDentakuStages[currentIndex + 1];
@@ -82,6 +121,15 @@ export default function IndexScreen() {
       return;
     }
     setScreen('dentakuStage');
+  };
+  const startNextLongFormStage = () => {
+    const currentIndex = selectedLongFormStages.findIndex((stage) => stage.id === playingLongFormStage.id);
+    const nextStage = selectedLongFormStages[currentIndex + 1];
+    if (nextStage) {
+      setPlayingLongFormStage(nextStage);
+      return;
+    }
+    setScreen('longFormStage');
   };
   if (screen === 'launch') {
     return <MarumaruGame mode="launch" onComplete={() => setScreen('mode')} />;
@@ -120,6 +168,24 @@ export default function IndexScreen() {
     );
   }
 
+  if (screen === 'longFormGame') {
+    return (
+      <DentakuGame
+        stage={playingLongFormStage}
+        longFormMode
+        onBack={() => setScreen('longFormStage')}
+        onNextStage={startNextLongFormStage}
+        onStageClear={(stageId) => {
+          setCompletedLongFormStageIds((current) => {
+            const next = new Set(current);
+            next.add(stageId);
+            return next;
+          });
+        }}
+      />
+    );
+  }
+
   if (screen === 'stage') {
     return (
       <StageSelect
@@ -149,6 +215,20 @@ export default function IndexScreen() {
     );
   }
 
+  if (screen === 'longFormStage') {
+    return (
+      <DentakuStageSelect
+        stages={selectedLongFormStages}
+        completedStageIds={completedLongFormStageIds}
+        mapWidth={mapWidth}
+        viewportWidth={width}
+        viewportHeight={height}
+        onBack={() => setScreen('longFormWorld')}
+        onStartStage={startLongFormStage}
+      />
+    );
+  }
+
   if (screen === 'dentakuWorld') {
     return (
       <DentakuWorldSelect
@@ -165,6 +245,24 @@ export default function IndexScreen() {
     );
   }
 
+  if (screen === 'longFormWorld') {
+    return (
+      <DentakuWorldSelect
+        completedStageIds={completedLongFormStageIds}
+        stagesForProgress={LONG_FORM_STAGES}
+        worlds={LONG_FORM_WORLDS}
+        mapWidth={mapWidth}
+        viewportWidth={width}
+        viewportHeight={height}
+        onBack={() => setScreen('mode')}
+        onSelectWorld={(worldId) => {
+          setSelectedLongFormWorldId(worldId);
+          setScreen('longFormStage');
+        }}
+      />
+    );
+  }
+
   if (screen === 'mode') {
     return (
       <ModeSelect
@@ -173,6 +271,7 @@ export default function IndexScreen() {
         viewportHeight={height}
         onSelectMarumaru={() => setScreen('world')}
         onSelectDentaku={() => setScreen('dentakuWorld')}
+        onSelectLongForm={() => setScreen('longFormWorld')}
       />
     );
   }
@@ -192,26 +291,45 @@ export default function IndexScreen() {
   );
 }
 
+function createLongFormStageSet(worldId: DentakuWorldId, operator: DentakuStage['operator'], titles: string[]): DentakuStage[] {
+  return titles.map((title, index) => {
+    const problemNumber = index + 1;
+    return {
+      id: `long-form-${worldId}-${problemNumber}`,
+      worldId,
+      title,
+      label: `#${problemNumber}`,
+      kind: 'binary' as const,
+      operator,
+      operandCount: 2,
+      problemNumber,
+    };
+  });
+}
+
 function ModeSelect({
   mapWidth,
   viewportWidth,
   viewportHeight,
   onSelectMarumaru,
   onSelectDentaku,
+  onSelectLongForm,
 }: {
   mapWidth: number;
   viewportWidth: number;
   viewportHeight: number;
   onSelectMarumaru: () => void;
   onSelectDentaku: () => void;
+  onSelectLongForm: () => void;
 }) {
   const [scrollDepth, setScrollDepth] = useState(0);
   const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
   const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
   const centerX = mapWidth / 2;
   const modeNodeOffset = Math.min(82, Math.max(58, mapWidth * 0.21));
-  const marumaruY = 176;
-  const dentakuY = 344;
+  const marumaruY = 210;
+  const dentakuY = 366;
+  const longFormY = 522;
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -225,7 +343,11 @@ function ModeSelect({
           scrollEventThrottle={16}
         >
           <View style={styles.modeRouteLayer}>
+            <View pointerEvents="none" style={styles.modeLogo}>
+              <BrandLogo size="medium" />
+            </View>
             <BubbleRoute from={{ x: centerX - modeNodeOffset, y: marumaruY }} to={{ x: centerX + modeNodeOffset, y: dentakuY }} />
+            <BubbleRoute from={{ x: centerX + modeNodeOffset, y: dentakuY }} to={{ x: centerX - modeNodeOffset, y: longFormY }} />
             <ModeDiver variant="boy" style={[styles.modeDiverBoy, { left: Math.max(18, centerX - 178) }]} />
             <ModeDiver variant="girl" style={[styles.modeDiverGirl, { left: Math.min(mapWidth - 136, centerX + 38) }]} />
             <ModeNode
@@ -246,6 +368,16 @@ function ModeSelect({
               onPress={() => {
                 playActionSfx();
                 onSelectDentaku();
+              }}
+            />
+            <ModeNode
+              label="long form mode"
+              kind="longForm"
+              x={centerX - modeNodeOffset}
+              y={longFormY}
+              onPress={() => {
+                playActionSfx();
+                onSelectLongForm();
               }}
             />
           </View>
@@ -293,7 +425,7 @@ function ModeNode({
   onPress,
 }: {
   label: string;
-  kind: 'marumaru' | 'dentaku';
+  kind: 'marumaru' | 'dentaku' | 'longForm';
   x: number;
   y: number;
   onPress: () => void;
@@ -315,7 +447,7 @@ function ModeNode({
     >
       <View pointerEvents="none" style={styles.nodeBubbleInnerGlow} />
       <View pointerEvents="none" style={styles.nodeBubbleShine} />
-      {kind === 'marumaru' ? <ModeMarumaruTitle /> : <ModeDentakuTitle />}
+      {kind === 'marumaru' ? <ModeMarumaruTitle /> : kind === 'longForm' ? <ModeLongFormTitle /> : <ModeDentakuTitle />}
     </Pressable>
   );
 }
@@ -329,7 +461,7 @@ function ModeMarumaruTitle() {
       <View style={[styles.modeTitleBead, styles.modeTitleBeadGold]}>
         <View style={styles.modeTitleBeadHighlight} />
       </View>
-      <Text style={styles.modeNodeText}> = 10</Text>
+      <Text style={styles.modeNodeText}> = 11</Text>
     </View>
   );
 }
@@ -337,13 +469,44 @@ function ModeMarumaruTitle() {
 function ModeDentakuTitle() {
   return (
     <Text pointerEvents="none" style={styles.modeNodeText}>
-      4 + 6 = <Text style={styles.modeNodeUnknown}>?</Text>
+      5 + 6 = <Text style={styles.modeNodeUnknown}>?</Text>
     </Text>
+  );
+}
+
+function ModeLongFormTitle() {
+  return (
+    <View pointerEvents="none" style={styles.modeLongFormTitle}>
+      <View style={styles.modeLongFormRow}>
+        <View style={styles.modeLongFormOperatorSlot} />
+        <View style={styles.modeLongFormNumberSlot}>
+          <Text style={styles.modeNodeText}>18</Text>
+        </View>
+      </View>
+      <View style={styles.modeLongFormRow}>
+        <Text style={[styles.modeNodeText, styles.modeLongFormOperator]}>-</Text>
+        <View style={styles.modeLongFormNumberSlot}>
+          <Text style={styles.modeNodeText}>7</Text>
+        </View>
+      </View>
+      <View style={styles.modeLongFormDividerRow}>
+        <View style={styles.modeLongFormOperatorSlot} />
+        <View style={styles.modeLongFormLine} />
+      </View>
+      <View style={styles.modeLongFormRow}>
+        <View style={styles.modeLongFormOperatorSlot} />
+        <View style={styles.modeLongFormNumberSlot}>
+          <Text style={[styles.modeNodeText, styles.modeNodeUnknown]}>?</Text>
+        </View>
+      </View>
+    </View>
   );
 }
 
 function DentakuWorldSelect({
   completedStageIds,
+  stagesForProgress = DENTAKU_STAGES,
+  worlds = DENTAKU_WORLDS,
   mapWidth,
   viewportWidth,
   viewportHeight,
@@ -351,6 +514,8 @@ function DentakuWorldSelect({
   onSelectWorld,
 }: {
   completedStageIds: Set<string>;
+  stagesForProgress?: DentakuStage[];
+  worlds?: typeof DENTAKU_WORLDS;
   mapWidth: number;
   viewportWidth: number;
   viewportHeight: number;
@@ -361,7 +526,7 @@ function DentakuWorldSelect({
   const { isVocalEnabled, toggleVocal } = useBgmControl();
   const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
   const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
-  const layouts = getDentakuWorldNodeLayouts(mapWidth);
+  const layouts = getDentakuWorldNodeLayouts(mapWidth).slice(0, worlds.length);
   const routeLayerHeight = getSelectionMapHeight(layouts);
 
   return (
@@ -390,12 +555,12 @@ function DentakuWorldSelect({
             {layouts.slice(0, -1).map((layout, index) => (
               <BubbleRoute key={`dentaku-world-route-${index}`} from={layout} to={layouts[index + 1]} />
             ))}
-            {DENTAKU_WORLDS.map((world, index) => (
+            {worlds.map((world, index) => (
               <DentakuWorldNode
                 key={world.id}
                 worldId={world.id}
                 label={world.label}
-                isDone={DENTAKU_STAGES.some((stage) => stage.worldId === world.id && completedStageIds.has(stage.id))}
+                isDone={stagesForProgress.some((stage) => stage.worldId === world.id && completedStageIds.has(stage.id))}
                 x={layouts[index].x}
                 y={layouts[index].y}
                 onPress={() => {
@@ -2144,13 +2309,21 @@ const styles = StyleSheet.create({
     minHeight: 1580,
   },
   modeScrollContent: {
-    minHeight: 620,
+    minHeight: 720,
     paddingTop: 0,
-    paddingBottom: 0,
+    paddingBottom: GRID * 5,
   },
   modeRouteLayer: {
     position: 'relative',
-    minHeight: 620,
+    minHeight: 720,
+  },
+  modeLogo: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 40,
+    zIndex: 5,
+    alignItems: 'center',
   },
   modeDiver: {
     position: 'absolute',
@@ -2731,6 +2904,42 @@ const styles = StyleSheet.create({
   },
   modeNodeUnknown: {
     color: 'rgba(71, 85, 105, 0.42)',
+  },
+  modeLongFormTitle: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 54,
+    transform: [{ translateX: -9 }],
+  },
+  modeLongFormRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    minWidth: 54,
+  },
+  modeLongFormOperatorSlot: {
+    width: 18,
+  },
+  modeLongFormOperator: {
+    width: 18,
+    textAlign: 'center',
+  },
+  modeLongFormNumberSlot: {
+    width: 36,
+    alignItems: 'flex-end',
+  },
+  modeLongFormDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    minWidth: 54,
+  },
+  modeLongFormLine: {
+    width: 36,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(18, 51, 74, 0.72)',
+    marginVertical: 1,
   },
   modeTitleLine: {
     flexDirection: 'row',

@@ -171,6 +171,8 @@ async function openIsland(page: Page, label: string) {
   await page.getByLabel('bubble-5').click();
   await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
   await page.getByLabel('next stage').click();
+  await expect(page.getByTestId('mode-select')).toBeVisible();
+  await page.getByLabel('marumaru mode', { exact: true }).click();
   await expect(page.getByTestId('world-select')).toBeVisible();
   await page.getByLabel(label, { exact: true }).click();
 }

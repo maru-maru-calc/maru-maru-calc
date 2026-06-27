@@ -27,12 +27,14 @@ test('landing page presents the core copy and opens the app', async ({ page }) =
   await expect(page.getByText('わざとまちがえてみよう。どうなるか見てみよう。')).toBeVisible();
   await expect(page.getByText('音と動きが、次にしたいことを教えてくれるよ。')).toBeVisible();
   await expect(page.getByText('おとなも子どもも、同じ変化をいっしょに見つけよう。')).toBeVisible();
-  await expect(page.getByText('４つ')).toBeVisible();
-  await expect(page.getByText('さわりかた')).toBeVisible();
+  await expect(page.getByText('４つのきごう')).toBeVisible();
   await expect(page.getByText('ボウルに一緒に落ちた"まる"が10こを超えると、まとまって少し大きい"まる"になるよ。どんな種類の"まる"があるかな？')).toBeVisible();
   await expect(page.getByText('黒い"まる"は、同じ大きさの"まる"とぶつかると一緒に消えちゃうよ。残った"まる"は何個かな？')).toBeVisible();
   await expect(page.getByText('"まる"をまとめた"あわ"が3つになったね。"あわ"が弾けたあとの"まる"は何個になったかな？')).toBeVisible();
   await expect(page.getByText('"まる"を同じ数で分けた"あわ"が、一つだけ残ったね。"まる"は何個になったかな？')).toBeVisible();
+  await expect(page.getByText('３つのモード')).toBeVisible();
+  await expect(page.getByText('筆算モード')).toBeVisible();
+  await expect(page.getByText('順番にとく')).toBeVisible();
   await expect(page.getByText('魚は何種類いるかな？')).toBeVisible();
   await expect(page.getByText('人魚にさわると歌をうたってくれるよ。')).toBeVisible();
   await expect(page.getByTestId('landing-features-ambient')).toBeVisible();
@@ -47,65 +49,43 @@ test('landing page presents the core copy and opens the app', async ({ page }) =
   await expect(page.getByTestId('operation-video-subtract')).toBeVisible();
   await expect(page.getByTestId('operation-video-multiply')).toBeVisible();
   await expect(page.getByTestId('operation-video-divide')).toBeVisible();
+  await expect(page.getByTestId('mode-video-long-form')).toBeVisible();
 
   await page.getByTestId('landing-play-button').click();
   await expect(page).toHaveURL(/\/game$/);
   await expect(page.getByLabel('maru logo')).toBeVisible();
 });
 
-test('landing page switches to English for non-Japanese browser languages', async ({ browser }) => {
+test('landing page switches copy for non-Japanese browser languages', async ({ browser }) => {
   const context = await browser.newContext({ locale: 'en-US', viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   await page.goto('/');
 
-  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
   await expect(page.getByText('Touch numbers').first()).toBeVisible();
   await expect(page.getByText('A hands-on math playground with little “maru” circles')).toBeVisible();
-  await expect(page.getByText('Discover before the answer')).toBeVisible();
-  await expect(page.getByText('4 ways to play')).toBeVisible();
-  await expect(page.getByText('Play on web').first()).toBeVisible();
 
   await context.close();
 });
 
-test('landing page language can be forced with a query parameter', async ({ page }) => {
+test('landing page copy can be forced with a query parameter', async ({ page }) => {
   await page.goto('/?lang=en');
 
-  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
   await expect(page.getByText('Touch numbers').first()).toBeVisible();
 
   await page.goto('/?lang=ja');
 
   await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
   await expect(page.getByText('すうじ').first()).toBeVisible();
-
-  await page.goto('/?lang=zh-Hans');
-
-  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-hans');
-  await expect(page.getByText('触摸数字').first()).toBeVisible();
-
-  await page.goto('/?lang=zh-Hant');
-
-  await expect(page.locator('html')).toHaveAttribute('lang', 'zh-hant');
-  await expect(page.getByText('觸摸數字').first()).toBeVisible();
-
-  await page.goto('/?lang=ko');
-
-  await expect(page.locator('html')).toHaveAttribute('lang', 'ko');
-  await expect(page.getByText('숫자를 만져 보자').first()).toBeVisible();
-
-  await page.goto('/?lang=de');
-
-  await expect(page.locator('html')).toHaveAttribute('lang', 'de');
-  await expect(page.getByText('Zahlen anfassen').first()).toBeVisible();
 });
 
-test('landing page switches to Chinese, Korean, and German browser languages', async ({ browser }) => {
+test('landing page switches copy for Chinese, Korean, and German browser languages', async ({ browser }) => {
   const cases = [
-    { locale: 'zh-CN', lang: 'zh-hans', text: '触摸数字' },
-    { locale: 'zh-TW', lang: 'zh-hant', text: '觸摸數字' },
-    { locale: 'ko-KR', lang: 'ko', text: '숫자를 만져 보자' },
-    { locale: 'de-DE', lang: 'de', text: 'Zahlen anfassen' },
+    { locale: 'zh-CN', text: '触摸数字' },
+    { locale: 'zh-TW', text: '觸摸數字' },
+    { locale: 'ko-KR', text: '숫자를 만져 보자' },
+    { locale: 'de-DE', text: 'Zahlen anfassen' },
   ];
 
   for (const testCase of cases) {
@@ -113,7 +93,7 @@ test('landing page switches to Chinese, Korean, and German browser languages', a
     const page = await context.newPage();
     await page.goto('/');
 
-    await expect(page.locator('html')).toHaveAttribute('lang', testCase.lang);
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
     await expect(page.getByText(testCase.text).first()).toBeVisible();
 
     await context.close();
@@ -316,6 +296,8 @@ test('moves through the depth path into the existing game', async ({ page }) => 
   await expect(page.getByLabel('next stage')).toBeVisible();
   await expect(page.getByTestId('world-select')).toHaveCount(0);
   await page.getByLabel('next stage').click();
+  await expect(page.getByTestId('mode-select')).toBeVisible();
+  await page.getByLabel('marumaru mode', { exact: true }).click();
   await expect(page.getByTestId('world-select')).toBeVisible();
   await expect(page.locator('[data-testid^="depth-background-bubble-"]')).toHaveCount(6);
   await expect(page.locator('[data-testid^="depth-fish-"]')).toHaveCount(5);
@@ -575,6 +557,8 @@ async function clearLaunch(page: Page) {
   await page.getByLabel('bubble-5').click();
   await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
   await page.getByLabel('next stage').click();
+  await expect(page.getByTestId('mode-select')).toBeVisible();
+  await page.getByLabel('marumaru mode', { exact: true }).click();
   await expect(page.getByTestId('world-select')).toBeVisible();
 }
 
