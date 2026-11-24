@@ -2009,11 +2009,18 @@ function KukuGoalTitle({
   const wrongOffset = isWrong ? Math.sin(feedbackTick / 34) * 4 : 0;
   const answerStyle = input.length === 0 ? styles.kukuQuestionUnknown : isWrong ? styles.kukuQuestionWrong : undefined;
 
+  const progressText = practice.questionNumber !== undefined && practice.questionTotal !== undefined ? `${practice.questionNumber}/${practice.questionTotal}` : undefined;
+
   return (
     <View style={[styles.kukuGameTitle, { maxWidth }, isWrong && { transform: [{ translateX: wrongOffset }] }]}>
       <Text testID="kuku-question-title" numberOfLines={1} style={[styles.kukuQuestionText, titleTextStyle]}>
         {expression} = <Text testID={isWrong ? 'kuku-question-wrong-answer' : undefined} style={answerStyle}>{answerText}</Text>
       </Text>
+      {progressText ? (
+        <Text pointerEvents="none" testID="kuku-question-progress" style={styles.kukuQuestionProgress}>
+          {progressText}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -5346,6 +5353,17 @@ const styles = StyleSheet.create({
   },
   kukuQuestionWrong: {
     color: '#E11D48',
+  },
+  // Hangs below the question without taking up space, so the question keeps its position.
+  kukuQuestionProgress: {
+    position: 'absolute',
+    top: '100%',
+    alignSelf: 'center',
+    color: 'rgba(18, 51, 74, 0.6)',
+    fontSize: 13,
+    lineHeight: 16,
+    fontWeight: '800',
+    fontFamily: LATIN_FONT_FAMILY,
   },
   longFormPanel: {
     minHeight: 104,
