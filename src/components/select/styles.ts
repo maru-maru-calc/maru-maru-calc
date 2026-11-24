@@ -874,33 +874,12 @@ export const styles = StyleSheet.create({
     position: 'relative',
     minHeight: 1050,
   },
-  dentakuWorldMermaid: {
-    left: 0,
-    top: 458,
-    bottom: 'auto',
-    opacity: 0.68,
-    transform: [{ scale: 0.78 }],
-  },
-  dentakuStageMermaid: {
-    left: 0,
-    top: 458,
-    bottom: 'auto',
-    opacity: 0.62,
-    transform: [{ scale: 0.72 }],
-  },
   singingMermaid: {
     position: 'absolute',
     bottom: 14,
     width: 176,
     height: 138,
     opacity: 0.76,
-  },
-  singingMermaidActive: {
-    opacity: 1,
-    shadowColor: '#FDE68A',
-    shadowOpacity: 0.22,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 0 },
   },
   mermaidSongBubbleOne: {
     position: 'absolute',
@@ -934,42 +913,6 @@ export const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(125, 211, 252, 0.4)',
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
-  },
-  mermaidSongBubbleActive: {
-    borderColor: 'rgba(56, 189, 248, 0.78)',
-    backgroundColor: 'rgba(224, 247, 255, 0.5)',
-    shadowColor: '#7DD3FC',
-    shadowOpacity: 0.34,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  mermaidSongBubbleActiveStrong: {
-    borderColor: 'rgba(45, 212, 191, 0.82)',
-    backgroundColor: 'rgba(204, 251, 241, 0.52)',
-    shadowColor: '#2DD4BF',
-    shadowOpacity: 0.36,
-    shadowRadius: 9,
-    shadowOffset: { width: 0, height: 0 },
-  },
-  mermaidSongPulse: {
-    position: 'absolute',
-    borderWidth: 2,
-    borderColor: 'rgba(125, 211, 252, 0.36)',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  mermaidSongPulseOne: {
-    right: 22,
-    top: 6,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-  },
-  mermaidSongPulseTwo: {
-    right: 2,
-    top: 26,
-    width: 25,
-    height: 25,
-    borderRadius: 13,
   },
   mermaidMusicNote: {
     position: 'absolute',
@@ -1016,10 +959,6 @@ export const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(224, 247, 255, 0.28)',
   },
-  mermaidRockBackActive: {
-    backgroundColor: 'rgba(56, 189, 248, 0.3)',
-    borderColor: 'rgba(224, 247, 255, 0.4)',
-  },
   mermaidRockLeft: {
     position: 'absolute',
     left: 8,
@@ -1030,9 +969,6 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(14, 165, 233, 0.24)',
     transform: [{ rotate: '-7deg' }],
   },
-  mermaidRockLeftActive: {
-    backgroundColor: 'rgba(14, 165, 233, 0.32)',
-  },
   mermaidRockRight: {
     position: 'absolute',
     right: 8,
@@ -1042,9 +978,6 @@ export const styles = StyleSheet.create({
     borderRadius: 26,
     backgroundColor: 'rgba(6, 182, 212, 0.2)',
     transform: [{ rotate: '8deg' }],
-  },
-  mermaidRockRightActive: {
-    backgroundColor: 'rgba(6, 182, 212, 0.3)',
   },
   mermaidTail: {
     position: 'absolute',
@@ -1057,10 +990,6 @@ export const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(153, 246, 228, 0.5)',
     transform: [{ rotate: '15deg' }, { scaleY: 0.72 }],
-  },
-  mermaidTailActive: {
-    backgroundColor: 'rgba(45, 212, 191, 0.68)',
-    borderColor: 'rgba(153, 246, 228, 0.72)',
   },
   mermaidTailFin: {
     position: 'absolute',
@@ -1076,9 +1005,6 @@ export const styles = StyleSheet.create({
     borderLeftColor: 'rgba(45, 212, 191, 0.46)',
     transform: [{ rotate: '14deg' }],
   },
-  mermaidTailFinActive: {
-    borderLeftColor: 'rgba(45, 212, 191, 0.66)',
-  },
   mermaidBody: {
     position: 'absolute',
     left: 67,
@@ -1090,10 +1016,6 @@ export const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'rgba(251, 207, 232, 0.4)',
     transform: [{ rotate: '-5deg' }],
-  },
-  mermaidBodyActive: {
-    backgroundColor: 'rgba(244, 114, 182, 0.58)',
-    borderColor: 'rgba(251, 207, 232, 0.62)',
   },
   mermaidArmBack: {
     position: 'absolute',
@@ -1115,9 +1037,6 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(253, 224, 197, 0.58)',
     transform: [{ rotate: '-18deg' }],
   },
-  mermaidSkinActive: {
-    backgroundColor: 'rgba(253, 224, 197, 0.72)',
-  },
   mermaidHairBack: {
     position: 'absolute',
     left: 54,
@@ -1128,9 +1047,6 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(250, 204, 21, 0.58)',
     transform: [{ rotate: '-8deg' }],
   },
-  mermaidHairActive: {
-    backgroundColor: 'rgba(250, 204, 21, 0.76)',
-  },
   mermaidLongHair: {
     position: 'absolute',
     left: 52,
@@ -1140,9 +1056,6 @@ export const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: 'rgba(234, 179, 8, 0.48)',
     transform: [{ rotate: '10deg' }],
-  },
-  mermaidLongHairActive: {
-    backgroundColor: 'rgba(234, 179, 8, 0.66)',
   },
   mermaidHead: {
     position: 'absolute',
@@ -1155,10 +1068,6 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.42)',
   },
-  mermaidHeadActive: {
-    backgroundColor: 'rgba(253, 224, 197, 0.8)',
-    borderColor: 'rgba(255, 255, 255, 0.62)',
-  },
   mermaidHairFront: {
     position: 'absolute',
     left: 56,
@@ -1169,9 +1078,6 @@ export const styles = StyleSheet.create({
     backgroundColor: 'rgba(253, 224, 71, 0.62)',
     transform: [{ rotate: '-20deg' }],
   },
-  mermaidHairFrontActive: {
-    backgroundColor: 'rgba(253, 224, 71, 0.82)',
-  },
   mermaidHairShine: {
     position: 'absolute',
     left: 62,
@@ -1181,9 +1087,6 @@ export const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: 'rgba(254, 240, 138, 0.42)',
     transform: [{ rotate: '-22deg' }],
-  },
-  mermaidHairShineActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   mermaidEye: {
     position: 'absolute',
@@ -1203,11 +1106,6 @@ export const styles = StyleSheet.create({
     borderRadius: 6,
     borderBottomWidth: 2,
     borderBottomColor: 'rgba(236, 72, 153, 0.5)',
-  },
-  mermaidMouthActive: {
-    width: 10,
-    height: 6,
-    borderBottomColor: 'rgba(236, 72, 153, 0.76)',
   },
   routeBubble: {
     position: 'absolute',
