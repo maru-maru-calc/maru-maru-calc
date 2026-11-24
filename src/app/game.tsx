@@ -3221,12 +3221,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   soundButtonNoteMuted: {
-    opacity: 0.38,
+    opacity: 0.6,
   },
   soundButtonMutedSlash: {
     position: 'absolute',
-    width: 34,
-    height: 4,
+    width: 36,
+    height: 3,
     borderRadius: 2,
     backgroundColor: TEXT_BASE_COLOR,
     transform: [{ rotate: '-45deg' }],
