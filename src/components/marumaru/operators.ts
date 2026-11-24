@@ -1,30 +1,17 @@
 // Which operators a stage allows and how often, plus small helpers for the practice modes.
 import type { DentakuPractice, OperatorButtonSymbol } from '@/components/marumaru/types';
 import { isOperatorToken, stripExpressionResult } from '@/game/expression';
+import { getStageOperatorUsage } from '@/game/stage-rules';
 import { getStage } from '@/game/stages';
 import { OperatorUsageLimit, OperatorUsageLimits } from '@/game/types';
 import type { Stage } from '@/game/types';
 
 export function getInitialOperatorUsage(stage: Stage, mode: 'stage' | 'launch'): OperatorUsageLimits {
-  const base: OperatorUsageLimits = getDefaultOperatorUsage(stage, mode);
-
-  return {
-    ...base,
-    ...stage.operatorLimits,
-  };
-}
-
-function getDefaultOperatorUsage(stage: Stage, mode: 'stage' | 'launch'): OperatorUsageLimits {
-  if (mode === 'launch' || stage.islandId === 'addition') {
+  if (mode === 'launch') {
     return { '+': 'infinite', '-': 0, '×': 0, '÷': 0 };
   }
-  if (stage.islandId === 'subtraction') {
-    return { '+': 'infinite', '-': 'infinite', '×': 0, '÷': 0 };
-  }
-  if (stage.islandId === 'mixed3Free' || stage.islandId === 'mixed4Free' || stage.islandId === 'mixed5Free') {
-    return { '+': 'infinite', '-': 'infinite', '×': 'infinite', '÷': 'infinite' };
-  }
-  return { '+': 0, '-': 0, '×': 0, '÷': 0 };
+
+  return getStageOperatorUsage(stage);
 }
 
 export function delay(ms: number) {

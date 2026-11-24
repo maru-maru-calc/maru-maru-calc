@@ -131,6 +131,12 @@ function createSingleOperatorQuestion(operator: DentakuOperator, operandCount: 2
   if (nextOperandCount === 2) {
     return createBinaryQuestion(operator, random, problemNumber);
   }
+  if (operator === '-') {
+    return createSubtractionChainQuestion(nextOperandCount, random, problemNumber);
+  }
+  if (operator === '÷') {
+    return createDivisionChainQuestion(nextOperandCount, random, problemNumber);
+  }
 
   let attempts = 0;
   while (attempts < 500) {
@@ -160,6 +166,59 @@ function createSingleOperatorQuestion(operator: DentakuOperator, operandCount: 2
   }
 
   return createBinaryQuestion(operator, random, problemNumber);
+}
+
+/**
+ * A chain of subtractions such as "27 - 8 - 5 - 9".
+ *
+ * Built from the answer backwards (answer 0 to 9, each number taken away 1 to 9), like the
+ * two-number questions. Starting from a small number and taking away whatever still fits, as this
+ * used to do, runs out of room: with five numbers more than half of the answers were 0 and most
+ * questions were "- 1 - 1 - 1".
+ */
+function createSubtractionChainQuestion(operandCount: 3 | 4 | 5, random: () => number, problemNumber: number): DentakuQuestion {
+  const answer = randomInt(random, 0, 9);
+  const subtrahends = Array.from({ length: operandCount - 1 }, () => randomInt(random, 1, 9));
+  const first = subtrahends.reduce((sum, value) => sum + value, answer);
+  const operands = [first, ...subtrahends];
+  return createQuestion(`--${problemNumber}-${operands.join('-')}`, operands, subtrahends.map(() => '-' as const), 'plain');
+}
+
+const divisionChainCache = new Map<number, number[][]>();
+
+/** Every chain "a ÷ b ÷ c ..." with `divisorCount` divisors from 2 to 9, a whole answer from 1 to 9 and nothing above 99. */
+function getDivisionChains(divisorCount: number): number[][] {
+  const cached = divisionChainCache.get(divisorCount);
+  if (cached) {
+    return cached;
+  }
+
+  const chains: number[][] = [];
+  const extend = (divisors: number[], product: number) => {
+    if (divisors.length === divisorCount) {
+      for (let answer = 1; answer <= 9 && answer * product <= 99; answer += 1) {
+        chains.push([answer * product, ...divisors]);
+      }
+      return;
+    }
+    for (let divisor = 2; divisor <= 9 && product * divisor <= 99; divisor += 1) {
+      extend([...divisors, divisor], product * divisor);
+    }
+  };
+  extend([], 1);
+  divisionChainCache.set(divisorCount, chains);
+  return chains;
+}
+
+/**
+ * A chain of divisions such as "72 ÷ 3 ÷ 4 ÷ 2", picked evenly from every chain that stays within
+ * 99. Starting from a number up to 18 and looking for divisors, as this used to do, left almost
+ * nothing to pick from: with five numbers 83% of the questions were "16 ÷ 2 ÷ 2 ÷ 2 ÷ 2".
+ */
+function createDivisionChainQuestion(operandCount: 3 | 4 | 5, random: () => number, problemNumber: number): DentakuQuestion {
+  const chains = getDivisionChains(operandCount - 1);
+  const operands = chains[randomInt(random, 0, chains.length - 1)];
+  return createQuestion(`÷-${problemNumber}-${operands.join('-')}`, operands, operands.slice(1).map(() => '÷' as const), 'plain');
 }
 
 function createBinaryQuestion(operator: DentakuOperator, random: () => number, problemNumber: number): DentakuQuestion {

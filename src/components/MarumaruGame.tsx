@@ -30,7 +30,10 @@ import {
   MULTIPLICATION_EXPANSION_HOLD_MS,
   OPERATOR_TABS_HEIGHT,
   PREVIEW_Y,
+  QUEUED_MOVE_CHECK_MS,
   RESULT_READY_DELAY_MS,
+  STUCK_AFTER_REFUSAL_MS,
+  STUCK_WITHOUT_TRYING_MS,
   UNIT_MERGE_ANIMATION_MS,
   UNIT_MERGE_COOLDOWN_MS,
   UNIT_MERGE_READY_DELAY_MS,
@@ -130,6 +133,7 @@ import {
 } from '@/game/expression';
 import { matchesLongFormStepAnswer } from '@/game/long-form';
 import { findMergeCluster, getTotalValue, hasMergeableCount } from '@/game/merge';
+import { hasLegalMove } from '@/game/stage-rules';
 import { getStage } from '@/game/stages';
 import { BeadRole, BeadSign, BeadSnapshot, OperatorUsageLimits, PlaceValue } from '@/game/types';
 import { a11yLabel } from '@/i18n/a11y-label';
@@ -185,6 +189,14 @@ export function MarumaruGame({
   const [longFormStepIndex, setLongFormStepIndex] = useState(0);
   const [longFormQuestionChangedAt, setLongFormQuestionChangedAt] = useState(() => Date.now());
   const [hasReleasedBubble, setHasReleasedBubble] = useState(false);
+  // A × or ÷ tapped while the maru are still settling cannot act yet. It waits here, with the
+  // bubble tapped after it, and both are carried out as soon as the board is ready.
+  const [queuedOperator, setQueuedOperator] = useState<OperatorButtonSymbol | undefined>(undefined);
+  const [queuedBubbleId, setQueuedBubbleId] = useState<string | undefined>(undefined);
+  const queuedOperatorRef = useRef<OperatorButtonSymbol | undefined>(undefined);
+  // Counts taps the game could not accept, so a stage with nothing left to do can end right after one.
+  const [refusedMoves, setRefusedMoves] = useState(0);
+  const stuckPositionRef = useRef<{ key: string; refusedMoves: number } | undefined>(undefined);
   const [isClear, setIsClear] = useState(false);
   const [clearedStageId, setClearedStageId] = useState<string | undefined>(undefined);
   const [isFailed, setIsFailed] = useState(false);
@@ -328,6 +340,10 @@ export function MarumaruGame({
     setSelectedOperator(nextSelectedOperator);
     setOperatorSign(1);
     setHasReleasedBubble(false);
+    queuedOperatorRef.current = undefined;
+    setQueuedOperator(undefined);
+    setQueuedBubbleId(undefined);
+    stuckPositionRef.current = undefined;
     setMergeAnimation(undefined);
     setAnnihilationAnimation(undefined);
     setDivisionSplitAnimation(undefined);
@@ -875,15 +891,27 @@ export function MarumaruGame({
       if (consumedPendingBubbleIdsRef.current.has(bubble.id)) {
         return;
       }
+      if (queuedOperatorRef.current) {
+        // Its operator is still waiting for the board, so this bubble waits behind it.
+        setQueuedBubbleId(bubble.id);
+        return;
+      }
       consumedPendingBubbleIdsRef.current.add(bubble.id);
       const hasPriorValue = hasExpressionValue(expressionTokensRef.current);
       const activeOperator: OperatorButtonSymbol = hasPriorValue ? selectedOperatorRef.current : '+';
       if (hasPriorValue && !canUseOperator(operatorUsage[activeOperator])) {
         consumedPendingBubbleIdsRef.current.delete(bubble.id);
+        setRefusedMoves((count) => count + 1);
         return;
       }
       if (hasPriorValue && (activeOperator === '×' || activeOperator === '÷') && isBoardBusyForPriorityOperation()) {
         consumedPendingBubbleIdsRef.current.delete(bubble.id);
+        if (canBoardBecomeReadyForPriorityOperation()) {
+          // The maru are still settling: pop it once they have, instead of dropping the tap.
+          setQueuedBubbleId(bubble.id);
+        } else {
+          setRefusedMoves((count) => count + 1);
+        }
         return;
       }
 
@@ -895,6 +923,7 @@ export function MarumaruGame({
         } else {
           restoreOperatorUsage(activeOperator);
           consumedPendingBubbleIdsRef.current.delete(bubble.id);
+          setRefusedMoves((count) => count + 1);
         }
         return;
       }
@@ -906,6 +935,7 @@ export function MarumaruGame({
         } else {
           restoreOperatorUsage(activeOperator);
           consumedPendingBubbleIdsRef.current.delete(bubble.id);
+          setRefusedMoves((count) => count + 1);
         }
         return;
       }
@@ -964,6 +994,16 @@ export function MarumaruGame({
     setHasReleasedBubble(false);
   };
 
+  const clearQueuedMove = () => {
+    queuedOperatorRef.current = undefined;
+    setQueuedOperator(undefined);
+    setQueuedBubbleId(undefined);
+  };
+
+  // × and ÷ act on a positive amount. While the board is busy but the amount is positive, it is
+  // only a matter of waiting for the maru to settle; at zero or below it will never be ready.
+  const canBoardBecomeReadyForPriorityOperation = () => (getPendingOperationExpressionValue(expressionTokensRef.current) ?? 0) > 0;
+
   const isBoardBusyForPriorityOperation = () => {
     const snapshots = toSnapshots(entitiesRef.current);
     return Boolean(
@@ -981,11 +1021,30 @@ export function MarumaruGame({
   const selectOperator = useCallback(
     (operator: OperatorButtonSymbol) => {
       markBubbleInteraction();
-      if ((operator === '×' || operator === '÷') && isBoardBusyForPriorityOperation()) {
-        return;
-      }
       if (!canUseOperator(operatorUsage[operator])) {
         return;
+      }
+      if ((operator === '×' || operator === '÷') && isBoardBusyForPriorityOperation()) {
+        if (canBoardBecomeReadyForPriorityOperation()) {
+          // Remember the tap and show it as chosen; it takes effect when the maru have settled.
+          // (It used to be dropped without a sign, and the next bubble was then added instead.)
+          if (queuedOperatorRef.current !== operator) {
+            playUiActionSfx();
+          }
+          queuedOperatorRef.current = operator;
+          setQueuedOperator(operator);
+        } else {
+          setRefusedMoves((count) => count + 1);
+        }
+        return;
+      }
+      // Choosing an operator directly replaces one that was waiting. A bubble waiting behind it
+      // stays only when this is that same operator finally taking effect.
+      const waitingOperator = queuedOperatorRef.current;
+      queuedOperatorRef.current = undefined;
+      setQueuedOperator(undefined);
+      if (waitingOperator !== operator) {
+        setQueuedBubbleId(undefined);
       }
       playUiActionSfx();
       const nextOperatorSign: BeadSign = operator === '-' ? -1 : operator === '+' ? 1 : selectedOperatorRef.current === '-' ? -1 : operatorSignRef.current;
@@ -1019,6 +1078,73 @@ export function MarumaruGame({
     },
     [markBubbleInteraction, operatorUsage, playUiActionSfx, selectedOperator, wrapMultiplicandForMultiplication],
   );
+
+  // Carries out a waiting operator, then the bubble behind it, once the maru have settled.
+  useEffect(() => {
+    if (queuedOperator === undefined && queuedBubbleId === undefined) {
+      return undefined;
+    }
+    if (isClear || isFailed) {
+      clearQueuedMove();
+      return undefined;
+    }
+
+    const interval = setInterval(() => {
+      if (isBoardBusyForPriorityOperation()) {
+        if (!canBoardBecomeReadyForPriorityOperation()) {
+          clearQueuedMove();
+        }
+        return;
+      }
+
+      if (queuedOperator !== undefined) {
+        selectOperator(queuedOperator);
+        return;
+      }
+
+      const bubble = pendingBubbles.find((candidate) => candidate.id === queuedBubbleId);
+      setQueuedBubbleId(undefined);
+      if (bubble) {
+        burstBubble(bubble);
+      }
+    }, QUEUED_MOVE_CHECK_MS);
+    return () => clearInterval(interval);
+    // clearQueuedMove and the two board checks only read refs and set state.
+  }, [burstBubble, isClear, isFailed, pendingBubbles, queuedBubbleId, queuedOperator, selectOperator]);
+
+  // A stage with bubbles left but no move the game would accept (the only operator left is a
+  // division that does not come out even, say) cannot be finished. It used to just sit there. Now
+  // it ends like a wrong result: quickly if the player has just tried something that was refused,
+  // otherwise after a pause.
+  useEffect(() => {
+    if (mode === 'launch' || dentakuPractice || isClear || isFailed || pendingBubbles.length === 0 || !hasExpressionValue(expressionTokens)) {
+      stuckPositionRef.current = undefined;
+      return undefined;
+    }
+
+    const boardTotal = getPendingOperationExpressionValue(expressionTokens);
+    const bubbleCounts = pendingBubbles.map((bubble) => bubble.count);
+    if (boardTotal === undefined || queuedOperator !== undefined || queuedBubbleId !== undefined || hasLegalMove(boardTotal, bubbleCounts, operatorUsage)) {
+      stuckPositionRef.current = undefined;
+      return undefined;
+    }
+
+    const positionKey = `${expressionTokens.join(' ')}|${pendingBubbles.map((bubble) => bubble.id).join(',')}`;
+    if (stuckPositionRef.current?.key !== positionKey) {
+      stuckPositionRef.current = { key: positionKey, refusedMoves };
+    }
+    if (divisionFailedAnimation) {
+      // Let "this does not divide" finish playing first.
+      return undefined;
+    }
+
+    const wasJustRefused = refusedMoves > stuckPositionRef.current.refusedMoves;
+    const timeout = setTimeout(() => {
+      setIsFailed(true);
+      setFailedAt(Date.now());
+    }, wasJustRefused ? STUCK_AFTER_REFUSAL_MS : STUCK_WITHOUT_TRYING_MS);
+    return () => clearTimeout(timeout);
+  }, [dentakuPractice, divisionFailedAnimation, expressionTokens, isClear, isFailed, mode, operatorUsage, pendingBubbles, queuedBubbleId, queuedOperator, refusedMoves]);
 
   const appendKukuDigit = (digit: string) => {
     if (!dentakuPractice || kukuInputState !== 'input' || isClear || isFailed) {
@@ -1697,11 +1823,11 @@ export function MarumaruGame({
 
       <View style={[styles.playArea, { width: fieldWidth }]}>
         <OperatorRail
-          selectedOperator={selectedOperator}
+          selectedOperator={queuedOperator ?? selectedOperator}
           operatorSign={operatorSign}
           operatorUsage={operatorUsage}
           hasInputValue={hasExpressionValue(expressionTokens)}
-          hasActiveSelection={hasReleasedBubble}
+          hasActiveSelection={hasReleasedBubble || queuedOperator !== undefined}
           isLocked={isStageReadyForResult(pendingBubbles)}
           onSelect={selectOperator}
         />
