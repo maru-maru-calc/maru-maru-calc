@@ -6,6 +6,7 @@ import type { TextStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandLogo } from '@/components/BrandLogo';
+import { DESKTOP_MIN_WIDTH, shouldUsePhoneFrame } from '@/layout/phone-frame';
 
 const TEXT_BASE_COLOR = '#12334A';
 const TEXT_ACCENT_COLOR = '#0284C7';
@@ -19,7 +20,6 @@ const RADIUS_LG = 16;
 const RADIUS_XL = 24;
 const RADIUS_PILL = 999;
 const COPYRIGHT_TEXT = '© 2026 nozomitaguchi';
-const DESKTOP_MIN_WIDTH = 900;
 const LANDING_DESKTOP_MIN_WIDTH = 1100;
 const BASE_PATH = __DEV__ ? '' : process.env.EXPO_BASE_URL ?? '';
 const demoVideoSource = require('../../assets/landing/maru-demo-field-wide-short.webm');
@@ -412,12 +412,18 @@ export default function LandingPage() {
 
   const openApp = () => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (!shouldUsePhoneFrame(width, height)) {
+        window.location.assign(`${BASE_PATH}/game`);
+        return;
+      }
+
       if (width >= DESKTOP_MIN_WIDTH) {
         window.open(`${BASE_PATH}/play`, '_blank', 'noopener,noreferrer');
         return;
       }
 
-      window.location.assign(`${BASE_PATH}/game`);
+      // Tablets get the framed, scaled-up game in the same tab.
+      window.location.assign(`${BASE_PATH}/play`);
       return;
     }
 

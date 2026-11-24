@@ -5,6 +5,7 @@ import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandLogo } from '@/components/BrandLogo';
+import { getPhoneFrameLayout, shouldUsePhoneFrame } from '@/layout/phone-frame';
 
 const TEXT_BASE_COLOR = '#12334A';
 const TEXT_ACCENT_COLOR = '#0284C7';
@@ -15,15 +16,22 @@ const GRID = 8;
 const SECTION_CONTENT_WIDTH = GRID * 123;
 const RADIUS_XL = 24;
 const RADIUS_PILL = 999;
-const DESKTOP_MIN_WIDTH = 900;
+const PAGE_PADDING_HORIZONTAL = GRID * 3;
+const HEADER_HEIGHT = 72;
+const PHONE_AREA_MARGIN_BOTTOM = GRID * 2;
+const COPYRIGHT_BLOCK_HEIGHT = 18 + GRID * 2;
 const COPYRIGHT_TEXT = '© 2026 nozomitaguchi';
 const BASE_PATH = __DEV__ ? '' : process.env.EXPO_BASE_URL ?? '';
 const PLAY_FRAME_VERSION = 'long-form-mode-v1';
 
 export default function PlayPage() {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const router = useRouter();
-  const shouldUsePhoneFrame = Platform.OS === 'web' && width >= DESKTOP_MIN_WIDTH;
+  const isFramed = Platform.OS === 'web' && shouldUsePhoneFrame(width, height);
+  const frame = getPhoneFrameLayout(
+    width - PAGE_PADDING_HORIZONTAL * 2,
+    height - HEADER_HEIGHT - PHONE_AREA_MARGIN_BOTTOM - COPYRIGHT_BLOCK_HEIGHT,
+  );
   const openLanding = () => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       const frame = document.querySelector('[data-testid="play-frame"]') as HTMLIFrameElement | null;
@@ -34,7 +42,7 @@ export default function PlayPage() {
     router.push('/');
   };
 
-  if (!shouldUsePhoneFrame) {
+  if (!isFramed) {
     return <Redirect href="/game" />;
   }
 
@@ -61,21 +69,38 @@ export default function PlayPage() {
         </View>
       </View>
 
-      <View style={styles.phoneShell}>
-        <View style={styles.phoneSpeaker} />
-        <View style={styles.phoneViewport}>
-          {createElement('iframe', {
-            src: `${BASE_PATH}/game?preview=${PLAY_FRAME_VERSION}`,
-            title: 'maru maru calc playable web app',
-            'data-testid': 'play-frame',
-            style: {
-              width: '100%',
-              height: '100%',
-              border: '0',
-              borderRadius: 24,
-              backgroundColor: WATER_COLOR,
-            },
-          })}
+      <View style={styles.phoneArea}>
+        {/* The slot takes up the scaled size on the page; the frame inside keeps its own size and is scaled to fill it. */}
+        <View style={{ width: frame.slotWidth, height: frame.slotHeight }} testID="play-frame-slot">
+          <View
+            style={[
+              styles.phoneShell,
+              {
+                width: frame.shellWidth,
+                height: frame.shellHeight,
+                left: (frame.slotWidth - frame.shellWidth) / 2,
+                top: (frame.slotHeight - frame.shellHeight) / 2,
+                transform: [{ scale: frame.scale }],
+              },
+            ]}
+            testID="play-frame-shell"
+          >
+            <View style={styles.phoneSpeaker} />
+            <View style={styles.phoneViewport}>
+              {createElement('iframe', {
+                src: `${BASE_PATH}/game?preview=${PLAY_FRAME_VERSION}`,
+                title: 'maru maru calc playable web app',
+                'data-testid': 'play-frame',
+                style: {
+                  width: '100%',
+                  height: '100%',
+                  border: '0',
+                  borderRadius: 24,
+                  backgroundColor: WATER_COLOR,
+                },
+              })}
+            </View>
+          </View>
         </View>
       </View>
       <Text style={styles.copyright}>{COPYRIGHT_TEXT}</Text>
@@ -130,7 +155,7 @@ const styles = StyleSheet.create({
   page: {
     flex: 1,
     backgroundColor: WATER_COLOR,
-    paddingHorizontal: GRID * 3,
+    paddingHorizontal: PAGE_PADDING_HORIZONTAL,
     alignItems: 'center',
   },
   background: {
@@ -280,7 +305,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
     width: '100%',
     maxWidth: SECTION_CONTENT_WIDTH,
-    minHeight: 72,
+    minHeight: HEADER_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
@@ -289,13 +314,16 @@ const styles = StyleSheet.create({
   pressedLogo: {
     opacity: 0.72,
   },
-  phoneShell: {
+  phoneArea: {
     zIndex: 1,
     flex: 1,
-    width: '100%',
-    maxWidth: 430,
-    maxHeight: 780,
-    marginBottom: GRID * 2,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: PHONE_AREA_MARGIN_BOTTOM,
+  },
+  phoneShell: {
+    position: 'absolute',
     borderRadius: 36,
     paddingHorizontal: 14,
     paddingTop: 26,

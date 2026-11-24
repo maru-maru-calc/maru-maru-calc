@@ -55,6 +55,8 @@ npm run export:web
 
 `main` ブランチへpushすると、GitHub ActionsでWeb版をエクスポートしてGitHub Pagesへデプロイします。
 
+Web版は1ページ構成(SPA)なので、`npm run export:web` の最後に `index.html` を `game.html` / `play.html` / `404.html` としてコピーしています。これで `/game` と `/play` が「404 Not Found」ではなく通常のページとして配信されます。
+
 SNSやSlackで共有された時の表示用に、タイトル、description、OGP/Twitter Card、favicon、apple-touch-iconを設定しています。
 
 ## ライセンス

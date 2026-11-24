@@ -17,6 +17,7 @@ import { createInitialNavState } from '@/game/navigation';
 import type { NavOptions, NavState } from '@/game/navigation';
 import { getStageIndexById, STAGE_ISLANDS, STAGES } from '@/game/stages';
 import { Stage } from '@/game/types';
+import { isSidewaysPhone } from '@/layout/phone-frame';
 import { loadProgress, saveProgress } from '@/storage/progress';
 
 type StageStatus = 'done' | 'open' | 'locked';
@@ -123,7 +124,32 @@ function addCompletedStageId(current: Set<string>, stageId: string) {
   return next;
 }
 
-export default function IndexScreen() {
+export default function GameRoute() {
+  const { width, height } = useWindowDimensions();
+  const shouldShowRotateHint = Platform.OS === 'web' && isSidewaysPhone(width, height);
+
+  return (
+    <View style={styles.gameRoute}>
+      <IndexScreen />
+      {shouldShowRotateHint ? <RotateHint /> : null}
+    </View>
+  );
+}
+
+// The game is laid out for portrait. On a phone held sideways the bowl and the footer fall off
+// the screen, so the game is covered (not unmounted: progress in a stage is kept) until it is turned back.
+function RotateHint() {
+  return (
+    <View accessibilityRole="alert" style={styles.rotateHint} testID="rotate-hint">
+      <View style={styles.rotateHintPhone}>
+        <View style={styles.rotateHintPhoneScreen} />
+      </View>
+      <Text style={styles.rotateHintText}>スマホを たてに してね</Text>
+    </View>
+  );
+}
+
+function IndexScreen() {
   const { width, height } = useWindowDimensions();
   const [nav, setNav] = useState<NavState>(() => createInitialNavState(NAV_OPTIONS));
   const navControllerRef = useRef<NavController | null>(null);
@@ -3200,6 +3226,37 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.26)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  gameRoute: {
+    flex: 1,
+  },
+  rotateHint: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    elevation: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: GRID * 2,
+    backgroundColor: '#C6E8F4',
+  },
+  rotateHintPhone: {
+    width: 44,
+    height: 76,
+    borderRadius: 10,
+    padding: 5,
+    backgroundColor: TEXT_BASE_COLOR,
+  },
+  rotateHintPhoneScreen: {
+    flex: 1,
+    borderRadius: 6,
+    backgroundColor: '#E8F6FB',
+  },
+  rotateHintText: {
+    color: TEXT_BASE_COLOR,
+    fontFamily: PLAYFUL_FONT_FAMILY,
+    fontSize: 20,
+    lineHeight: 28,
+    fontWeight: '900',
   },
   soundButton: {
     position: 'absolute',

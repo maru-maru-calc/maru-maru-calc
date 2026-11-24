@@ -7,7 +7,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "export:web": "expo export --platform web --output-dir dist && node scripts/patch-web-metadata.js",
+    "export:web": "expo export --platform web --output-dir dist && node scripts/patch-web-metadata.js && node scripts/add-route-pages.js",
     "e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
