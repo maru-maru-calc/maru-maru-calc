@@ -1714,6 +1714,48 @@ export function MarumaruGame({
     playUiActionSfx();
     onComplete?.();
   };
+
+  // A physical keyboard can drive the answer pad: digits, Backspace and Enter.
+  const hasAnswerPad = Boolean(dentakuPractice);
+  const isAnswerPadActive = hasAnswerPad && kukuInputState === 'input' && !isClear && !isFailed;
+  const answerPadKeyHandlersRef = useRef({ isAnswerPadActive, appendKukuDigit, deleteKukuDigit, submitKukuAnswer });
+  answerPadKeyHandlersRef.current = { isAnswerPadActive, appendKukuDigit, deleteKukuDigit, submitKukuAnswer };
+
+  useEffect(() => {
+    if (!hasAnswerPad || typeof document === 'undefined') {
+      return undefined;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey || event.repeat) {
+        return;
+      }
+
+      const handlers = answerPadKeyHandlersRef.current;
+      if (!handlers.isAnswerPadActive) {
+        return;
+      }
+
+      if (/^[0-9]$/.test(event.key)) {
+        handlers.appendKukuDigit(event.key);
+      } else if (event.key === 'Backspace') {
+        handlers.deleteKukuDigit();
+      } else if (event.key === 'Enter') {
+        handlers.submitKukuAnswer();
+      } else {
+        return;
+      }
+
+      // Stops a focused on-screen key from also reacting to the same key press.
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [hasAnswerPad]);
   const clearActionPulse = isClear ? 1 + Math.sin(backgroundBubbleTick / 170) * 0.08 : 1;
   const failedProgress = failedAt ? clamp((backgroundBubbleTick - failedAt) / FAILED_VEIL_FADE_IN_MS, 0, 1) : 0;
   const failedActionPulse = isFailed ? 1 + Math.sin(backgroundBubbleTick / 155) * (0.04 + failedProgress * 0.09) : 1;
@@ -3574,6 +3616,8 @@ function BackgroundBubbleLayer({
             key={bubble.id}
             accessibilityLabel="decorative bubble"
             accessibilityRole="button"
+            focusable={false}
+            tabIndex={-1}
             testID={`background-bubble-${bubble.id}`}
             onPress={() => onPop(bubble.id)}
             style={({ pressed }) => [

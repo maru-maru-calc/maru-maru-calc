@@ -838,6 +838,8 @@ function DepthBackdrop({
             key={bubble.id}
             accessibilityLabel="decorative bubble"
             accessibilityRole="button"
+            focusable={false}
+            tabIndex={-1}
             testID={`depth-background-bubble-${bubble.id}`}
             onPress={() => {
               onBubblePop?.();
@@ -922,6 +924,8 @@ function DepthCreature({
     <Pressable
       accessibilityLabel={`sea creature ${spec.kind}`}
       accessibilityRole="button"
+      focusable={false}
+      tabIndex={-1}
       hitSlop={18}
       onPress={onPress}
       testID={`depth-fish-${spec.id}`}
