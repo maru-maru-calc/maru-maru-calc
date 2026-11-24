@@ -36,13 +36,15 @@ export function LaunchLogo({ variant = 'header', onPress }: { variant?: 'header'
   );
 }
 
-export function StageGoalTitle({ stageNumber, target, maxWidth }: { stageNumber: number; target: number; maxWidth: number }) {
+export function StageGoalTitle({ stageNumber, target, maxWidth, showsGoalParts = true }: { stageNumber: number | undefined; target: number; maxWidth: number; showsGoalParts?: boolean }) {
   return (
     <View testID="stage-goal-title" style={[styles.stageGameTitle, { maxWidth }]}>
-      <View style={styles.stageGameNumberSlot}>
-        <Text testID="stage-goal-number" style={styles.stageGameNumber}>#{stageNumber}</Text>
-      </View>
-      <HeaderGoalParts target={target} maxWidth={Math.max(54, maxWidth - 118)} />
+      {stageNumber === undefined ? null : (
+        <View style={styles.stageGameNumberSlot}>
+          <Text testID="stage-goal-number" style={styles.stageGameNumber}>#{stageNumber}</Text>
+        </View>
+      )}
+      {showsGoalParts ? <HeaderGoalParts target={target} maxWidth={Math.max(54, maxWidth - 118)} /> : null}
       <View style={styles.stageGameEqualsSlot}>
         <Text testID="stage-goal-equals" style={styles.stageGameEquals}>=</Text>
       </View>

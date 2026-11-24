@@ -18,6 +18,10 @@ export const BASIN_FRAME_THICKNESS = 5;
 export const FIELD_ENTITY_INSET = 10;
 export const BASIN_ENTITY_GUARD_MARGIN = 3;
 export const BUBBLE_ROW_Y = 56;
+// Bubbles go in one row until their widths add up to more than this share of the board's width.
+export const PENDING_BUBBLE_ROW_FILL_LIMIT = 1.15;
+// How far below the first row the second one sits: about one big bubble.
+export const PENDING_BUBBLE_SECOND_ROW_OFFSET = 118;
 export const MERGE_ANIMATION_MS = 520;
 export const UNIT_MERGE_ANIMATION_MS = 560;
 export const MERGE_COOLDOWN_MS = 420;
