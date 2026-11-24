@@ -409,10 +409,11 @@ export function MarumaruGame({
     return () => clearInterval(interval);
   }, [isClear, isFailed, mode, pendingBubbles.length]);
 
-  useEffect(() => {
-    expressionTokensRef.current = expressionTokens;
-  }, [expressionTokens]);
-
+  // The line, the chosen operator and its sign are written to their refs at the moment they are
+  // changed, everywhere. They used to be copied from state after each draw as well, which could
+  // put an older value back: after a ×, the operator is reset to + and that draw can come late;
+  // an operator tapped in between was then undone for a moment, and a bubble tapped in that
+  // moment went in with + (or was turned away, where + had no uses left).
   useEffect(() => {
     pendingBubblesRef.current = pendingBubbles;
   }, [pendingBubbles]);
@@ -436,14 +437,6 @@ export function MarumaruGame({
   useEffect(() => {
     multiplicationExpansionAnimationRef.current = multiplicationExpansionAnimation;
   }, [multiplicationExpansionAnimation]);
-
-  useEffect(() => {
-    selectedOperatorRef.current = selectedOperator;
-  }, [selectedOperator]);
-
-  useEffect(() => {
-    operatorSignRef.current = operatorSign;
-  }, [operatorSign]);
 
   useEffect(() => {
     setStageIndex(initialStageIndex);

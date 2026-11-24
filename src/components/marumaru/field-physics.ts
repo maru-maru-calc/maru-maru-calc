@@ -397,6 +397,16 @@ export function createLaunchBeads(engine: Matter.Engine, fieldWidth: number, fie
 
 export function applyBeadForces(entities: BeadEntity[], draggingBeadId?: string) {
   const attractionCounts = getAttractionCounts(entities, draggingBeadId);
+  const singlesPresent = new Set(entities.filter((entity) => entity.count === 1).map((entity) => `${entity.value}:${entity.sign}`));
+  // A lone maru to take away with nothing of its own size to cancel against has to break a bigger
+  // one (a ten for a one). That happens when the two touch, so they are drawn together. Without
+  // this they pushed each other apart like any other unlike pair and could come to rest side by
+  // side for good: the amount on the board never settled, and a × or ÷ waited for it forever.
+  const needsBiggerMaru = (single: BeadEntity, other: BeadEntity) =>
+    single.count === 1
+    && single.sign !== other.sign
+    && getNextPlaceValue(single.value) === other.value
+    && !singlesPresent.has(`${single.value}:${-single.sign}`);
 
   for (let leftIndex = 0; leftIndex < entities.length; leftIndex += 1) {
     for (let rightIndex = leftIndex + 1; rightIndex < entities.length; rightIndex += 1) {
@@ -423,6 +433,23 @@ export function applyBeadForces(entities: BeadEntity[], draggingBeadId?: string)
         }
 
         const closeness = 1 - distance / ANNIHILATION_ATTRACTION_RADIUS;
+        const strength = ANNIHILATION_ATTRACTION_FORCE * closeness * closeness * velocityFactor;
+        const force = {
+          x: (dx / distance) * strength,
+          y: (dy / distance) * strength,
+        };
+
+        Matter.Body.applyForce(left.body, left.body.position, force);
+        Matter.Body.applyForce(right.body, right.body.position, {
+          x: -force.x,
+          y: -force.y,
+        });
+        continue;
+      }
+
+      if (needsBiggerMaru(left, right) || needsBiggerMaru(right, left)) {
+        // At least a share of the pull however far apart they are; the board is small.
+        const closeness = Math.max(0.4, 1 - distance / ANNIHILATION_ATTRACTION_RADIUS);
         const strength = ANNIHILATION_ATTRACTION_FORCE * closeness * closeness * velocityFactor;
         const force = {
           x: (dx / distance) * strength,
