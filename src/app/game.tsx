@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,10 +11,14 @@ import { DentakuGame } from '@/components/DentakuGame';
 import { MarumaruGame } from '@/components/MarumaruGame';
 import { NavImageIcon } from '@/components/NavImageIcon';
 import { DENTAKU_STAGES, DENTAKU_WORLDS, DentakuStage, DentakuWorldId } from '@/game/dentaku';
+import { createNavController } from '@/game/nav-controller';
+import type { HistoryWindow, NavController } from '@/game/nav-controller';
+import { createInitialNavState } from '@/game/navigation';
+import type { NavOptions, NavState } from '@/game/navigation';
 import { getStageIndexById, STAGE_ISLANDS, STAGES } from '@/game/stages';
 import { Stage } from '@/game/types';
+import { loadProgress, saveProgress } from '@/storage/progress';
 
-type AppScreen = 'launch' | 'mode' | 'world' | 'stage' | 'game' | 'dentakuWorld' | 'dentakuStage' | 'dentakuGame' | 'longFormWorld' | 'longFormStage' | 'longFormGame';
 type StageStatus = 'done' | 'open' | 'locked';
 type WorldId = Stage['islandId'];
 type DepthBubbleSpec = {
@@ -80,72 +84,173 @@ const LONG_FORM_STAGES: DentakuStage[] = [
   ]),
 ];
 
+const NAV_OPTIONS: NavOptions = {
+  worldIds: STAGE_ISLANDS.map((island) => island.id),
+  dentakuWorldIds: DENTAKU_WORLDS.map((world) => world.id),
+  longFormWorldIds: LONG_FORM_WORLDS.map((world) => world.id),
+  stageCount: STAGES.length,
+  dentakuStageIds: DENTAKU_STAGES.map((stage) => stage.id),
+  longFormStageIds: LONG_FORM_STAGES.map((stage) => stage.id),
+};
+
+function getHistoryWindow(): HistoryWindow | undefined {
+  if (Platform.OS !== 'web' || typeof window === 'undefined' || typeof window.history?.pushState !== 'function') {
+    return undefined;
+  }
+  return window as unknown as HistoryWindow;
+}
+
+// Read while the bundle loads, before the router rewrites the entry (see `stateAtPageLoad`).
+// It describes the page load only, so only the first game screen after it may use it.
+let historyStateAtPageLoad: unknown = Platform.OS === 'web' && typeof window !== 'undefined' ? window.history?.state : undefined;
+
+function takeHistoryStateAtPageLoad() {
+  const state = historyStateAtPageLoad;
+  historyStateAtPageLoad = undefined;
+  return state;
+}
+
+function isGameRouteActive() {
+  return typeof window === 'undefined' || !window.location || /\/game\/?$/.test(window.location.pathname);
+}
+
+function addCompletedStageId(current: Set<string>, stageId: string) {
+  if (current.has(stageId)) {
+    return current;
+  }
+  const next = new Set(current);
+  next.add(stageId);
+  return next;
+}
+
 export default function IndexScreen() {
   const { width, height } = useWindowDimensions();
-  const [screen, setScreen] = useState<AppScreen>('launch');
-  const [selectedWorldId, setSelectedWorldId] = useState<WorldId>('addition');
-  const [selectedDentakuWorldId, setSelectedDentakuWorldId] = useState<DentakuWorldId>('kuku');
-  const [selectedLongFormWorldId, setSelectedLongFormWorldId] = useState<DentakuWorldId>('addition');
-  const [playingStageIndex, setPlayingStageIndex] = useState(0);
-  const [playingDentakuStage, setPlayingDentakuStage] = useState<DentakuStage>(DENTAKU_STAGES[0]);
-  const [playingLongFormStage, setPlayingLongFormStage] = useState<DentakuStage>(LONG_FORM_STAGES[0]);
+  const [nav, setNav] = useState<NavState>(() => createInitialNavState(NAV_OPTIONS));
+  const navControllerRef = useRef<NavController | null>(null);
+  const [isReady, setIsReady] = useState(false);
+  const [hasSeenIntro, setHasSeenIntro] = useState(false);
   const [completedStageIds, setCompletedStageIds] = useState<Set<string>>(() => new Set());
   const [completedDentakuStageIds, setCompletedDentakuStageIds] = useState<Set<string>>(() => new Set());
   const [completedLongFormStageIds, setCompletedLongFormStageIds] = useState<Set<string>>(() => new Set());
 
-  const selectedIslandId = selectedWorldId;
+  const screen = nav.screen;
+  const selectedIslandId = nav.worldId as WorldId;
+  const selectedDentakuWorldId = nav.dentakuWorldId as DentakuWorldId;
+  const selectedLongFormWorldId = nav.longFormWorldId as DentakuWorldId;
+  const playingStageIndex = nav.stageIndex;
+  const playingDentakuStage = DENTAKU_STAGES.find((stage) => stage.id === nav.dentakuStageId) ?? DENTAKU_STAGES[0];
+  const playingLongFormStage = LONG_FORM_STAGES.find((stage) => stage.id === nav.longFormStageId) ?? LONG_FORM_STAGES[0];
   const selectedIsland = STAGE_ISLANDS.find((island) => island.id === selectedIslandId) ?? STAGE_ISLANDS[0];
   const selectedStages = useMemo(() => STAGES.filter((stage) => stage.islandId === selectedIslandId), [selectedIslandId]);
   const selectedDentakuStages = useMemo(() => DENTAKU_STAGES.filter((stage) => stage.worldId === selectedDentakuWorldId), [selectedDentakuWorldId]);
   const selectedLongFormStages = useMemo(() => LONG_FORM_STAGES.filter((stage) => stage.worldId === selectedLongFormWorldId), [selectedLongFormWorldId]);
   const mapWidth = Math.max(320, width);
 
+  const navigate = (patch: Partial<NavState>, method: 'push' | 'replace' = 'push') => {
+    navControllerRef.current?.navigate(patch, method);
+  };
+  const goBack = () => {
+    navControllerRef.current?.goBack();
+  };
+
+  useEffect(() => {
+    let isCancelled = false;
+    const navController = createNavController({
+      historyWindow: getHistoryWindow(),
+      options: NAV_OPTIONS,
+      initialNav: createInitialNavState(NAV_OPTIONS),
+      onChange: setNav,
+      isRouteActive: isGameRouteActive,
+      stateAtPageLoad: takeHistoryStateAtPageLoad(),
+    });
+    navControllerRef.current = navController;
+
+    void loadProgress().then((progress) => {
+      if (isCancelled) {
+        return;
+      }
+
+      setHasSeenIntro(progress.hasSeenIntro);
+      setCompletedStageIds((current) => new Set([...progress.marumaru, ...current]));
+      setCompletedDentakuStageIds((current) => new Set([...progress.dentaku, ...current]));
+      setCompletedLongFormStageIds((current) => new Set([...progress.longForm, ...current]));
+      // Returning players skip the launch demo and start from the mode select.
+      navController.start(progress.hasSeenIntro ? 'mode' : 'launch');
+      setIsReady(true);
+    });
+
+    return () => {
+      isCancelled = true;
+      navController.dispose();
+      navControllerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isReady) {
+      return;
+    }
+
+    saveProgress({
+      marumaru: [...completedStageIds],
+      dentaku: [...completedDentakuStageIds],
+      longForm: [...completedLongFormStageIds],
+      hasSeenIntro,
+    });
+  }, [completedDentakuStageIds, completedLongFormStageIds, completedStageIds, hasSeenIntro, isReady]);
+
+  const completeLaunch = () => {
+    setHasSeenIntro(true);
+    // Replaces the launch entry, so going back from the mode select leaves the game instead of replaying the demo.
+    navControllerRef.current?.setBaseScreen('mode');
+    navigate({ screen: 'mode' }, 'replace');
+  };
+
   const startStage = (stage: Stage) => {
-    setPlayingStageIndex(getStageIndexById(stage.id));
-    setScreen('game');
+    navigate({ screen: 'game', stageIndex: getStageIndexById(stage.id) });
   };
 
   const startDentakuStage = (stage: DentakuStage) => {
-    setPlayingDentakuStage(stage);
-    setScreen('dentakuGame');
+    navigate({ screen: 'dentakuGame', dentakuStageId: stage.id });
   };
   const startLongFormStage = (stage: DentakuStage) => {
-    setPlayingLongFormStage(stage);
-    setScreen('longFormGame');
+    navigate({ screen: 'longFormGame', longFormStageId: stage.id });
   };
   const startNextDentakuStage = () => {
     const currentIndex = selectedDentakuStages.findIndex((stage) => stage.id === playingDentakuStage.id);
     const nextStage = selectedDentakuStages[currentIndex + 1];
     if (nextStage) {
-      setPlayingDentakuStage(nextStage);
+      navigate({ dentakuStageId: nextStage.id }, 'replace');
       return;
     }
-    setScreen('dentakuStage');
+    goBack();
   };
   const startNextLongFormStage = () => {
     const currentIndex = selectedLongFormStages.findIndex((stage) => stage.id === playingLongFormStage.id);
     const nextStage = selectedLongFormStages[currentIndex + 1];
     if (nextStage) {
-      setPlayingLongFormStage(nextStage);
+      navigate({ longFormStageId: nextStage.id }, 'replace');
       return;
     }
-    setScreen('longFormStage');
+    goBack();
   };
+
+  if (!isReady) {
+    // Saved progress loads within a moment; showing only the water avoids flashing the wrong screen.
+    return <SafeAreaView style={styles.screen} />;
+  }
+
   if (screen === 'launch') {
-    return <MarumaruGame mode="launch" onComplete={() => setScreen('mode')} />;
+    return <MarumaruGame mode="launch" onComplete={completeLaunch} />;
   }
 
   if (screen === 'game') {
     return (
       <MarumaruGame
         initialStageIndex={playingStageIndex}
-        onBack={() => setScreen('stage')}
+        onBack={goBack}
         onStageClear={(stageId) => {
-          setCompletedStageIds((current) => {
-            const next = new Set(current);
-            next.add(stageId);
-            return next;
-          });
+          setCompletedStageIds((current) => addCompletedStageId(current, stageId));
         }}
       />
     );
@@ -155,14 +260,10 @@ export default function IndexScreen() {
     return (
       <DentakuGame
         stage={playingDentakuStage}
-        onBack={() => setScreen('dentakuStage')}
+        onBack={goBack}
         onNextStage={startNextDentakuStage}
         onStageClear={(stageId) => {
-          setCompletedDentakuStageIds((current) => {
-            const next = new Set(current);
-            next.add(stageId);
-            return next;
-          });
+          setCompletedDentakuStageIds((current) => addCompletedStageId(current, stageId));
         }}
       />
     );
@@ -173,14 +274,10 @@ export default function IndexScreen() {
       <DentakuGame
         stage={playingLongFormStage}
         longFormMode
-        onBack={() => setScreen('longFormStage')}
+        onBack={goBack}
         onNextStage={startNextLongFormStage}
         onStageClear={(stageId) => {
-          setCompletedLongFormStageIds((current) => {
-            const next = new Set(current);
-            next.add(stageId);
-            return next;
-          });
+          setCompletedLongFormStageIds((current) => addCompletedStageId(current, stageId));
         }}
       />
     );
@@ -195,7 +292,7 @@ export default function IndexScreen() {
         mapWidth={mapWidth}
         viewportWidth={width}
         viewportHeight={height}
-        onBack={() => setScreen('world')}
+        onBack={goBack}
         onStartStage={startStage}
       />
     );
@@ -209,7 +306,7 @@ export default function IndexScreen() {
         mapWidth={mapWidth}
         viewportWidth={width}
         viewportHeight={height}
-        onBack={() => setScreen('dentakuWorld')}
+        onBack={goBack}
         onStartStage={startDentakuStage}
       />
     );
@@ -223,7 +320,7 @@ export default function IndexScreen() {
         mapWidth={mapWidth}
         viewportWidth={width}
         viewportHeight={height}
-        onBack={() => setScreen('longFormWorld')}
+        onBack={goBack}
         onStartStage={startLongFormStage}
       />
     );
@@ -236,10 +333,9 @@ export default function IndexScreen() {
         mapWidth={mapWidth}
         viewportWidth={width}
         viewportHeight={height}
-        onBack={() => setScreen('mode')}
+        onBack={goBack}
         onSelectWorld={(worldId) => {
-          setSelectedDentakuWorldId(worldId);
-          setScreen('dentakuStage');
+          navigate({ screen: 'dentakuStage', dentakuWorldId: worldId });
         }}
       />
     );
@@ -254,10 +350,9 @@ export default function IndexScreen() {
         mapWidth={mapWidth}
         viewportWidth={width}
         viewportHeight={height}
-        onBack={() => setScreen('mode')}
+        onBack={goBack}
         onSelectWorld={(worldId) => {
-          setSelectedLongFormWorldId(worldId);
-          setScreen('longFormStage');
+          navigate({ screen: 'longFormStage', longFormWorldId: worldId });
         }}
       />
     );
@@ -269,9 +364,9 @@ export default function IndexScreen() {
         mapWidth={mapWidth}
         viewportWidth={width}
         viewportHeight={height}
-        onSelectMarumaru={() => setScreen('world')}
-        onSelectDentaku={() => setScreen('dentakuWorld')}
-        onSelectLongForm={() => setScreen('longFormWorld')}
+        onSelectMarumaru={() => navigate({ screen: 'world' })}
+        onSelectDentaku={() => navigate({ screen: 'dentakuWorld' })}
+        onSelectLongForm={() => navigate({ screen: 'longFormWorld' })}
       />
     );
   }
@@ -282,10 +377,9 @@ export default function IndexScreen() {
       mapWidth={mapWidth}
       viewportWidth={width}
       viewportHeight={height}
-      onBack={() => setScreen('mode')}
+      onBack={goBack}
       onSelectWorld={(worldId) => {
-        setSelectedWorldId(worldId);
-        setScreen('stage');
+        navigate({ screen: 'stage', worldId });
       }}
     />
   );
@@ -335,6 +429,7 @@ function ModeSelect({
     <SafeAreaView style={styles.screen}>
       <View testID="mode-select" style={styles.depthScene}>
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <SoundToggleButton />
         <ScrollView
           style={styles.worldScroll}
           contentContainerStyle={styles.modeScrollContent}
@@ -533,6 +628,7 @@ function DentakuWorldSelect({
     <SafeAreaView style={styles.screen}>
       <View testID="dentaku-world-select" style={styles.depthScene}>
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <SoundToggleButton />
         <Pressable
           accessibilityLabel="Back"
           accessibilityRole="button"
@@ -604,6 +700,7 @@ function WorldSelect({
     <SafeAreaView style={styles.screen}>
       <View testID="world-select" style={styles.depthScene}>
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <SoundToggleButton />
         <Pressable
           accessibilityLabel="Back"
           accessibilityRole="button"
@@ -688,6 +785,26 @@ function WorldSelect({
   );
 }
 
+function SoundToggleButton() {
+  const { isMuted, toggleMute } = useBgmControl();
+
+  return (
+    <Pressable
+      accessibilityLabel={isMuted ? 'turn sound on' : 'turn sound off'}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: !isMuted }}
+      onPress={toggleMute}
+      testID="sound-toggle"
+      style={({ pressed }) => [styles.soundButton, pressed && styles.pressed]}
+    >
+      <Text pointerEvents="none" style={[styles.soundButtonNote, isMuted && styles.soundButtonNoteMuted]}>
+        ♪
+      </Text>
+      {isMuted ? <View pointerEvents="none" testID="sound-toggle-muted-mark" style={styles.soundButtonMutedSlash} /> : null}
+    </Pressable>
+  );
+}
+
 function DepthBackdrop({
   width,
   height,
@@ -732,6 +849,8 @@ function DepthBackdrop({
             key={bubble.id}
             accessibilityLabel="decorative bubble"
             accessibilityRole="button"
+            focusable={false}
+            tabIndex={-1}
             testID={`depth-background-bubble-${bubble.id}`}
             onPress={() => {
               onBubblePop?.();
@@ -816,6 +935,8 @@ function DepthCreature({
     <Pressable
       accessibilityLabel={`sea creature ${spec.kind}`}
       accessibilityRole="button"
+      focusable={false}
+      tabIndex={-1}
       hitSlop={18}
       onPress={onPress}
       testID={`depth-fish-${spec.id}`}
@@ -1141,6 +1262,7 @@ function StageSelect({
     <SafeAreaView style={styles.screen}>
       <View style={styles.depthScene}>
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <SoundToggleButton />
         <Pressable
           accessibilityLabel="Back"
           accessibilityRole="button"
@@ -1215,6 +1337,7 @@ function DentakuStageSelect({
     <SafeAreaView style={styles.screen}>
       <View style={styles.depthScene}>
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <SoundToggleButton />
         <Pressable
           accessibilityLabel="Back"
           accessibilityRole="button"
@@ -3077,6 +3200,36 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.26)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  soundButton: {
+    position: 'absolute',
+    right: GRID * 3,
+    top: 37,
+    zIndex: 5,
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS_LG,
+    backgroundColor: 'rgba(255, 255, 255, 0.26)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  soundButtonNote: {
+    color: TEXT_BASE_COLOR,
+    fontFamily: LATIN_FONT_FAMILY,
+    fontSize: 26,
+    lineHeight: 30,
+    fontWeight: '900',
+  },
+  soundButtonNoteMuted: {
+    opacity: 0.6,
+  },
+  soundButtonMutedSlash: {
+    position: 'absolute',
+    width: 36,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: TEXT_BASE_COLOR,
+    transform: [{ rotate: '-45deg' }],
   },
   stageScroll: {
     flex: 1,
