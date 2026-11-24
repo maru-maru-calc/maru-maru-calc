@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createPuzzleGameStage, getPuzzleId, getPuzzleProgress, pickStartPuzzle, PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
+import { createPuzzleGameStage, createQuickPuzzle, getPuzzleId, getPuzzleProgress, pickStartPuzzle, PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
 import { PUZZLE_START_GROUPS, PUZZLE_STAGES, PuzzleStage } from '@/game/puzzle-stages';
 import { solveStage } from '@/game/stage-rules';
 
@@ -146,5 +146,47 @@ describe('progress through the puzzle game', () => {
     expect(getPuzzleProgress(['something-else', ids[0]])).toEqual({ solved: 1, next: 2 });
     // Nothing left: the game has to be able to say so.
     expect(getPuzzleProgress(ids)).toEqual({ solved: 100, next: undefined });
+  });
+});
+
+describe('the puzzles of the one-minute game', () => {
+  const seeded = (seed: number) => {
+    let state = seed;
+    return () => {
+      state = (state * 16807) % 2147483647;
+      return state / 2147483647;
+    };
+  };
+
+  it('have three different numbers from 2 to 9 and exactly one way, by the board\'s own rules', () => {
+    const random = seeded(7);
+    const seen = new Set<string>();
+
+    for (let round = 0; round < 400; round += 1) {
+      const puzzle = createQuickPuzzle(random);
+      const amounts = amountsOf(puzzle.solution);
+
+      expect(puzzle.bubbles).toHaveLength(3);
+      expect(new Set(puzzle.bubbles).size).toBe(3);
+      expect(puzzle.bubbles.every((value) => value >= 2 && value <= 9)).toBe(true);
+      expect(waysOf(puzzle)).toEqual([puzzle.solution]);
+      expect(amounts[amounts.length - 1]).toBe(puzzle.goal);
+      expect(Math.min(...amounts)).toBeGreaterThanOrEqual(1);
+      expect(Math.max(...amounts)).toBeLessThanOrEqual(99);
+      seen.add(getPuzzleId(puzzle));
+    }
+    // Plenty to draw from: a minute never runs out of new ones.
+    expect(seen.size).toBeGreaterThan(250);
+  });
+
+  it('do not hand out the puzzle that was just played', () => {
+    const random = seeded(11);
+    let last = createQuickPuzzle(random);
+
+    for (let round = 0; round < 300; round += 1) {
+      const next = createQuickPuzzle(random, last);
+      expect(getPuzzleId(next)).not.toBe(getPuzzleId(last));
+      last = next;
+    }
   });
 });

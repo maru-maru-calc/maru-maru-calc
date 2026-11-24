@@ -590,7 +590,10 @@ export const styles = StyleSheet.create({
   },
   pendingBubbleButton: {
     position: 'absolute',
-    zIndex: 2,
+    // Above the maru (3 to 6) and the pop's spray (7). Maru falling out of a bubble used to pass
+    // in front of the bubbles still waiting, and a tap on one of those then took hold of a maru
+    // instead: the move was lost without a sign. Only a maru being dragged (40) goes over them.
+    zIndex: 8,
   },
   pendingBubbleHintRing: {
     position: 'absolute',
@@ -954,6 +957,28 @@ export const styles = StyleSheet.create({
     borderColor: 'rgba(186, 230, 253, 0.72)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cornerBadge: {
+    position: 'absolute',
+    left: GRID * 3,
+    bottom: 0,
+    zIndex: 45,
+    minWidth: 44,
+    height: 44,
+    paddingHorizontal: GRID,
+    borderRadius: RADIUS_LG,
+    backgroundColor: 'rgba(255, 255, 255, 0.58)',
+    borderWidth: 3,
+    borderColor: 'rgba(186, 230, 253, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cornerBadgeText: {
+    color: TEXT_BASE_COLOR,
+    fontSize: 20,
+    lineHeight: 24,
+    fontWeight: '900',
+    fontFamily: LATIN_FONT_FAMILY,
   },
   undoButtonDisabled: {
     opacity: 0.38,
