@@ -116,6 +116,8 @@ export type OperationSource = {
 };
 
 export type OperatorButtonSymbol = OperatorSymbol;
+/** A tap that has to wait for its turn: an operator, or one of the bubbles. */
+export type HeldTap = { operator: OperatorButtonSymbol } | { bubbleId: string };
 export type MultiplierBubblePart = {
   value: PlaceValue;
   radius: number;

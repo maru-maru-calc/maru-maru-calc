@@ -53,6 +53,30 @@ test.describe('user-reported regressions', () => {
     await expect(page.locator('[data-testid^="bead-division-2-"]')).toHaveCount(0, { timeout: 3500 });
   });
 
+  test('moves tapped while the maru are still settling all happen, in order', async ({ page }) => {
+    await page.goto('/game');
+
+    await clearLaunch(page);
+    await openIsland(page, 'mixed-5-free');
+    await page.getByTestId('stage-mixed5Free-1').click();
+
+    const bubble = (count: number) => page.locator(`[data-testid^="pending-bubble-${count}-"]`).first();
+    await bubble(2).click();
+    await page.getByTestId('operator-+').click();
+    await bubble(4).click();
+    await page.getByTestId('operator--').click();
+    await bubble(3).click();
+    // The take-away is still playing, so × 5 has to wait, and + 6 is tapped behind it. The + used
+    // to replace the waiting × 5, which then never happened.
+    await page.getByTestId('operator-×').click();
+    await bubble(5).click();
+    await page.getByTestId('operator-+').click();
+    await bubble(6).click();
+
+    await expect(page.getByTestId('expression-display-text')).toContainText('× 5 + 6 = 21', { timeout: 20000 });
+    await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 20000 });
+  });
+
   test('multiplication preview bubble does not auto-burst while multiply is selected', async ({ page }) => {
     await page.goto('/game');
 
