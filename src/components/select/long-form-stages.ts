@@ -18,11 +18,15 @@ export const LONG_FORM_STAGES: DentakuStage[] = [
     '2けたのくり下がり',
     '引き算まとめ',
   ]),
+  // Two digits × one digit come first. They were added later, so the stages after them keep the
+  // ids they were saved under.
   ...createLongFormStageSet('multiplication', '×', [
-    '部分積',
-    '位取りの0',
-    '部分積の足し算',
-    '掛け算まとめ',
+    { title: '2けた × 1けた', id: 'long-form-multiplication-single-1' },
+    { title: '2けた × 1けた くり上がり', id: 'long-form-multiplication-single-2' },
+    { title: '部分積', id: 'long-form-multiplication-1' },
+    { title: '位取りの0', id: 'long-form-multiplication-2' },
+    { title: '部分積の足し算', id: 'long-form-multiplication-3' },
+    { title: '掛け算まとめ', id: 'long-form-multiplication-4' },
   ]),
   ...createLongFormStageSet('division', '÷', [
     '商を立てる',
@@ -32,11 +36,12 @@ export const LONG_FORM_STAGES: DentakuStage[] = [
   ]),
 ];
 
-function createLongFormStageSet(worldId: DentakuWorldId, operator: DentakuStage['operator'], titles: string[]): DentakuStage[] {
-  return titles.map((title, index) => {
+function createLongFormStageSet(worldId: DentakuWorldId, operator: DentakuStage['operator'], titles: Array<string | { title: string; id: string }>): DentakuStage[] {
+  return titles.map((entry, index) => {
     const problemNumber = index + 1;
+    const title = typeof entry === 'string' ? entry : entry.title;
     return {
-      id: `long-form-${worldId}-${problemNumber}`,
+      id: typeof entry === 'string' ? `long-form-${worldId}-${problemNumber}` : entry.id,
       worldId,
       title,
       label: `#${problemNumber}`,
