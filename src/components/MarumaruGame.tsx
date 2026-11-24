@@ -26,6 +26,7 @@ import { getStage } from '@/game/stages';
 import { BeadRole, BeadSign, BeadSnapshot, MergeCluster, OperatorUsageLimit, OperatorUsageLimits, PlaceValue } from '@/game/types';
 import type { Stage } from '@/game/types';
 import type { DentakuOperator } from '@/game/dentaku';
+import { matchesLongFormStepAnswer } from '@/game/long-form';
 
 type BeadEntity = {
   id: string;
@@ -1253,7 +1254,7 @@ export function MarumaruGame({
     const longFormStep = getLongFormStep(dentakuPractice, longFormStepIndex);
     const expectedAnswer = longFormStep?.expectedAnswer ?? dentakuPractice.answer;
 
-    if (Number(kukuInput) !== expectedAnswer) {
+    if (!matchesLongFormStepAnswer(kukuInput, expectedAnswer, longFormStep?.acceptsWrittenDigit ?? false)) {
       playFailSfx();
       setKukuInputState('wrong');
       setTimeout(() => {
@@ -1798,7 +1799,13 @@ export function MarumaruGame({
             {mode === 'launch' ? (
               <LaunchLogo onPress={onLogoPress} />
             ) : dentakuPractice ? (
-              <KukuGoalTitle practice={dentakuPractice} input={kukuInput} maxWidth={Math.max(168, fieldWidth - 132)} />
+              <KukuGoalTitle
+                practice={dentakuPractice}
+                input={kukuInput}
+                maxWidth={Math.max(168, fieldWidth - 132)}
+                isWrong={kukuInputState === 'wrong'}
+                feedbackTick={backgroundBubbleTick}
+              />
             ) : (
               <StageGoalTitle stageNumber={stageNumberInIsland} target={target} maxWidth={Math.max(168, fieldWidth - 132)} />
             )}
@@ -1976,7 +1983,19 @@ function StageGoalTitle({ stageNumber, target, maxWidth }: { stageNumber: number
   );
 }
 
-function KukuGoalTitle({ practice, input, maxWidth }: { practice: DentakuPractice; input: string; maxWidth: number }) {
+function KukuGoalTitle({
+  practice,
+  input,
+  maxWidth,
+  isWrong,
+  feedbackTick,
+}: {
+  practice: DentakuPractice;
+  input: string;
+  maxWidth: number;
+  isWrong: boolean;
+  feedbackTick: number;
+}) {
   if (practice.longFormMode) {
     return <LongFormStageTitle label={practice.stageLabel} questionNumber={practice.questionNumber} questionTotal={practice.questionTotal} maxWidth={maxWidth} />;
   }
@@ -1986,10 +2005,14 @@ function KukuGoalTitle({ practice, input, maxWidth }: { practice: DentakuPractic
   const questionText = `${expression} = ${answerText}`;
   const titleTextStyle = getKukuQuestionTitleTextStyle(questionText, maxWidth);
 
+  // A wrong answer shakes and turns red where the player is looking, the same way a long-form cell does.
+  const wrongOffset = isWrong ? Math.sin(feedbackTick / 34) * 4 : 0;
+  const answerStyle = input.length === 0 ? styles.kukuQuestionUnknown : isWrong ? styles.kukuQuestionWrong : undefined;
+
   return (
-    <View style={[styles.kukuGameTitle, { maxWidth }]}>
+    <View style={[styles.kukuGameTitle, { maxWidth }, isWrong && { transform: [{ translateX: wrongOffset }] }]}>
       <Text testID="kuku-question-title" numberOfLines={1} style={[styles.kukuQuestionText, titleTextStyle]}>
-        {expression} = <Text style={input.length === 0 ? styles.kukuQuestionUnknown : undefined}>{answerText}</Text>
+        {expression} = <Text testID={isWrong ? 'kuku-question-wrong-answer' : undefined} style={answerStyle}>{answerText}</Text>
       </Text>
     </View>
   );
@@ -2133,6 +2156,8 @@ type LongFormStep = {
   expectedAnswer: number;
   isFinal: boolean;
   maxInputLength: number;
+  /** A column sum that may also be answered with just the digit written under it (see matchesLongFormStepAnswer). */
+  acceptsWrittenDigit?: boolean;
 };
 
 function getLongFormStep(practice: DentakuPractice, stepIndex: number): LongFormStep | undefined {
@@ -2159,6 +2184,7 @@ function getLongFormStep(practice: DentakuPractice, stepIndex: number): LongForm
       expectedAnswer: placeStep.onesAnswer,
       isFinal: false,
       maxInputLength: 2,
+      acceptsWrittenDigit: problem.operator === '+',
     };
   }
 
@@ -2268,10 +2294,13 @@ function getLongFormMultiplicationStep(problem: LongFormProblem, stepIndex: numb
     return undefined;
   }
 
+  const isFinal = stepIndex - state.partialProducts.length >= state.additionSteps.length - 1;
   return {
     expectedAnswer: additionStep.expectedAnswer,
-    isFinal: stepIndex - state.partialProducts.length >= state.additionSteps.length - 1,
+    isFinal,
     maxInputLength: String(additionStep.expectedAnswer).length,
+    // The last column has nowhere to carry to, so its whole sum is written.
+    acceptsWrittenDigit: !isFinal,
   };
 }
 
@@ -5314,6 +5343,9 @@ const styles = StyleSheet.create({
   },
   kukuQuestionUnknown: {
     color: 'rgba(71, 85, 105, 0.45)',
+  },
+  kukuQuestionWrong: {
+    color: '#E11D48',
   },
   longFormPanel: {
     minHeight: 104,
