@@ -260,6 +260,10 @@ test('mermaid song toggle keeps the background music position', async ({ page })
     )
     .toBeGreaterThan(41);
 
+  // The app re-syncs the new track shortly after a switch. Let that finish first; otherwise it
+  // overwrites the position set below and the next switch starts from the wrong place.
+  await page.waitForTimeout(300);
+
   await page.evaluate(() => {
     const normalBgm = window.__testAudioElements.find((audio) => audio.src.includes('/bgm.') && !audio.src.includes('bgm-vocal'));
     const vocalBgm = window.__testAudioElements.find((audio) => audio.src.includes('bgm-vocal'));
