@@ -28,6 +28,9 @@ describe('screen reader names', () => {
     expect(a11yLabel('mixed-3', 'ja')).toBe('3つのあわ');
     expect(a11yLabel('mixed-3-free', 'ja')).toBe('3つのあわ じゆう');
     expect(a11yLabel('stage 2: make 10', 'ja')).toBe('ステージ2 10にしよう');
+    expect(a11yLabel('skip the replay', 'ja')).toBe('とばす');
+    expect(a11yLabel('3 × ? shuffled', 'ja')).toBe('3 × ? ばらばら');
+    expect(a11yLabel('3 × ?', 'ja')).toBe('3 × ?');
   });
 
   it('names sea creatures, with a general name for an unknown kind', () => {

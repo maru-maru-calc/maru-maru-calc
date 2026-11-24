@@ -66,6 +66,14 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  skipReplayField: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 60,
+  },
   headerNextButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     shadowColor: '#38BDF8',

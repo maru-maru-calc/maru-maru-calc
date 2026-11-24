@@ -34,6 +34,8 @@ export type DentakuPractice = {
   autoAdvance: boolean;
   longFormMode?: boolean;
   onNextQuestion: () => void;
+  /** Told about each wrong answer to the question itself (not to a step of a long-form sum). */
+  onWrongAnswer?: () => void;
 };
 
 export type DentakuAutomationPractice = Pick<DentakuPractice, 'operands' | 'operators'>;
