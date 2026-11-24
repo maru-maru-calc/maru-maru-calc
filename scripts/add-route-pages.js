@@ -6,7 +6,7 @@ const path = require('path');
 // Search engines and link previews treat that as a missing page. Giving each route its own copy of
 // the page makes GitHub Pages answer /game and /play with a normal 200.
 const distDir = path.join(__dirname, '..', 'dist');
-const routePages = ['game', 'play'];
+const routePages = ['game', 'play', 'puzzle'];
 
 const indexPath = path.join(distDir, 'index.html');
 if (!fs.existsSync(indexPath)) {

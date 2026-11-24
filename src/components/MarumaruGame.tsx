@@ -137,7 +137,7 @@ import { findMergeCluster, getTotalValue, hasMergeableCount } from '@/game/merge
 import { BoardPosition, spendOperatorUse, takeBackLastMove } from '@/game/move-history';
 import { hasLegalMove } from '@/game/stage-rules';
 import { getStage } from '@/game/stages';
-import { BeadRole, BeadSign, BeadSnapshot, OperatorUsageLimits, PlaceValue } from '@/game/types';
+import { BeadRole, BeadSign, BeadSnapshot, OperatorUsageLimits, PlaceValue, Stage } from '@/game/types';
 import { a11yLabel } from '@/i18n/a11y-label';
 import { usePrefersReducedMotion } from '@/layout/reduced-motion';
 
@@ -149,7 +149,19 @@ export function MarumaruGame({
   onComplete,
   onLogoPress,
   dentakuPractice,
+  stages,
+  onLastStageNext,
+  showsStageNumber = true,
+  showsGoalAsMaru = true,
 }: {
+  /** Whether the header also draws the goal as maru, beside the number. */
+  showsGoalAsMaru?: boolean;
+  /** The stages to play, numbered from 1 in this order. Left out: the stages of まるまるモード. */
+  stages?: Stage[];
+  /** Called for "next" on the last of `stages`, instead of staying on it. */
+  onLastStageNext?: () => void;
+  /** Whether the header shows "#n" before the goal. */
+  showsStageNumber?: boolean;
   initialStageIndex?: number;
   onBack?: () => void;
   onStageClear?: (stageId: string) => void;
@@ -162,9 +174,14 @@ export function MarumaruGame({
   const fieldWidth = Math.max(240, width - FIELD_MARGIN * 2);
   const fieldHeight = Math.max(360, height - HEADER_HEIGHT - FOOTER_HEIGHT - OPERATOR_TABS_HEIGHT - 20);
   const [stageIndex, setStageIndex] = useState(initialStageIndex);
-  const stage = useMemo(() => (dentakuPractice ? createDentakuPracticeStage(dentakuPractice) : getStage(stageIndex)), [dentakuPractice, stageIndex]);
+  const stage = useMemo(
+    () => (dentakuPractice ? createDentakuPracticeStage(dentakuPractice) : stages ? stages[Math.max(0, Math.min(stageIndex, stages.length - 1))] : getStage(stageIndex)),
+    [dentakuPractice, stageIndex, stages],
+  );
   const target = mode === 'launch' ? LAUNCH_TARGET : stage.target;
-  const stageNumberInIsland = useMemo(() => getStageNumberInIsland(stageIndex), [stageIndex]);
+  const stageNumberInIsland = useMemo(() => (stages ? stageIndex + 1 : getStageNumberInIsland(stageIndex)), [stageIndex, stages]);
+  // A list of its own (the puzzle game) can have six bubbles; those need a second row.
+  const bubbleRows = stages ? 'fit' : 'one';
   const [selectedOperator, setSelectedOperator] = useState<OperatorSymbol>('+');
   const selectedOperatorRef = useRef<OperatorSymbol>('+');
   const [operatorSign, setOperatorSign] = useState<BeadSign>(1);
@@ -185,7 +202,7 @@ export function MarumaruGame({
   const [divisionFailedAnimation, setDivisionFailedAnimation] = useState<DivisionFailedAnimation | undefined>(undefined);
   const [multiplicationExpansionAnimation, setMultiplicationExpansionAnimation] = useState<MultiplicationExpansionAnimation | undefined>(undefined);
   const [bubbleBurstAnimations, setBubbleBurstAnimations] = useState<BubbleBurstAnimation[]>([]);
-  const [operatorUsage, setOperatorUsage] = useState<OperatorUsageLimits>(() => getInitialOperatorUsage(getStage(initialStageIndex), mode));
+  const [operatorUsage, setOperatorUsage] = useState<OperatorUsageLimits>(() => getInitialOperatorUsage(stages ? stages[Math.max(0, Math.min(initialStageIndex, stages.length - 1))] : getStage(initialStageIndex), mode));
   const [kukuInput, setKukuInput] = useState('');
   const [kukuInputState, setKukuInputState] = useState<'input' | 'wrong' | 'running'>('input');
   const [longFormStepIndex, setLongFormStepIndex] = useState(0);
@@ -351,7 +368,7 @@ export function MarumaruGame({
     const initialEntities = mode === 'launch' ? createLaunchBeads(engine, fieldWidth, fieldHeight) : [];
     entitiesRef.current = initialEntities;
     publishBeads(beadFrameStore, setBeads, initialEntities, fieldWidth, fieldHeight);
-    setPendingBubbles(createPendingBubbles(fieldWidth, mode === 'launch' ? [LAUNCH_BUBBLE_COUNT] : stage.bubbleCounts));
+    setPendingBubbles(createPendingBubbles(fieldWidth, mode === 'launch' ? [LAUNCH_BUBBLE_COUNT] : stage.bubbleCounts, bubbleRows));
     const initialExpression = mode === 'launch' ? [String(LAUNCH_INITIAL_TOTAL), '+'] : [];
     expressionTokensRef.current = initialExpression;
     setExpressionTokens(initialExpression);
@@ -386,7 +403,7 @@ export function MarumaruGame({
     lastFieldBubbleAutoBurstAtRef.current = 0;
     mergeReadySinceRef.current = undefined;
     resultReadySinceRef.current = undefined;
-  }, [fadeOutResultSfx, fieldHeight, fieldWidth, markBubbleInteraction, mode, stage.bubbleCounts]);
+  }, [bubbleRows, fadeOutResultSfx, fieldHeight, fieldWidth, markBubbleInteraction, mode, stage.bubbleCounts]);
 
   // A new stage or question starts on a fresh board. The id is watched as well as the bubbles:
   // the same question asked twice in a row has the same bubbles, and used to keep the old board
@@ -409,10 +426,11 @@ export function MarumaruGame({
     return () => clearInterval(interval);
   }, [isClear, isFailed, mode, pendingBubbles.length]);
 
-  useEffect(() => {
-    expressionTokensRef.current = expressionTokens;
-  }, [expressionTokens]);
-
+  // The line, the chosen operator and its sign are written to their refs at the moment they are
+  // changed, everywhere. They used to be copied from state after each draw as well, which could
+  // put an older value back: after a ×, the operator is reset to + and that draw can come late;
+  // an operator tapped in between was then undone for a moment, and a bubble tapped in that
+  // moment went in with + (or was turned away, where + had no uses left).
   useEffect(() => {
     pendingBubblesRef.current = pendingBubbles;
   }, [pendingBubbles]);
@@ -436,14 +454,6 @@ export function MarumaruGame({
   useEffect(() => {
     multiplicationExpansionAnimationRef.current = multiplicationExpansionAnimation;
   }, [multiplicationExpansionAnimation]);
-
-  useEffect(() => {
-    selectedOperatorRef.current = selectedOperator;
-  }, [selectedOperator]);
-
-  useEffect(() => {
-    operatorSignRef.current = operatorSign;
-  }, [operatorSign]);
 
   useEffect(() => {
     setStageIndex(initialStageIndex);
@@ -1893,6 +1903,10 @@ export function MarumaruGame({
       dentakuPractice.onNextQuestion();
       return;
     }
+    if (stages && stageIndex >= stages.length - 1) {
+      onLastStageNext?.();
+      return;
+    }
     setStageIndex((current) => current + 1);
   };
   const retryStage = () => {
@@ -1992,7 +2006,7 @@ export function MarumaruGame({
                 isWrong={kukuInputState === 'wrong'}
               />
             ) : (
-              <StageGoalTitle stageNumber={stageNumberInIsland} target={target} maxWidth={Math.max(168, fieldWidth - 132)} />
+              <StageGoalTitle showsGoalParts={showsGoalAsMaru} stageNumber={showsStageNumber ? stageNumberInIsland : undefined} target={target} maxWidth={Math.max(168, fieldWidth - 132)} />
             )}
           </View>
         </View>

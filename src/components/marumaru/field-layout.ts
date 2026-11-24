@@ -5,6 +5,8 @@ import {
   BASIN_FRAME_THICKNESS,
   BASIN_POINT_COUNT,
   BUBBLE_ROW_Y,
+  PENDING_BUBBLE_ROW_FILL_LIMIT,
+  PENDING_BUBBLE_SECOND_ROW_OFFSET,
   FIELD_ENTITY_INSET,
   MULTIPLIER_BUBBLE_X_STEP,
   MULTIPLIER_BUBBLE_Y_STEP,
@@ -167,15 +169,33 @@ export function getMultiplierClusterRadius(count: number) {
   return Math.max(34, Math.min(86, Math.max(widestRow / 2 + 8, contentHeight / 2 + 8)));
 }
 
-export function createPendingBubbles(fieldWidth: number, counts: number[]): PendingBubble[] {
-  const gap = fieldWidth / (counts.length + 1);
+/**
+ * Where the bubbles wait. `rows` is 'one' for a single row whatever their number, as the learning app
+ * has always laid them out, or 'fit' to use a second row when one would be too crowded.
+ */
+export function createPendingBubbles(fieldWidth: number, counts: number[], rows: 'one' | 'fit' = 'one'): PendingBubble[] {
+  const placeRow = (rowCounts: number[], firstIndex: number, y: number): PendingBubble[] => {
+    const gap = fieldWidth / (rowCounts.length + 1);
+    return rowCounts.map((count, place) => ({
+      id: `bubble-${firstIndex + place}-${count}`,
+      count,
+      x: gap * (place + 1),
+      y,
+    }));
+  };
 
-  return counts.map((count, index) => ({
-    id: `bubble-${index}-${count}`,
-    count,
-    x: gap * (index + 1),
-    y: BUBBLE_ROW_Y,
-  }));
+  // One row, as long as the bubbles do not cover each other much. Five or six bubbles, or four big
+  // ones, would lie so far over each other that some could not be tapped; they go in two rows.
+  const widthInOneRow = counts.reduce((sum, count) => sum + getEntityRadius(1, count) * 2, 0);
+  if (rows === 'one' || (counts.length < 5 && widthInOneRow <= fieldWidth * PENDING_BUBBLE_ROW_FILL_LIMIT)) {
+    return placeRow(counts, 0, BUBBLE_ROW_Y);
+  }
+
+  const upperCount = Math.ceil(counts.length / 2);
+  return [
+    ...placeRow(counts.slice(0, upperCount), 0, BUBBLE_ROW_Y),
+    ...placeRow(counts.slice(upperCount), upperCount, BUBBLE_ROW_Y + PENDING_BUBBLE_SECOND_ROW_OFFSET),
+  ];
 }
 
 export function getBackgroundBubbleSpecs(fieldWidth: number): BackgroundBubbleSpec[] {
