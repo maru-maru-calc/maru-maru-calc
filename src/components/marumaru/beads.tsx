@@ -1,5 +1,5 @@
 // The maru themselves, the layer that draws them, and the tray they sit in.
-import { memo, useMemo, useRef, useSyncExternalStore } from 'react';
+import { memo, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { PanResponder, Text, View } from 'react-native';
 
 import { MIN_TOUCH_TARGET_SIZE, TAP_DRIFT_TO_BURST_THRESHOLD } from '@/components/marumaru/constants';
@@ -244,9 +244,16 @@ type DraggableBeadViewProps = {
   onTap?: (beadId: string) => void;
 };
 
-const DraggableBeadView = memo(function DraggableBeadView({ bead, onMove, onDragStart, onDragEnd, isDragging, isAlmostMerge, onTap }: DraggableBeadViewProps) {
+const DraggableBeadView = memo(function DraggableBeadView(props: DraggableBeadViewProps) {
+  const { bead, isDragging, isAlmostMerge } = props;
+  // The gesture handlers are made once per maru and read whatever is current through this ref.
+  // They used to be rebuilt every time the maru moved, which threw away how far the finger had
+  // travelled: a held maru stayed where it was instead of following the finger.
+  const latestRef = useRef(props);
+  latestRef.current = props;
   const startPositionRef = useRef({ x: bead.x, y: bead.y });
   const hasDraggedRef = useRef(false);
+  const isHeldRef = useRef(false);
   const radius = getEntityRadius(bead.value, bead.count);
   const hitSize = Math.max(radius * 2 + 24, MIN_TOUCH_TARGET_SIZE);
   const beadOffset = hitSize / 2;
@@ -256,27 +263,46 @@ const DraggableBeadView = memo(function DraggableBeadView({ bead, onMove, onDrag
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: () => {
-          startPositionRef.current = { x: bead.x, y: bead.y };
+          const latest = latestRef.current;
+          startPositionRef.current = { x: latest.bead.x, y: latest.bead.y };
           hasDraggedRef.current = false;
-          onDragStart(bead.id);
+          isHeldRef.current = true;
+          latest.onDragStart(latest.bead.id);
         },
         onPanResponderMove: (_event, gesture) => {
           if (Math.hypot(gesture.dx, gesture.dy) > TAP_DRIFT_TO_BURST_THRESHOLD) {
             hasDraggedRef.current = true;
           }
-          onMove(bead.id, startPositionRef.current.x + gesture.dx, startPositionRef.current.y + gesture.dy);
+          const latest = latestRef.current;
+          latest.onMove(latest.bead.id, startPositionRef.current.x + gesture.dx, startPositionRef.current.y + gesture.dy);
         },
         onPanResponderRelease: () => {
-          onDragEnd(bead.id);
+          const latest = latestRef.current;
+          isHeldRef.current = false;
+          latest.onDragEnd(latest.bead.id);
           if (!hasDraggedRef.current) {
-            onTap?.(bead.id);
+            latest.onTap?.(latest.bead.id);
           }
         },
         onPanResponderTerminate: () => {
-          onDragEnd(bead.id);
+          const latest = latestRef.current;
+          isHeldRef.current = false;
+          latest.onDragEnd(latest.bead.id);
         },
       }),
-    [bead.id, bead.x, bead.y, onDragEnd, onDragStart, onMove, onTap],
+    [],
+  );
+
+  // A maru can disappear while it is held (it merges, say). Let go of it then, so the game does
+  // not go on thinking something is being dragged.
+  useEffect(
+    () => () => {
+      if (isHeldRef.current) {
+        isHeldRef.current = false;
+        latestRef.current.onDragEnd(latestRef.current.bead.id);
+      }
+    },
+    [],
   );
 
   return (
