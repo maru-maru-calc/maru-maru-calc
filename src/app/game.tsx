@@ -418,6 +418,7 @@ function ModeSelect({
     <SafeAreaView style={styles.screen}>
       <View testID="mode-select" style={styles.depthScene}>
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <SoundToggleButton />
         <ScrollView
           style={styles.worldScroll}
           contentContainerStyle={styles.modeScrollContent}
@@ -616,6 +617,7 @@ function DentakuWorldSelect({
     <SafeAreaView style={styles.screen}>
       <View testID="dentaku-world-select" style={styles.depthScene}>
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <SoundToggleButton />
         <Pressable
           accessibilityLabel="Back"
           accessibilityRole="button"
@@ -687,6 +689,7 @@ function WorldSelect({
     <SafeAreaView style={styles.screen}>
       <View testID="world-select" style={styles.depthScene}>
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <SoundToggleButton />
         <Pressable
           accessibilityLabel="Back"
           accessibilityRole="button"
@@ -768,6 +771,26 @@ function WorldSelect({
         </ScrollView>
       </View>
     </SafeAreaView>
+  );
+}
+
+function SoundToggleButton() {
+  const { isMuted, toggleMute } = useBgmControl();
+
+  return (
+    <Pressable
+      accessibilityLabel={isMuted ? 'turn sound on' : 'turn sound off'}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: !isMuted }}
+      onPress={toggleMute}
+      testID="sound-toggle"
+      style={({ pressed }) => [styles.soundButton, pressed && styles.pressed]}
+    >
+      <Text pointerEvents="none" style={[styles.soundButtonNote, isMuted && styles.soundButtonNoteMuted]}>
+        ♪
+      </Text>
+      {isMuted ? <View pointerEvents="none" testID="sound-toggle-muted-mark" style={styles.soundButtonMutedSlash} /> : null}
+    </Pressable>
   );
 }
 
@@ -1224,6 +1247,7 @@ function StageSelect({
     <SafeAreaView style={styles.screen}>
       <View style={styles.depthScene}>
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <SoundToggleButton />
         <Pressable
           accessibilityLabel="Back"
           accessibilityRole="button"
@@ -1298,6 +1322,7 @@ function DentakuStageSelect({
     <SafeAreaView style={styles.screen}>
       <View style={styles.depthScene}>
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <SoundToggleButton />
         <Pressable
           accessibilityLabel="Back"
           accessibilityRole="button"
@@ -3160,6 +3185,36 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.26)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  soundButton: {
+    position: 'absolute',
+    right: GRID * 3,
+    top: 37,
+    zIndex: 5,
+    width: 48,
+    height: 48,
+    borderRadius: RADIUS_LG,
+    backgroundColor: 'rgba(255, 255, 255, 0.26)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  soundButtonNote: {
+    color: TEXT_BASE_COLOR,
+    fontFamily: LATIN_FONT_FAMILY,
+    fontSize: 26,
+    lineHeight: 30,
+    fontWeight: '900',
+  },
+  soundButtonNoteMuted: {
+    opacity: 0.38,
+  },
+  soundButtonMutedSlash: {
+    position: 'absolute',
+    width: 34,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: TEXT_BASE_COLOR,
+    transform: [{ rotate: '-45deg' }],
   },
   stageScroll: {
     flex: 1,

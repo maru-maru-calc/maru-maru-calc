@@ -7,6 +7,7 @@ import { Stack, usePathname } from 'expo-router';
 import { AppState, Platform, StyleSheet, View } from 'react-native';
 
 import { BgmControlContext } from '@/audio/bgm-control';
+import { isSoundMuted, loadStoredSoundMuted, setSoundMuted, useIsSoundMuted } from '@/audio/sound-settings';
 
 const BGM_VOLUME = 0.28;
 const BGM_SYNC_CHECK_MS = 250;
@@ -35,6 +36,11 @@ export default function RootLayout() {
   const isAppActiveRef = useRef(true);
   const isVocalEnabledRef = useRef(false);
   const [isVocalEnabled, setIsVocalEnabled] = useState(false);
+  const isMuted = useIsSoundMuted();
+
+  useEffect(() => {
+    loadStoredSoundMuted();
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') {
@@ -76,6 +82,10 @@ export default function RootLayout() {
   }, []);
 
   const playSyncedBgmFromStart = useCallback(() => {
+    if (isSoundMuted()) {
+      return;
+    }
+
     applyBgmVolumes();
     if (webBgmAudioRef.current && webVocalBgmAudioRef.current) {
       const activeAudio = getActiveWebBgmAudio(webBgmAudioRef.current, webVocalBgmAudioRef.current, isVocalEnabledRef.current);
@@ -105,6 +115,10 @@ export default function RootLayout() {
   }, [applyBgmVolumes]);
 
   const resumeSyncedBgm = useCallback(() => {
+    if (isSoundMuted()) {
+      return;
+    }
+
     syncBgmPositionsToCurrentTrack();
     applyBgmVolumes();
     if (webBgmAudioRef.current && webVocalBgmAudioRef.current) {
@@ -120,11 +134,16 @@ export default function RootLayout() {
   }, [applyBgmVolumes, syncBgmPositionsToCurrentTrack]);
 
   const startBgmAfterUserAction = useCallback(() => {
-    if (!isBgmEnabledOnRoute || hasUserStartedBgmRef.current || !isAppActiveRef.current) {
+    if (!isBgmEnabledOnRoute || hasUserStartedBgmRef.current || !isAppActiveRef.current || isSoundMuted()) {
       return false;
     }
 
     hasUserStartedBgmRef.current = true;
+    // The vocal track is only needed once the mermaid is found, so it starts loading after the first play.
+    if (webVocalBgmAudioRef.current && webVocalBgmAudioRef.current.preload !== 'auto') {
+      webVocalBgmAudioRef.current.preload = 'auto';
+      webVocalBgmAudioRef.current.load();
+    }
     playSyncedBgmFromStart();
     return false;
   }, [isBgmEnabledOnRoute, playSyncedBgmFromStart]);
@@ -137,7 +156,7 @@ export default function RootLayout() {
         webVocalBgmAudioRef.current,
         isVocalEnabledRef.current,
         nextIsVocalEnabled,
-        hasUserStartedBgmRef.current && isAppActiveRef.current && isBgmEnabledOnRoute,
+        hasUserStartedBgmRef.current && isAppActiveRef.current && isBgmEnabledOnRoute && !isSoundMuted(),
         webSwitchTimeoutRef,
       );
       isVocalEnabledRef.current = nextIsVocalEnabled;
@@ -152,7 +171,7 @@ export default function RootLayout() {
         vocalBgmPlayerRef.current,
         isVocalEnabledRef.current,
         nextIsVocalEnabled,
-        hasUserStartedBgmRef.current && isAppActiveRef.current && isBgmEnabledOnRoute,
+        hasUserStartedBgmRef.current && isAppActiveRef.current && isBgmEnabledOnRoute && !isSoundMuted(),
       ).finally(() => {
         isBgmSwitchingRef.current = false;
       });
@@ -173,13 +192,44 @@ export default function RootLayout() {
     webVocalBgmAudioRef.current?.pause();
   }, []);
 
+  const toggleMute = useCallback(() => {
+    const nextIsMuted = !isSoundMuted();
+    setSoundMuted(nextIsMuted);
+
+    if (nextIsMuted) {
+      pauseBgm();
+      return;
+    }
+
+    if (!isBgmEnabledOnRoute || !isAppActiveRef.current) {
+      return;
+    }
+
+    if (hasUserStartedBgmRef.current) {
+      resumeSyncedBgm();
+      return;
+    }
+
+    // Switching sound back on is itself a user action, so the BGM may start right here.
+    startBgmAfterUserAction();
+  }, [isBgmEnabledOnRoute, pauseBgm, resumeSyncedBgm, startBgmAfterUserAction]);
+
+  useEffect(() => {
+    // Covers a saved "sound off" setting that finishes loading after the BGM has already started.
+    if (isMuted) {
+      pauseBgm();
+    }
+  }, [isMuted, pauseBgm]);
+
   const bgmControlValue = useMemo(
     () => ({
       isVocalEnabled,
+      isMuted,
       pauseBgm,
       toggleVocal,
+      toggleMute,
     }),
-    [isVocalEnabled, pauseBgm, toggleVocal],
+    [isMuted, isVocalEnabled, pauseBgm, toggleMute, toggleVocal],
   );
 
   useEffect(() => {
@@ -240,18 +290,22 @@ export default function RootLayout() {
     let webVocalAudio: HTMLAudioElement | null = null;
 
     if (Platform.OS === 'web' && typeof Audio !== 'undefined') {
-      const bgmAsset = Asset.fromModule(bgmSource);
-      const vocalBgmAsset = Asset.fromModule(vocalBgmSource);
-      webAudio = new Audio(bgmAsset.uri);
-      webAudio.loop = false;
-      webAudio.volume = BGM_VOLUME;
-      webAudio.preload = 'auto';
-      webBgmAudioRef.current = webAudio;
-      webVocalAudio = new Audio(vocalBgmAsset.uri);
-      webVocalAudio.loop = false;
-      webVocalAudio.volume = 0;
-      webVocalAudio.preload = 'auto';
-      webVocalBgmAudioRef.current = webVocalAudio;
+      // The BGM files are large, so they are only requested on the route that plays them.
+      if (isBgmEnabledOnRoute) {
+        const bgmAsset = Asset.fromModule(bgmSource);
+        const vocalBgmAsset = Asset.fromModule(vocalBgmSource);
+        webAudio = new Audio(bgmAsset.uri);
+        webAudio.loop = false;
+        webAudio.volume = BGM_VOLUME;
+        webAudio.preload = 'auto';
+        webBgmAudioRef.current = webAudio;
+        webVocalAudio = new Audio();
+        webVocalAudio.preload = 'none';
+        webVocalAudio.src = vocalBgmAsset.uri;
+        webVocalAudio.loop = false;
+        webVocalAudio.volume = 0;
+        webVocalBgmAudioRef.current = webVocalAudio;
+      }
     } else {
       void setAudioModeAsync({
         playsInSilentMode: false,
@@ -301,7 +355,7 @@ export default function RootLayout() {
     });
 
     const syncInterval = setInterval(() => {
-      if (!isBgmEnabledOnRoute || !hasUserStartedBgmRef.current || !isAppActiveRef.current || isBgmSwitchingRef.current) {
+      if (!isBgmEnabledOnRoute || !hasUserStartedBgmRef.current || !isAppActiveRef.current || isBgmSwitchingRef.current || isSoundMuted()) {
         return;
       }
 

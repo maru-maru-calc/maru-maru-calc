@@ -4,6 +4,8 @@ import type { AudioPlayer } from 'expo-audio';
 import { Asset } from 'expo-asset';
 import { Platform } from 'react-native';
 
+import { isSoundMuted } from './sound-settings';
+
 const SFX_FADE_OUT_MS = 220;
 
 type FadeTimer = ReturnType<typeof setInterval>;
@@ -98,6 +100,10 @@ export function useOneShotAudio(source: number, volume: number) {
   }, [fadeOut, source, volume]);
 
   const play = useCallback(() => {
+    if (isSoundMuted()) {
+      return;
+    }
+
     clearFadeTimers();
 
     const webAudio = webAudioRef.current;
