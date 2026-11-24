@@ -26,6 +26,7 @@ import { getStage } from '@/game/stages';
 import { BeadRole, BeadSign, BeadSnapshot, MergeCluster, OperatorUsageLimit, OperatorUsageLimits, PlaceValue } from '@/game/types';
 import type { Stage } from '@/game/types';
 import type { DentakuOperator } from '@/game/dentaku';
+import { matchesLongFormStepAnswer } from '@/game/long-form';
 
 type BeadEntity = {
   id: string;
@@ -1253,7 +1254,7 @@ export function MarumaruGame({
     const longFormStep = getLongFormStep(dentakuPractice, longFormStepIndex);
     const expectedAnswer = longFormStep?.expectedAnswer ?? dentakuPractice.answer;
 
-    if (Number(kukuInput) !== expectedAnswer) {
+    if (!matchesLongFormStepAnswer(kukuInput, expectedAnswer, longFormStep?.acceptsWrittenDigit ?? false)) {
       playFailSfx();
       setKukuInputState('wrong');
       setTimeout(() => {
@@ -2133,6 +2134,8 @@ type LongFormStep = {
   expectedAnswer: number;
   isFinal: boolean;
   maxInputLength: number;
+  /** A column sum that may also be answered with just the digit written under it (see matchesLongFormStepAnswer). */
+  acceptsWrittenDigit?: boolean;
 };
 
 function getLongFormStep(practice: DentakuPractice, stepIndex: number): LongFormStep | undefined {
@@ -2159,6 +2162,7 @@ function getLongFormStep(practice: DentakuPractice, stepIndex: number): LongForm
       expectedAnswer: placeStep.onesAnswer,
       isFinal: false,
       maxInputLength: 2,
+      acceptsWrittenDigit: problem.operator === '+',
     };
   }
 
@@ -2268,10 +2272,13 @@ function getLongFormMultiplicationStep(problem: LongFormProblem, stepIndex: numb
     return undefined;
   }
 
+  const isFinal = stepIndex - state.partialProducts.length >= state.additionSteps.length - 1;
   return {
     expectedAnswer: additionStep.expectedAnswer,
-    isFinal: stepIndex - state.partialProducts.length >= state.additionSteps.length - 1,
+    isFinal,
     maxInputLength: String(additionStep.expectedAnswer).length,
+    // The last column has nowhere to carry to, so its whole sum is written.
+    acceptsWrittenDigit: !isFinal,
   };
 }
 
