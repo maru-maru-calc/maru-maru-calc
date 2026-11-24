@@ -18,6 +18,7 @@ import type { NavOptions, NavState } from '@/game/navigation';
 import { getStageIndexById, STAGE_ISLANDS, STAGES } from '@/game/stages';
 import { Stage } from '@/game/types';
 import { isSidewaysPhone } from '@/layout/phone-frame';
+import { usePrefersReducedMotion } from '@/layout/reduced-motion';
 import { loadProgress, saveProgress } from '@/storage/progress';
 
 type StageStatus = 'done' | 'open' | 'locked';
@@ -138,13 +139,17 @@ export default function GameRoute() {
 
 // The game is laid out for portrait. On a phone held sideways the bowl and the footer fall off
 // the screen, so the game is covered (not unmounted: progress in a stage is kept) until it is turned back.
+// Like the rest of the game it speaks in pictures: a sideways phone, a turn arrow, an upright phone.
 function RotateHint() {
   return (
-    <View accessibilityRole="alert" style={styles.rotateHint} testID="rotate-hint">
+    <View accessibilityLabel="スマホを縦向きにしてください" accessibilityRole="alert" style={styles.rotateHint} testID="rotate-hint">
+      <View style={[styles.rotateHintPhone, styles.rotateHintPhoneSideways]}>
+        <View style={styles.rotateHintPhoneScreen} />
+      </View>
+      <NavImageIcon kind="retry" size={40} />
       <View style={styles.rotateHintPhone}>
         <View style={styles.rotateHintPhoneScreen} />
       </View>
-      <Text style={styles.rotateHintText}>スマホを たてに してね</Text>
     </View>
   );
 }
@@ -844,17 +849,23 @@ function DepthBackdrop({
   onBubblePop?: () => void;
   onCreaturePress?: () => void;
 }) {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [tick, setTick] = useState(() => Date.now());
   const [bubbleStarts, setBubbleStarts] = useState<Record<string, number>>({});
   const [creatureStarts, setCreatureStarts] = useState<Record<string, number>>({});
-  const bubbles = useMemo(() => getDepthBubbleSpecs(width), [width]);
-  const fish = useMemo(() => getDepthFishSpecs(), []);
+  // The rising bubbles and swimming creatures are decoration, so they are left out when less motion is asked for.
+  const bubbles = useMemo(() => (prefersReducedMotion ? [] : getDepthBubbleSpecs(width)), [prefersReducedMotion, width]);
+  const fish = useMemo(() => (prefersReducedMotion ? [] : getDepthFishSpecs()), [prefersReducedMotion]);
   const shadeOpacity = Math.min(0.44, Math.max(0, scrollDepth / 1500) * 0.44);
 
   useEffect(() => {
+    if (prefersReducedMotion) {
+      return undefined;
+    }
+
     const interval = setInterval(() => setTick(Date.now()), DEPTH_BUBBLE_TICK_MS);
     return () => clearInterval(interval);
-  }, []);
+  }, [prefersReducedMotion]);
 
   return (
     <View pointerEvents="box-none" style={styles.depthBackdrop}>
@@ -3234,9 +3245,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 20,
     elevation: 20,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: GRID * 2,
+    gap: GRID * 4,
     backgroundColor: '#C6E8F4',
   },
   rotateHintPhone: {
@@ -3251,12 +3263,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#E8F6FB',
   },
-  rotateHintText: {
-    color: TEXT_BASE_COLOR,
-    fontFamily: PLAYFUL_FONT_FAMILY,
-    fontSize: 20,
-    lineHeight: 28,
-    fontWeight: '900',
+  rotateHintPhoneSideways: {
+    opacity: 0.38,
+    transform: [{ rotate: '90deg' }],
   },
   soundButton: {
     position: 'absolute',

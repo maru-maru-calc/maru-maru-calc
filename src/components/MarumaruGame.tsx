@@ -27,6 +27,7 @@ import { BeadRole, BeadSign, BeadSnapshot, MergeCluster, OperatorUsageLimit, Ope
 import type { Stage } from '@/game/types';
 import type { DentakuOperator } from '@/game/dentaku';
 import { matchesLongFormStepAnswer } from '@/game/long-form';
+import { usePrefersReducedMotion } from '@/layout/reduced-motion';
 
 type BeadEntity = {
   id: string;
@@ -281,6 +282,8 @@ export function MarumaruGame({
   const [isFailed, setIsFailed] = useState(false);
   const [failedAt, setFailedAt] = useState<number | undefined>(undefined);
   const [idleHintTick, setIdleHintTick] = useState(() => Date.now());
+  // Decorative movement (drifting bubbles, fireworks, pulsing buttons) is dropped when less motion is asked for.
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [backgroundBubbleTick, setBackgroundBubbleTick] = useState(() => Date.now());
   const [backgroundBubbleStarts, setBackgroundBubbleStarts] = useState<Record<string, number>>({});
   const engineRef = useRef<Matter.Engine | null>(null);
@@ -1757,9 +1760,9 @@ export function MarumaruGame({
       document.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [hasAnswerPad]);
-  const clearActionPulse = isClear ? 1 + Math.sin(backgroundBubbleTick / 170) * 0.08 : 1;
+  const clearActionPulse = isClear && !prefersReducedMotion ? 1 + Math.sin(backgroundBubbleTick / 170) * 0.08 : 1;
   const failedProgress = failedAt ? clamp((backgroundBubbleTick - failedAt) / FAILED_VEIL_FADE_IN_MS, 0, 1) : 0;
-  const failedActionPulse = isFailed ? 1 + Math.sin(backgroundBubbleTick / 155) * (0.04 + failedProgress * 0.09) : 1;
+  const failedActionPulse = isFailed && !prefersReducedMotion ? 1 + Math.sin(backgroundBubbleTick / 155) * (0.04 + failedProgress * 0.09) : 1;
   const clearEquation = `${formatResultExpression(expressionTokens, target)} = ${target}`;
   const failedEquation = `${total} ≠ ${target}`;
   const longFormProblem = dentakuPractice?.longFormMode ? getLongFormProblem(dentakuPractice) : undefined;
@@ -1892,7 +1895,7 @@ export function MarumaruGame({
             <BubbleBurst key={animation.id} animation={animation} />
           ))}
           {multiplicationExpansionAnimation ? <MultiplicationExpansionOverlay animation={multiplicationExpansionAnimation} /> : null}
-          {isClear ? <ClearBubbleFireworks fieldWidth={fieldWidth} fieldHeight={fieldHeight} tick={backgroundBubbleTick} /> : null}
+          {isClear && !prefersReducedMotion ? <ClearBubbleFireworks fieldWidth={fieldWidth} fieldHeight={fieldHeight} tick={backgroundBubbleTick} /> : null}
           {displayBeads.map((bead) => (
             divisionSplitAnimation?.resultBeadId === bead.id ? null :
             <DraggableBeadView
@@ -1934,7 +1937,7 @@ export function MarumaruGame({
       ) : null}
       {isFailed ? <View pointerEvents="none" style={[styles.failedScreenVeil, { opacity: failedProgress }]} /> : null}
       <BackgroundBubbleLayer
-        bubbles={backgroundBubbles}
+        bubbles={prefersReducedMotion ? NO_BACKGROUND_BUBBLES : backgroundBubbles}
         fieldWidth={width}
         fieldHeight={height}
         tick={backgroundBubbleTick}
@@ -3619,6 +3622,8 @@ function ExpressionDisplay({ tokens }: { tokens: string[] }) {
     </View>
   );
 }
+
+const NO_BACKGROUND_BUBBLES: BackgroundBubbleSpec[] = [];
 
 function BackgroundBubbleLayer({
   bubbles,
