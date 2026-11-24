@@ -204,6 +204,7 @@ function DentakuStageNode({
       <View pointerEvents="none" style={styles.nodeBubbleInnerGlow} />
       <View pointerEvents="none" style={styles.nodeBubbleShine} />
       <Text style={styles.kukuStageMainLabel}>{stageLabel}</Text>
+      {stage.subLabel ? <Text style={styles.kukuStageSubLabel}>{stage.subLabel}</Text> : null}
       {isDone ? <StageDoneStarfish /> : null}
     </Pressable>
   );

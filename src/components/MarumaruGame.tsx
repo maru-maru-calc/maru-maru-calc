@@ -382,9 +382,12 @@ export function MarumaruGame({
     resultReadySinceRef.current = undefined;
   }, [fadeOutResultSfx, fieldHeight, fieldWidth, markBubbleInteraction, mode, stage.bubbleCounts]);
 
+  // A new stage or question starts on a fresh board. The id is watched as well as the bubbles:
+  // the same question asked twice in a row has the same bubbles, and used to keep the old board
+  // (already cleared, so it was passed over without being asked).
   useEffect(() => {
     resetStage();
-  }, [resetStage]);
+  }, [resetStage, stage.id]);
 
   useEffect(() => {
     // Only the launch screen hints at its bubbles.
@@ -1299,6 +1302,10 @@ export function MarumaruGame({
         const operator = practice.operators[index - 1];
         selectOperator(operator);
         await delay(650);
+        // The replay may have been skipped while this waited; its next bubble must not go in then.
+        if (dentakuAutomationRunRef.current !== runId) {
+          return;
+        }
       }
 
       if (operand === 0) {
@@ -1351,6 +1358,36 @@ export function MarumaruGame({
     return isIdle;
   };
 
+  const canSkipReplay = Boolean(dentakuPractice && !dentakuPractice.longFormMode && kukuInputState === 'running' && !isClear && !isFailed);
+
+  // After a right answer the maru act the calculation out, which takes a while with several
+  // numbers. A tap stops that and shows where it would have ended: the answer on the board.
+  const skipReplay = () => {
+    if (!dentakuPractice || !canSkipReplay) {
+      return;
+    }
+
+    dentakuAutomationRunRef.current += 1;
+    // A fresh board, so nothing that was still moving or about to appear turns up afterwards.
+    resetStage();
+    pendingBubblesRef.current = [];
+    setPendingBubbles([]);
+    if (dentakuPractice.answer > 0) {
+      addReleasedBeads(dentakuPractice.answer, 1, { x: fieldWidth / 2, y: fieldHeight * 0.42 });
+      publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
+    }
+    const tokens = [
+      ...dentakuPractice.operands.flatMap((operand, index) => (index === 0 ? [String(operand)] : [dentakuPractice.operators[index - 1], String(operand)])),
+      '=',
+      String(dentakuPractice.answer),
+    ];
+    expressionTokensRef.current = tokens;
+    expressionHistoryRef.current = stripExpressionResult(tokens);
+    expressionTotalRef.current = dentakuPractice.answer;
+    setExpressionTokens(tokens);
+    completeCurrentStage();
+  };
+
   const submitKukuAnswer = () => {
     if (!dentakuPractice || kukuInputState !== 'input' || isClear || isFailed || kukuInput.length === 0) {
       return;
@@ -1360,6 +1397,9 @@ export function MarumaruGame({
     const expectedAnswer = longFormStep?.expectedAnswer ?? dentakuPractice.answer;
 
     if (!matchesLongFormStepAnswer(kukuInput, expectedAnswer, longFormStep?.acceptsWrittenDigit ?? false)) {
+      if (!longFormStep) {
+        dentakuPractice.onWrongAnswer?.();
+      }
       playFailSfx();
       setKukuInputState('wrong');
       setTimeout(() => {
@@ -1873,6 +1913,17 @@ export function MarumaruGame({
               onPress={isClear ? (mode === 'launch' ? completeLaunch : playNextStage) : retryStage}
             />
           ) : null}
+          {canSkipReplay ? (
+            <Pressable
+              accessibilityLabel={a11yLabel('skip the replay')}
+              accessibilityRole="button"
+              testID="skip-replay"
+              onPress={skipReplay}
+              style={({ pressed }) => [styles.headerRetryButton, pressed && styles.pressedButton]}
+            >
+              <NavImageIcon kind="skip" size={29} />
+            </Pressable>
+          ) : null}
           <View style={styles.headerMainTitleShift}>
             {mode === 'launch' ? (
               <LaunchLogo onPress={onLogoPress} />
@@ -1940,6 +1991,8 @@ export function MarumaruGame({
           {divisionSplitAnimation ? <DivisionSplitOverlay animation={divisionSplitAnimation} /> : null}
           {divisionFailedAnimation ? <DivisionFailedOverlay animation={divisionFailedAnimation} /> : null}
           {isFailed ? <FailedWaterOverlay failedAt={failedAt} /> : null}
+          {/* The whole board skips too; the button in the header is the one that says so. */}
+          {canSkipReplay ? <Pressable aria-hidden focusable={false} testID="skip-replay-field" onPress={skipReplay} style={styles.skipReplayField} /> : null}
         </View>
       </View>
 

@@ -174,7 +174,7 @@ function getLongFormMultiplicationStep(problem: LongFormProblem, stepIndex: numb
 }
 
 function getLongFormMultiplicationState(problem: LongFormProblem) {
-  if (problem.operator !== '×' || problem.left < 10 || problem.left > 99 || problem.right < 10 || problem.right > 99) {
+  if (problem.operator !== '×' || problem.left < 10 || problem.left > 99 || problem.right < 2 || problem.right > 99) {
     return undefined;
   }
 
@@ -185,8 +185,13 @@ function getLongFormMultiplicationState(problem: LongFormProblem) {
   const partialProducts = [
     { inputValue: leftOnes * rightOnes, value: leftOnes * rightOnes, leftColumn: 1, rightColumn: 1 },
     { inputValue: leftTens * rightOnes, value: leftTens * 10 * rightOnes, leftColumn: 0, rightColumn: 1 },
-    { inputValue: leftOnes * rightTens, value: leftOnes * rightTens * 10, leftColumn: 1, rightColumn: 0 },
-    { inputValue: leftTens * rightTens, value: leftTens * 10 * rightTens * 10, leftColumn: 0, rightColumn: 0 },
+    // A multiplier of one digit has no tens to multiply by.
+    ...(rightTens > 0
+      ? [
+        { inputValue: leftOnes * rightTens, value: leftOnes * rightTens * 10, leftColumn: 1, rightColumn: 0 },
+        { inputValue: leftTens * rightTens, value: leftTens * 10 * rightTens * 10, leftColumn: 0, rightColumn: 0 },
+      ]
+      : []),
   ];
   const partialValues = partialProducts.map((partial) => partial.value);
   const answerWidth = Math.max(String(problem.answer).length, ...partialValues.map((value) => String(value).length), 3);

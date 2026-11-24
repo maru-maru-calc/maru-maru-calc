@@ -28,6 +28,68 @@ test('kuku world opens a dan stage and retries the same question after a wrong a
   await expect(page.getByTestId('kuku-question-title')).toHaveText('2 × 3 = ?', { timeout: 10000 });
 });
 
+test('a missed times-table question comes back after the others, and the replay can be skipped', async ({ page }) => {
+  await page.goto('/game');
+
+  await clearLaunch(page);
+  await page.getByLabel('dentaku mode', { exact: true }).click();
+  await page.getByLabel('9×9', { exact: true }).click();
+  await page.getByTestId('kuku-stage-dentaku-kuku-dan-2').click();
+  await expect(page.getByTestId('kuku-question-title')).toHaveText('2 × 1 = ?');
+  await expect(page.getByTestId('kuku-question-progress')).toHaveText('1/9');
+
+  await enterDentakuAnswer(page, 9);
+  await expect(page.getByTestId('kuku-question-title')).toHaveText('2 × 1 = ?', { timeout: 1200 });
+  await enterDentakuAnswer(page, 2);
+  await page.getByLabel('skip the replay').click();
+  await expect(page.getByTestId('current-total-value')).toHaveText('2');
+
+  // The stage is one question longer now.
+  for (let multiplier = 2; multiplier <= 9; multiplier += 1) {
+    await expect(page.getByTestId('kuku-question-title')).toHaveText(`2 × ${multiplier} = ?`, { timeout: 10000 });
+    await expect(page.getByTestId('kuku-question-progress')).toHaveText(`${multiplier}/10`);
+    await enterDentakuAnswer(page, 2 * multiplier);
+    await page.getByLabel('skip the replay').click();
+  }
+  await expect(page.getByTestId('kuku-question-title')).toHaveText('2 × 1 = ?', { timeout: 10000 });
+  await expect(page.getByTestId('kuku-question-progress')).toHaveText('10/10');
+
+  // Answered at the first try this time, so the stage ends and the same table follows out of order.
+  await enterDentakuAnswer(page, 2);
+  await page.getByLabel('skip the replay').click();
+  await expect(page.getByTestId('kuku-question-progress')).toHaveText('1/9', { timeout: 10000 });
+  await expect(page.getByTestId('kuku-question-title')).toHaveText(/^2 × \d = \?$/);
+});
+
+test('later dentaku stages use bigger numbers, and a skipped replay ends on the answer', async ({ page }) => {
+  await page.goto('/game');
+
+  await clearLaunch(page);
+  await page.getByLabel('dentaku mode', { exact: true }).click();
+  await page.getByLabel('+', { exact: true }).click();
+  await page.getByTestId('kuku-stage-dentaku-addition-21').scrollIntoViewIfNeeded();
+  await page.getByTestId('kuku-stage-dentaku-addition-21').click();
+
+  // #21 to #25: two digits plus one digit, into the next ten.
+  const prompt = await page.getByTestId('kuku-question-title').innerText();
+  const match = prompt.match(/^(\d{2}) \+ (\d) = \?$/);
+  if (!match) {
+    throw new Error(`Unexpected prompt for addition #21: ${prompt}`);
+  }
+  const left = Number(match[1]);
+  const right = Number(match[2]);
+  expect((left % 10) + right).toBeGreaterThanOrEqual(10);
+
+  await expect(page.getByLabel('skip the replay')).toHaveCount(0);
+  await enterDentakuAnswer(page, left + right);
+  await page.getByLabel('skip the replay').click();
+  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 2000 });
+  await expect(page.getByTestId('current-total-value')).toHaveText(String(left + right));
+  await expect(page.getByTestId('expression-display-text')).toHaveText(`${left} + ${right} = ${left + right}`);
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(0);
+  await expect(page.getByLabel('skip the replay')).toHaveCount(0);
+});
+
 test('dentaku non-kuku next button opens the next problem instead of returning to stage select', async ({ page }) => {
   await page.goto('/game');
 
@@ -151,6 +213,40 @@ test('long form multiplication advances through partial products and addition', 
     await enterDentakuAnswer(page, partialInput);
   }
 
+  const answer = left * right;
+  const width = Math.max(String(answer).length, ...partials.map((partial) => String(partial).length), 3);
+  for (const step of getColumnAdditionSteps(partials, width)) {
+    await enterDentakuAnswer(page, step);
+  }
+
+  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId('expression-display-text')).toHaveText(`${left} × ${right} = ${answer}`);
+});
+
+test('long form multiplication starts with two digits times one digit', async ({ page }) => {
+  await page.goto('/game');
+
+  await clearLaunch(page);
+  await page.getByLabel('long form mode', { exact: true }).click();
+  await page.getByLabel('×', { exact: true }).click();
+  await page.getByTestId('kuku-stage-long-form-multiplication-single-2').click();
+  await expect(page.getByTestId('long-form-panel')).toBeVisible();
+  const prompt = await page.getByTestId('long-form-question-prompt').innerText();
+  const match = prompt.match(/^(\d{2}) × (\d) = \?$/);
+  if (!match) {
+    throw new Error(`Unexpected long-form multiplication prompt: ${prompt}`);
+  }
+
+  const left = Number(match[1]);
+  const right = Number(match[2]);
+  const ones = (left % 10) * right;
+  const tens = Math.floor(left / 10) * right;
+  expect(ones).toBeGreaterThanOrEqual(10);
+
+  // Two partial products, then their sum column by column.
+  await enterDentakuAnswer(page, ones);
+  await enterDentakuAnswer(page, tens);
+  const partials = [ones, tens * 10];
   const answer = left * right;
   const width = Math.max(String(answer).length, ...partials.map((partial) => String(partial).length), 3);
   for (const step of getColumnAdditionSteps(partials, width)) {

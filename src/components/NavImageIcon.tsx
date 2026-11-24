@@ -1,12 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-type NavImageIconKind = 'back' | 'next' | 'retry';
+type NavImageIconKind = 'back' | 'next' | 'retry' | 'skip';
 
 const TEXT_BASE_COLOR = '#12334A';
 
 export function NavImageIcon({ kind, size }: { kind: NavImageIconKind; size: number }) {
   if (kind === 'retry') {
     return <RetryIcon size={size} />;
+  }
+  if (kind === 'skip') {
+    return <SkipIcon size={size} />;
   }
 
   return <ArrowIcon direction={kind === 'back' ? -1 : 1} size={size} />;
@@ -47,6 +50,35 @@ function ArrowIcon({ direction, size }: { direction: -1 | 1; size: number }) {
           },
         ]}
       />
+    </View>
+  );
+}
+
+/** Two arrowheads pointing right: "fast forward". */
+function SkipIcon({ size }: { size: number }) {
+  const stroke = Math.max(4, Math.round(size * 0.14));
+  const head = Math.round(size * 0.38);
+
+  return (
+    <View pointerEvents="none" testID="nav-icon-skip" style={{ width: size, height: size }}>
+      {[0.08, 0.42].map((left) => (
+        <View
+          key={left}
+          style={[
+            styles.arrowHead,
+            {
+              width: head,
+              height: head,
+              borderLeftWidth: stroke,
+              borderTopWidth: stroke,
+              borderRadius: Math.max(1, Math.round(stroke * 0.38)),
+              left: size * left,
+              top: size / 2 - head / 2,
+              transform: [{ rotate: '135deg' }],
+            },
+          ]}
+        />
+      ))}
     </View>
   );
 }
