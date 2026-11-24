@@ -1,7 +1,7 @@
 import { expect, Page, test } from '@playwright/test';
 
 import { PUZZLE_GAME_STAGES } from '../src/game/puzzle-game';
-import { PUZZLE_START_GROUPS } from '../src/game/puzzle-stages';
+import { PUZZLE_STAGES, PUZZLE_START_GROUPS } from '../src/game/puzzle-stages';
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -56,6 +56,28 @@ test('in the one-minute game a solved puzzle counts and a new one follows; a wro
   await page.getByLabel('Back', { exact: true }).click();
   await expect(page.getByTestId('quick-time-left')).toHaveCount(0);
   expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '{}').quickScores ?? [], SAVE_KEY)).toEqual([]);
+});
+
+test('maru falling out of a bubble never cover the bubbles still waiting', async ({ page }) => {
+  // Six bubbles in two rows: the maru of the upper row fall past the lower one.
+  const number = 77;
+  await openPuzzleGame(page, { version: 1, solved: PUZZLE_GAME_STAGES.slice(0, number - 1).map((stage) => stage.id), startVisits: 9, quickScores: [] });
+  await solveStartPuzzle(page);
+  await page.getByTestId('choose-puzzles').click();
+  await expect(page.getByTestId('stage-goal-number')).toHaveText(`#${number}`);
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(6);
+
+  const way = PUZZLE_STAGES[number - 1].solution.split(' ');
+  const covered: string[] = [];
+  await bubble(page, way[0]).click();
+  covered.push(...(await watchWaitingBubbles(page)));
+  for (let index = 1; index < way.length - 2; index += 2) {
+    await page.getByTestId(`operator-${way[index]}`).click();
+    await bubble(page, way[index + 1]).click();
+    covered.push(...(await watchWaitingBubbles(page)));
+  }
+
+  expect(covered).toEqual([]);
 });
 
 async function openPuzzleGame(page: Page, saved?: object) {
@@ -122,4 +144,30 @@ function findWay(bubbles: number[], goal: number): Array<string | number> | unde
     }
   }
   return undefined;
+}
+
+/** For 1.2 seconds, on every frame: which waiting bubbles have something else at their centre. */
+function watchWaitingBubbles(page: Page) {
+  return page.evaluate(
+    () =>
+      new Promise<string[]>((resolve) => {
+        const covered = new Set<string>();
+        const startedAt = performance.now();
+        const look = () => {
+          document.querySelectorAll('[data-testid^="pending-bubble-"]').forEach((element) => {
+            const box = element.getBoundingClientRect();
+            const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+            if (!top || !element.contains(top)) {
+              covered.add(`bubble ${element.getAttribute('data-testid')?.split('-')[2]} by ${top?.closest('[data-testid]')?.getAttribute('data-testid') ?? top?.tagName}`);
+            }
+          });
+          if (performance.now() - startedAt < 1200) {
+            requestAnimationFrame(look);
+          } else {
+            resolve([...covered]);
+          }
+        };
+        requestAnimationFrame(look);
+      }),
+  );
 }

@@ -590,7 +590,10 @@ export const styles = StyleSheet.create({
   },
   pendingBubbleButton: {
     position: 'absolute',
-    zIndex: 2,
+    // Above the maru (3 to 6) and the pop's spray (7). Maru falling out of a bubble used to pass
+    // in front of the bubbles still waiting, and a tap on one of those then took hold of a maru
+    // instead: the move was lost without a sign. Only a maru being dragged (40) goes over them.
+    zIndex: 8,
   },
   pendingBubbleHintRing: {
     position: 'absolute',
