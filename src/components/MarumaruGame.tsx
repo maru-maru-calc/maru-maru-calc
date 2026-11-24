@@ -1,7 +1,7 @@
 import * as Matter from 'matter-js';
-import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { PanResponder, PixelRatio, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { SFX } from '@/audio/sfx';
@@ -9,6 +9,8 @@ import { useOneShotAudio } from '@/audio/use-one-shot-audio';
 import { BrandLogo } from '@/components/BrandLogo';
 import { NavImageIcon } from '@/components/NavImageIcon';
 import { OperatorImageIcon } from '@/components/OperatorImageIcon';
+import { createBeadFrameStore, keepSameMaru, snapToPixel } from '@/game/bead-snapshots';
+import type { BeadFrameStore } from '@/game/bead-snapshots';
 import { getBeadKind, getNextPlaceValue } from '@/game/beads';
 import {
   evaluateExpressionTokens,
@@ -26,6 +28,7 @@ import { getStage } from '@/game/stages';
 import { BeadRole, BeadSign, BeadSnapshot, MergeCluster, OperatorUsageLimit, OperatorUsageLimits, PlaceValue } from '@/game/types';
 import type { Stage } from '@/game/types';
 import type { DentakuOperator } from '@/game/dentaku';
+import { useFrameTick, useTick, useTickUntil } from '@/game/use-tick';
 import { matchesLongFormStepAnswer } from '@/game/long-form';
 import { a11yLabel } from '@/i18n/a11y-label';
 import { usePrefersReducedMotion } from '@/layout/reduced-motion';
@@ -196,6 +199,13 @@ const DIVISION_FAILED_ANIMATION_MS = 980;
 const MULTIPLICATION_EXPANSION_HOLD_MS = 1100;
 const PRODUCT_BUBBLE_BURST_DELAY_MS = 1250;
 const BACKGROUND_BUBBLE_TICK_MS = 90;
+const RESULT_TICK_MS = 90;
+const IDLE_HINT_DELAY_MS = 2200;
+const IDLE_HINT_PULSE_MS = 720;
+const FEEDBACK_TICK_MS = 90;
+const IDLE_CHECK_MS = 90;
+const RESULT_READY_DELAY_MS = 1400;
+const LONG_FORM_QUESTION_TRANSITION_MS = 420;
 const FAILED_VEIL_FADE_IN_MS = 3200;
 const FIELD_BUBBLE_AUTO_BURST_IDLE_MS = 650;
 const FIELD_BUBBLE_AUTO_BURST_STEP_MS = 360;
@@ -265,7 +275,11 @@ export function MarumaruGame({
   const expressionTotalRef = useRef(0);
   const expressionHistoryRef = useRef<string[]>([]);
   const [pendingBubbles, setPendingBubbles] = useState<PendingBubble[]>([]);
+  // Which maru exist. This list is replaced only when a maru is added, removed or changed, so the
+  // x and y in it go stale: the rules below never look at them. Where the maru are right now lives
+  // in beadFrameStore, and only BeadLayer listens to that.
   const [beads, setBeads] = useState<BeadSnapshot[]>([]);
+  const [beadFrameStore] = useState(createBeadFrameStore);
   const [mergeAnimation, setMergeAnimation] = useState<MergeAnimation | undefined>(undefined);
   const [annihilationAnimation, setAnnihilationAnimation] = useState<AnnihilationAnimation | undefined>(undefined);
   const [divisionSplitAnimation, setDivisionSplitAnimation] = useState<DivisionSplitAnimation | undefined>(undefined);
@@ -283,10 +297,11 @@ export function MarumaruGame({
   const [clearedStageId, setClearedStageId] = useState<string | undefined>(undefined);
   const [isFailed, setIsFailed] = useState(false);
   const [failedAt, setFailedAt] = useState<number | undefined>(undefined);
-  const [idleHintTick, setIdleHintTick] = useState(() => Date.now());
+  // -1 while the player is active; once they have been idle for a while it counts the hint's pulses.
+  const [idleHintStep, setIdleHintStep] = useState(-1);
   // Decorative movement (drifting bubbles, fireworks, pulsing buttons) is dropped when less motion is asked for.
   const prefersReducedMotion = usePrefersReducedMotion();
-  const [backgroundBubbleTick, setBackgroundBubbleTick] = useState(() => Date.now());
+  const [resultCheckRetry, setResultCheckRetry] = useState(0);
   const [backgroundBubbleStarts, setBackgroundBubbleStarts] = useState<Record<string, number>>({});
   const engineRef = useRef<Matter.Engine | null>(null);
   const entitiesRef = useRef<BeadEntity[]>([]);
@@ -312,17 +327,12 @@ export function MarumaruGame({
   const didPlayFailSfxRef = useRef(false);
 
   const total = useMemo(() => getTotalValue(beads), [beads]);
-  const displayBeads = useMemo(
-    () => getDisplayBeadsForPendingPriorityExpression(beads, expressionTokens),
-    [beads, expressionTokens],
-  );
-  const almostMergeBeadIds = useMemo(() => findAlmostMergeBeadIds(displayBeads), [displayBeads]);
   const basinFrameSegments = useMemo(() => getBasinFrameSegments(fieldWidth, fieldHeight), [fieldHeight, fieldWidth]);
   const backgroundBubbles = useMemo(() => getBackgroundBubbleSpecs(width), [width]);
   const markBubbleInteraction = useCallback(() => {
     const now = Date.now();
     lastBubbleInteractionAtRef.current = now;
-    setIdleHintTick(now);
+    setIdleHintStep(-1);
   }, []);
   const shouldHintPendingBubbles =
     mode === 'launch' &&
@@ -330,9 +340,8 @@ export function MarumaruGame({
     !isClear &&
     !isFailed &&
     draggingBeadId === undefined &&
-    idleHintTick - lastBubbleInteractionAtRef.current >= 2200;
-  const shouldPulsePendingBubbles =
-    shouldHintPendingBubbles && Math.floor((idleHintTick - lastBubbleInteractionAtRef.current - 2200) / 720) % 2 === 0;
+    idleHintStep >= 0;
+  const shouldPulsePendingBubbles = shouldHintPendingBubbles && idleHintStep % 2 === 0;
   const footerExpressionTokens = getFooterExpressionTokens({
     dentakuPractice,
     expressionTokens,
@@ -412,7 +421,7 @@ export function MarumaruGame({
     engineRef.current = engine;
     const initialEntities = mode === 'launch' ? createLaunchBeads(engine, fieldWidth, fieldHeight) : [];
     entitiesRef.current = initialEntities;
-    setBeads(toSnapshots(initialEntities, { width: fieldWidth, height: fieldHeight }));
+    publishBeads(beadFrameStore, setBeads, initialEntities, fieldWidth, fieldHeight);
     setPendingBubbles(createPendingBubbles(fieldWidth, mode === 'launch' ? [LAUNCH_BUBBLE_COUNT] : stage.bubbleCounts));
     const initialExpression = mode === 'launch' ? [String(LAUNCH_INITIAL_TOTAL), '+'] : [];
     expressionTokensRef.current = initialExpression;
@@ -449,18 +458,18 @@ export function MarumaruGame({
   }, [resetStage]);
 
   useEffect(() => {
-    const interval = setInterval(() => setBackgroundBubbleTick(Date.now()), BACKGROUND_BUBBLE_TICK_MS);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (pendingBubbles.length === 0 || isClear || isFailed) {
+    // Only the launch screen hints at its bubbles.
+    if (mode !== 'launch' || pendingBubbles.length === 0 || isClear || isFailed) {
       return undefined;
     }
 
-    const interval = setInterval(() => setIdleHintTick(Date.now()), 260);
+    // The screen is drawn again only when the hint changes (it starts, or pulses), not on every look at the clock.
+    const interval = setInterval(() => {
+      const idleFor = Date.now() - lastBubbleInteractionAtRef.current;
+      setIdleHintStep(idleFor >= IDLE_HINT_DELAY_MS ? Math.floor((idleFor - IDLE_HINT_DELAY_MS) / IDLE_HINT_PULSE_MS) : -1);
+    }, 260);
     return () => clearInterval(interval);
-  }, [isClear, isFailed, pendingBubbles.length]);
+  }, [isClear, isFailed, mode, pendingBubbles.length]);
 
   useEffect(() => {
     expressionTokensRef.current = expressionTokens;
@@ -556,15 +565,22 @@ export function MarumaruGame({
       return;
     }
 
+    // The board has to stay ready for a moment before the result counts. Nothing redraws this
+    // screen while the board rests, so the wait is a timer that runs this check again.
+    const checkAgainIn = (ms: number) => {
+      const timeout = setTimeout(() => setResultCheckRetry((count) => count + 1), ms);
+      return () => clearTimeout(timeout);
+    };
     const now = Date.now();
     resultReadySinceRef.current ??= now;
-    if (now - resultReadySinceRef.current < 1400) {
-      return;
+    const waited = now - resultReadySinceRef.current;
+    if (waited < RESULT_READY_DELAY_MS) {
+      return checkAgainIn(RESULT_READY_DELAY_MS - waited);
     }
 
     if (hasPendingSamePlaceCancellation(beads)) {
       resultReadySinceRef.current = now;
-      return;
+      return checkAgainIn(RESULT_READY_DELAY_MS);
     }
 
     const currentTotal = getTotalValue(beads);
@@ -584,7 +600,7 @@ export function MarumaruGame({
     }
 
     return undefined;
-  }, [annihilationAnimation, beads, completeCurrentStage, dentakuPractice, divisionFailedAnimation, divisionSplitAnimation, isClear, isFailed, kukuInputState, mergeAnimation, multiplicationExpansionAnimation, pendingBubbles, target]);
+  }, [annihilationAnimation, beads, completeCurrentStage, dentakuPractice, divisionFailedAnimation, divisionSplitAnimation, isClear, isFailed, kukuInputState, mergeAnimation, multiplicationExpansionAnimation, pendingBubbles, resultCheckRetry, target]);
 
   const addBead = useCallback(
     (
@@ -681,7 +697,7 @@ export function MarumaruGame({
     removeBodies(engine, candidates);
     entitiesRef.current = entitiesRef.current.filter((entity) => !candidates.some((candidate) => candidate.id === entity.id));
     addBead(1, totalCount, targetSign, center.x, center.y, false, undefined, 'multiplicand');
-    setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
+    publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
   }, [addBead, fieldHeight, fieldWidth]);
 
   useEffect(() => {
@@ -766,7 +782,7 @@ export function MarumaruGame({
       expressionHistoryRef.current = stripExpressionResult(nextExpressionTokens);
       setExpressionTokens(nextExpressionTokens);
       setMessage(`${formatSignedCount(signedSourceCount)}のまとまりが ${formatSignedCount(signedMultiplier)}こ`);
-      setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
+      publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
       setTimeout(() => {
         if (engineRef.current !== engine) {
           return;
@@ -776,7 +792,7 @@ export function MarumaruGame({
           addBead(1, source.count, resultSign, group.x, group.y, false, { x: Math.cos(group.angle) * 1.8, y: 2 + Math.sin(group.angle) }, 'product');
         });
         setMultiplicationExpansionAnimation((current) => (current?.id === expansionId ? undefined : current));
-        setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
+        publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
       }, MULTIPLICATION_EXPANSION_HOLD_MS);
       return true;
     },
@@ -848,7 +864,7 @@ export function MarumaruGame({
       expressionHistoryRef.current = stripExpressionResult(nextExpressionTokens);
       setExpressionTokens(nextExpressionTokens);
       setMessage(`${formatSignedCount(signedSourceCount)}を ${formatSignedCount(signedDivisor)}つに わけたよ`);
-      setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
+      publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
       return true;
     },
     [addBead, fieldHeight, fieldWidth, triggerBubbleBurst],
@@ -875,7 +891,7 @@ export function MarumaruGame({
     expressionHistoryRef.current = stripExpressionResult(evaluatedTokens);
     setExpressionTokens(evaluatedTokens);
     setMessage(usedSimpleRelease ? `${formatSignedCount(totalValue)}を まとまったまるでだしたよ` : `${formatSignedCount(totalValue)}この まるになったよ`);
-    setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
+    publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
     return true;
   }, [addReleasedBeads, expressionTokens, fieldHeight, fieldWidth]);
 
@@ -893,7 +909,7 @@ export function MarumaruGame({
       const usedSimpleRelease = addReleasedBeads(productGroup.count, productGroup.sign, productGroup.body.position);
 
       setMessage(usedSimpleRelease ? `${productGroup.count}を まとまったまるでだしたよ` : `${productGroup.count}この まるに われたよ`);
-      setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
+      publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
       return true;
     },
     [addReleasedBeads, fieldHeight, fieldWidth],
@@ -920,7 +936,7 @@ export function MarumaruGame({
       }
 
       setMessage(`${group.count}この まるに われたよ`);
-      setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
+      publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
       return true;
     },
     [addBead, fieldHeight, fieldWidth],
@@ -928,37 +944,43 @@ export function MarumaruGame({
 
   useEffect(() => {
     if (!divisionFailedAnimation) {
-      return;
+      return undefined;
     }
 
-    if (backgroundBubbleTick - divisionFailedAnimation.startedAt >= DIVISION_FAILED_ANIMATION_MS) {
-      setDivisionFailedAnimation(undefined);
-    }
-  }, [backgroundBubbleTick, divisionFailedAnimation]);
+    const remaining = divisionFailedAnimation.startedAt + DIVISION_FAILED_ANIMATION_MS - Date.now();
+    const timeout = setTimeout(() => setDivisionFailedAnimation(undefined), Math.max(0, remaining));
+    return () => clearTimeout(timeout);
+  }, [divisionFailedAnimation]);
 
   useEffect(() => {
     if (isClear || isFailed || draggingBeadId !== undefined || mergeAnimation || divisionSplitAnimation || divisionFailedAnimation || annihilationAnimation || multiplicationExpansionAnimation) {
-      return;
+      return undefined;
     }
 
-    const idleDuration = backgroundBubbleTick - lastBubbleInteractionAtRef.current;
-    if (idleDuration < FIELD_BUBBLE_AUTO_BURST_IDLE_MS) {
-      return;
-    }
+    // Looks at the clock on a timer of its own, so waiting for the player costs no redraw.
+    const burstWhenIdle = () => {
+      const now = Date.now();
+      if (now - lastBubbleInteractionAtRef.current < FIELD_BUBBLE_AUTO_BURST_IDLE_MS) {
+        return;
+      }
 
-    if (backgroundBubbleTick - lastFieldBubbleAutoBurstAtRef.current < FIELD_BUBBLE_AUTO_BURST_STEP_MS) {
-      return;
-    }
+      if (now - lastFieldBubbleAutoBurstAtRef.current < FIELD_BUBBLE_AUTO_BURST_STEP_MS) {
+        return;
+      }
 
-    const fieldBubble = findAutoBurstFieldBubble(entitiesRef.current, fieldWidth, fieldHeight);
-    if (!fieldBubble) {
-      return;
-    }
+      const fieldBubble = findAutoBurstFieldBubble(entitiesRef.current, fieldWidth, fieldHeight);
+      if (!fieldBubble) {
+        return;
+      }
 
-    lastFieldBubbleAutoBurstAtRef.current = backgroundBubbleTick;
-    playBubblePopSfx();
-    unwrapBeadGroup(fieldBubble.id);
-  }, [annihilationAnimation, backgroundBubbleTick, divisionFailedAnimation, divisionSplitAnimation, draggingBeadId, fieldHeight, fieldWidth, isClear, isFailed, mergeAnimation, multiplicationExpansionAnimation, playBubblePopSfx, unwrapBeadGroup]);
+      lastFieldBubbleAutoBurstAtRef.current = now;
+      playBubblePopSfx();
+      unwrapBeadGroup(fieldBubble.id);
+    };
+
+    const interval = setInterval(burstWhenIdle, IDLE_CHECK_MS);
+    return () => clearInterval(interval);
+  }, [annihilationAnimation, divisionFailedAnimation, divisionSplitAnimation, draggingBeadId, fieldHeight, fieldWidth, isClear, isFailed, mergeAnimation, multiplicationExpansionAnimation, playBubblePopSfx, unwrapBeadGroup]);
 
   const burstBubble = useCallback(
     (bubble: PendingBubble) => {
@@ -1366,7 +1388,7 @@ export function MarumaruGame({
       });
       Matter.Body.setVelocity(entity.body, { x: 0, y: 0 });
       Matter.Body.setAngularVelocity(entity.body, 0);
-      setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
+      publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
     },
     [fieldHeight, fieldWidth],
   );
@@ -1670,7 +1692,8 @@ export function MarumaruGame({
           }
         }
       }
-      setBeads(toSnapshots(entitiesRef.current, { width: fieldWidth, height: fieldHeight }));
+      // Moving maru redraw only the maru layer; this screen hears about it when the set of maru changes.
+      publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
       frame = requestAnimationFrame(tick);
     };
 
@@ -1762,15 +1785,9 @@ export function MarumaruGame({
       document.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [hasAnswerPad]);
-  const clearActionPulse = isClear && !prefersReducedMotion ? 1 + Math.sin(backgroundBubbleTick / 170) * 0.08 : 1;
-  const failedProgress = failedAt ? clamp((backgroundBubbleTick - failedAt) / FAILED_VEIL_FADE_IN_MS, 0, 1) : 0;
-  const failedActionPulse = isFailed && !prefersReducedMotion ? 1 + Math.sin(backgroundBubbleTick / 155) * (0.04 + failedProgress * 0.09) : 1;
   const clearEquation = `${formatResultExpression(expressionTokens, target)} = ${target}`;
   const failedEquation = `${total} ≠ ${target}`;
   const longFormProblem = dentakuPractice?.longFormMode ? getLongFormProblem(dentakuPractice) : undefined;
-  const longFormQuestionTransition = dentakuPractice?.longFormMode
-    ? 1 - clamp((backgroundBubbleTick - longFormQuestionChangedAt) / 420, 0, 1)
-    : 0;
 
   return (
     <View style={styles.screen}>
@@ -1782,23 +1799,14 @@ export function MarumaruGame({
             </Pressable>
           ) : null}
           {(!dentakuPractice && (mode !== 'launch' || isClear)) || (dentakuPractice && isClear && !dentakuPractice.autoAdvance) ? (
-            <Pressable
-              accessibilityLabel={a11yLabel(isClear ? 'next stage' : 'retry')}
-              accessibilityRole="button"
+            <HeaderActionButton
+              isClear={isClear}
+              isFailed={isFailed}
+              failedAt={failedAt}
+              isLaunch={mode === 'launch'}
+              prefersReducedMotion={prefersReducedMotion}
               onPress={isClear ? (mode === 'launch' ? completeLaunch : playNextStage) : retryStage}
-              style={({ pressed }) => [
-                styles.headerRetryButton,
-                isClear && styles.headerNextButton,
-                mode === 'launch' && isClear && styles.headerLaunchNextButton,
-                isFailed && styles.headerRetryButtonFailed,
-                isFailed && { transform: [{ scale: failedActionPulse }], shadowOpacity: 0.18 + failedProgress * 0.46, shadowRadius: 8 + failedProgress * 16 },
-                pressed && styles.pressedButton,
-              ]}
-            >
-              <View pointerEvents="none" style={isClear ? { transform: [{ scale: clearActionPulse }] } : undefined}>
-                <NavImageIcon kind={isClear ? 'next' : 'retry'} size={isClear ? 31 : 29} />
-              </View>
-            </Pressable>
+            />
           ) : null}
           <View style={styles.headerMainTitleShift}>
             {mode === 'launch' ? (
@@ -1809,7 +1817,6 @@ export function MarumaruGame({
                 input={kukuInput}
                 maxWidth={Math.max(168, fieldWidth - 132)}
                 isWrong={kukuInputState === 'wrong'}
-                feedbackTick={backgroundBubbleTick}
               />
             ) : (
               <StageGoalTitle stageNumber={stageNumberInIsland} target={target} maxWidth={Math.max(168, fieldWidth - 132)} />
@@ -1832,51 +1839,7 @@ export function MarumaruGame({
           onSelect={selectOperator}
         />
         <View style={[styles.field, { width: fieldWidth, height: fieldHeight }]}>
-          {basinFrameSegments.map((segment) => (
-            <View
-              key={`${segment.id}-tray`}
-              pointerEvents="none"
-              style={[
-                styles.basinTraySegment,
-                {
-                  left: segment.x,
-                  top: segment.y + 3,
-                  width: segment.length + 4,
-                  transform: [{ rotate: `${segment.angle}rad` }],
-                },
-              ]}
-            />
-          ))}
-          {basinFrameSegments.map((segment) => (
-            <View
-              key={segment.id}
-              pointerEvents="none"
-              style={[
-                styles.basinFrameSegment,
-                {
-                  left: segment.x,
-                  top: segment.y,
-                  width: segment.length + 3,
-                  transform: [{ rotate: `${segment.angle}rad` }],
-                },
-              ]}
-            />
-          ))}
-          {basinFrameSegments.map((segment) => (
-            <View
-              key={`${segment.id}-shine`}
-              pointerEvents="none"
-              style={[
-                styles.basinFrameHighlightSegment,
-                {
-                  left: segment.x + 1,
-                  top: segment.y - 2,
-                  width: segment.length,
-                  transform: [{ rotate: `${segment.angle}rad` }],
-                },
-              ]}
-            />
-          ))}
+          <BasinFrame segments={basinFrameSegments} />
           {pendingBubbles.map((bubble) => {
             const activePendingOperator = hasReleasedBubble ? selectedOperator : '+';
             const bubbleSign: BeadSign = activePendingOperator === '×' || activePendingOperator === '÷' ? operatorSign : activePendingOperator === '-' ? -1 : 1;
@@ -1897,24 +1860,21 @@ export function MarumaruGame({
             <BubbleBurst key={animation.id} animation={animation} />
           ))}
           {multiplicationExpansionAnimation ? <MultiplicationExpansionOverlay animation={multiplicationExpansionAnimation} /> : null}
-          {isClear && !prefersReducedMotion ? <ClearBubbleFireworks fieldWidth={fieldWidth} fieldHeight={fieldHeight} tick={backgroundBubbleTick} /> : null}
-          {displayBeads.map((bead) => (
-            divisionSplitAnimation?.resultBeadId === bead.id ? null :
-            <DraggableBeadView
-              key={bead.id}
-              bead={bead}
-              onMove={moveBead}
-              onDragStart={startDragBead}
-              onDragEnd={endDragBead}
-              isDragging={draggingBeadId === bead.id}
-              isAlmostMerge={almostMergeBeadIds.has(bead.id)}
-              onTap={bead.id !== 'expression-wrap-preview' && canBurstBead(bead) ? () => unwrapBeadGroup(bead.id) : undefined}
-            />
-          ))}
+          {isClear && !prefersReducedMotion ? <ClearBubbleFireworks fieldWidth={fieldWidth} fieldHeight={fieldHeight} /> : null}
+          <BeadLayer
+            store={beadFrameStore}
+            expressionTokens={expressionTokens}
+            hiddenBeadId={divisionSplitAnimation?.resultBeadId}
+            draggingBeadId={draggingBeadId}
+            onMove={moveBead}
+            onDragStart={startDragBead}
+            onDragEnd={endDragBead}
+            onUnwrap={unwrapBeadGroup}
+          />
           {mergeAnimation ? <MergePulse animation={mergeAnimation} /> : null}
           {divisionSplitAnimation ? <DivisionSplitOverlay animation={divisionSplitAnimation} /> : null}
-          {divisionFailedAnimation ? <DivisionFailedOverlay animation={divisionFailedAnimation} tick={backgroundBubbleTick} /> : null}
-          {isFailed ? <FailedWaterOverlay progress={failedProgress} /> : null}
+          {divisionFailedAnimation ? <DivisionFailedOverlay animation={divisionFailedAnimation} /> : null}
+          {isFailed ? <FailedWaterOverlay failedAt={failedAt} /> : null}
         </View>
       </View>
 
@@ -1929,20 +1889,18 @@ export function MarumaruGame({
           canSubmit={kukuInput.length > 0 && kukuInputState === 'input' && !isFailed}
           longFormProblem={longFormProblem}
           longFormStepIndex={longFormStepIndex}
-          longFormQuestionTransition={longFormQuestionTransition}
-          longFormFeedbackTick={backgroundBubbleTick}
+          longFormQuestionChangedAt={longFormQuestionChangedAt}
           input={kukuInput}
           onDigit={appendKukuDigit}
           onDelete={deleteKukuDigit}
           onSubmit={submitKukuAnswer}
         />
       ) : null}
-      {isFailed ? <View pointerEvents="none" style={[styles.failedScreenVeil, { opacity: failedProgress }]} /> : null}
+      {isFailed ? <FailedScreenVeil failedAt={failedAt} /> : null}
       <BackgroundBubbleLayer
         bubbles={prefersReducedMotion ? NO_BACKGROUND_BUBBLES : backgroundBubbles}
         fieldWidth={width}
         fieldHeight={height}
-        tick={backgroundBubbleTick}
         bubbleStarts={backgroundBubbleStarts}
         onPop={(bubbleId) => {
           playBackgroundBubbleSfx();
@@ -1993,14 +1951,13 @@ function KukuGoalTitle({
   input,
   maxWidth,
   isWrong,
-  feedbackTick,
 }: {
   practice: DentakuPractice;
   input: string;
   maxWidth: number;
   isWrong: boolean;
-  feedbackTick: number;
 }) {
+  const feedbackTick = useTick(FEEDBACK_TICK_MS, isWrong && !practice.longFormMode);
   if (practice.longFormMode) {
     return <LongFormStageTitle label={practice.stageLabel} questionNumber={practice.questionNumber} questionTotal={practice.questionTotal} maxWidth={maxWidth} />;
   }
@@ -2052,19 +2009,21 @@ function LongFormGoalTitle({
   problem,
   input,
   stepIndex,
-  transition,
+  questionChangedAt,
   isWrong,
-  feedbackTick,
   maxWidth,
 }: {
   problem: LongFormProblem;
   input: string;
   stepIndex: number;
-  transition: number;
+  questionChangedAt: number;
   isWrong: boolean;
-  feedbackTick: number;
   maxWidth: number;
 }) {
+  // A new question settles in over a moment; after that this clock stops.
+  const transitionTick = useTickUntil(FEEDBACK_TICK_MS, questionChangedAt + LONG_FORM_QUESTION_TRANSITION_MS);
+  const transition = 1 - clamp((transitionTick - questionChangedAt) / LONG_FORM_QUESTION_TRANSITION_MS, 0, 1);
+  const feedbackTick = useTick(FEEDBACK_TICK_MS, isWrong);
   const answerText = input || '?';
   const hasInput = input.length > 0;
   const promptText = `${problem.left} ${problem.operator} ${problem.right} = ${answerText}`;
@@ -2847,8 +2806,7 @@ function KukuAnswerPad({
   canSubmit,
   longFormProblem,
   longFormStepIndex,
-  longFormQuestionTransition,
-  longFormFeedbackTick,
+  longFormQuestionChangedAt,
   input,
   onDigit,
   onDelete,
@@ -2858,8 +2816,7 @@ function KukuAnswerPad({
   canSubmit: boolean;
   longFormProblem?: LongFormProblem;
   longFormStepIndex: number;
-  longFormQuestionTransition: number;
-  longFormFeedbackTick: number;
+  longFormQuestionChangedAt: number;
   input: string;
   onDigit: (digit: string) => void;
   onDelete: () => void;
@@ -2873,9 +2830,8 @@ function KukuAnswerPad({
             problem={longFormProblem}
             input={input}
             stepIndex={longFormStepIndex}
-            transition={longFormQuestionTransition}
+            questionChangedAt={longFormQuestionChangedAt}
             isWrong={state === 'wrong'}
-            feedbackTick={longFormFeedbackTick}
             maxWidth={280}
           />
         </View>
@@ -2989,7 +2945,8 @@ function MiniGoalBead({ part, size }: { part: GoalPart; size: number }) {
   );
 }
 
-function BeadView({
+// Its look depends only on what the maru is, so a maru that merely moves is not drawn again inside.
+const BeadView = memo(function BeadView({
   value,
   count,
   sign,
@@ -3086,7 +3043,7 @@ function BeadView({
       )}
     </View>
   );
-}
+});
 
 function MergePulse({ animation }: { animation: MergeAnimation }) {
   const nextKind = getBeadKind(animation.nextValue);
@@ -3165,7 +3122,69 @@ function MergePulse({ animation }: { animation: MergeAnimation }) {
   );
 }
 
-function FailedWaterOverlay({ progress }: { progress: number }) {
+/** How far the "try again" look has faded in: 0 when the stage has just failed, 1 once it is fully there. */
+function getFailedProgress(now: number, failedAt?: number) {
+  return failedAt ? clamp((now - failedAt) / FAILED_VEIL_FADE_IN_MS, 0, 1) : 0;
+}
+
+/** A clock for the fade-in after a failed stage. It stops by itself when the fade is done. */
+function useFailedProgress(failedAt?: number) {
+  const tick = useTickUntil(RESULT_TICK_MS, (failedAt ?? 0) + FAILED_VEIL_FADE_IN_MS);
+  return getFailedProgress(tick, failedAt);
+}
+
+/**
+ * The retry / next button in the header. It pulses on the result screens, and keeps the clock for
+ * that to itself so the pulse does not redraw the game around it.
+ */
+function HeaderActionButton({
+  isClear,
+  isFailed,
+  failedAt,
+  isLaunch,
+  prefersReducedMotion,
+  onPress,
+}: {
+  isClear: boolean;
+  isFailed: boolean;
+  failedAt?: number;
+  isLaunch: boolean;
+  prefersReducedMotion: boolean;
+  onPress: () => void;
+}) {
+  const tick = useTick(RESULT_TICK_MS, isFailed || (isClear && !prefersReducedMotion));
+  const clearActionPulse = isClear && !prefersReducedMotion ? 1 + Math.sin(tick / 170) * 0.08 : 1;
+  const failedProgress = getFailedProgress(tick, failedAt);
+  const failedActionPulse = isFailed && !prefersReducedMotion ? 1 + Math.sin(tick / 155) * (0.04 + failedProgress * 0.09) : 1;
+
+  return (
+    <Pressable
+      accessibilityLabel={a11yLabel(isClear ? 'next stage' : 'retry')}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.headerRetryButton,
+        isClear && styles.headerNextButton,
+        isLaunch && isClear && styles.headerLaunchNextButton,
+        isFailed && styles.headerRetryButtonFailed,
+        isFailed && { transform: [{ scale: failedActionPulse }], shadowOpacity: 0.18 + failedProgress * 0.46, shadowRadius: 8 + failedProgress * 16 },
+        pressed && styles.pressedButton,
+      ]}
+    >
+      <View pointerEvents="none" style={isClear ? { transform: [{ scale: clearActionPulse }] } : undefined}>
+        <NavImageIcon kind={isClear ? 'next' : 'retry'} size={isClear ? 31 : 29} />
+      </View>
+    </Pressable>
+  );
+}
+
+function FailedScreenVeil({ failedAt }: { failedAt?: number }) {
+  const progress = useFailedProgress(failedAt);
+  return <View pointerEvents="none" style={[styles.failedScreenVeil, { opacity: progress }]} />;
+}
+
+function FailedWaterOverlay({ failedAt }: { failedAt?: number }) {
+  const progress = useFailedProgress(failedAt);
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.failedWaterOverlay, { opacity: progress }]}>
       <View style={[styles.failedSiltCloud, styles.failedSiltCloudLeft]} />
@@ -3179,7 +3198,7 @@ function FailedWaterOverlay({ progress }: { progress: number }) {
 }
 
 function MultiplicationExpansionOverlay({ animation }: { animation: MultiplicationExpansionAnimation }) {
-  const age = Date.now() - animation.startedAt;
+  const age = useFrameTick() - animation.startedAt;
   const settleProgress = clamp(age / MULTIPLICATION_EXPANSION_HOLD_MS, 0, 1);
   const scale = 0.92 + settleProgress * 0.08;
   const opacity = clamp(age / 180, 0, 1) * (1 - clamp((age - MULTIPLICATION_EXPANSION_HOLD_MS + 220) / 220, 0, 0.18));
@@ -3207,7 +3226,7 @@ function MultiplicationExpansionOverlay({ animation }: { animation: Multiplicati
 }
 
 function BubbleBurst({ animation }: { animation: BubbleBurstAnimation }) {
-  const progress = clamp((Date.now() - animation.startedAt) / BUBBLE_BURST_ANIMATION_MS, 0, 1);
+  const progress = clamp((useFrameTick() - animation.startedAt) / BUBBLE_BURST_ANIMATION_MS, 0, 1);
   const fade = 1 - progress;
   const ringRadius = animation.radius + 3 + progress * 8;
   const innerRingRadius = animation.radius * 0.58 + progress * 4;
@@ -3401,8 +3420,8 @@ function DivisionSplitOverlay({ animation }: { animation: DivisionSplitAnimation
   );
 }
 
-function DivisionFailedOverlay({ animation, tick }: { animation: DivisionFailedAnimation; tick: number }) {
-  const age = tick - animation.startedAt;
+function DivisionFailedOverlay({ animation }: { animation: DivisionFailedAnimation }) {
+  const age = useTick(FEEDBACK_TICK_MS) - animation.startedAt;
   const progress = clamp(age / DIVISION_FAILED_ANIMATION_MS, 0, 1);
   const showProgress = clamp(progress / 0.34, 0, 1);
   const rejectProgress = clamp((progress - 0.46) / 0.42, 0, 1);
@@ -3633,17 +3652,17 @@ function BackgroundBubbleLayer({
   bubbles,
   fieldWidth,
   fieldHeight,
-  tick,
   bubbleStarts,
   onPop,
 }: {
   bubbles: BackgroundBubbleSpec[];
   fieldWidth: number;
   fieldHeight: number;
-  tick: number;
   bubbleStarts: Record<string, number>;
   onPop: (bubbleId: string) => void;
 }) {
+  // The drift is drawn from this layer's own clock, so it never redraws the game around it.
+  const tick = useTick(BACKGROUND_BUBBLE_TICK_MS, bubbles.length > 0);
   return (
     <View pointerEvents="box-none" style={styles.backgroundBubbleLayer}>
       {bubbles.map((bubble) => {
@@ -3684,7 +3703,8 @@ function BackgroundBubbleLayer({
   );
 }
 
-function ClearBubbleFireworks({ fieldWidth, fieldHeight, tick }: { fieldWidth: number; fieldHeight: number; tick: number }) {
+function ClearBubbleFireworks({ fieldWidth, fieldHeight }: { fieldWidth: number; fieldHeight: number }) {
+  const tick = useTick(RESULT_TICK_MS);
   const cycle = 2600;
   const baseTime = tick % cycle;
   const burstSpecs = [
@@ -3924,23 +3944,117 @@ function MiniWrappedBubble({
   );
 }
 
-function DraggableBeadView({
-  bead,
+/** The tray the maru sit in. It only depends on the size of the field, so it is drawn once. */
+const BasinFrame = memo(function BasinFrame({ segments }: { segments: ReturnType<typeof getBasinFrameSegments> }) {
+  return (
+    <>
+      {segments.map((segment) => (
+        <View
+          key={`${segment.id}-tray`}
+          pointerEvents="none"
+          style={[
+            styles.basinTraySegment,
+            {
+              left: segment.x,
+              top: segment.y + 3,
+              width: segment.length + 4,
+              transform: [{ rotate: `${segment.angle}rad` }],
+            },
+          ]}
+        />
+      ))}
+      {segments.map((segment) => (
+        <View
+          key={segment.id}
+          pointerEvents="none"
+          style={[
+            styles.basinFrameSegment,
+            {
+              left: segment.x,
+              top: segment.y,
+              width: segment.length + 3,
+              transform: [{ rotate: `${segment.angle}rad` }],
+            },
+          ]}
+        />
+      ))}
+      {segments.map((segment) => (
+        <View
+          key={`${segment.id}-shine`}
+          pointerEvents="none"
+          style={[
+            styles.basinFrameHighlightSegment,
+            {
+              left: segment.x + 1,
+              top: segment.y - 2,
+              width: segment.length,
+              transform: [{ rotate: `${segment.angle}rad` }],
+            },
+          ]}
+        />
+      ))}
+    </>
+  );
+});
+
+/**
+ * Draws the maru. It is the only part of the game that listens to where the maru are, so a maru
+ * that moves redraws this layer and nothing else.
+ */
+const BeadLayer = memo(function BeadLayer({
+  store,
+  expressionTokens,
+  hiddenBeadId,
+  draggingBeadId,
   onMove,
   onDragStart,
   onDragEnd,
-  isDragging,
-  isAlmostMerge,
-  onTap,
+  onUnwrap,
 }: {
+  store: BeadFrameStore;
+  expressionTokens: string[];
+  hiddenBeadId?: string;
+  draggingBeadId?: string;
+  onMove: (beadId: string, x: number, y: number) => void;
+  onDragStart: (beadId: string) => void;
+  onDragEnd: (beadId: string) => void;
+  onUnwrap: (beadId: string) => void;
+}) {
+  const beads = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  const displayBeads = useMemo(() => getDisplayBeadsForPendingPriorityExpression(beads, expressionTokens), [beads, expressionTokens]);
+  const almostMergeBeadIds = useMemo(() => findAlmostMergeBeadIds(displayBeads), [displayBeads]);
+
+  return (
+    <>
+      {displayBeads.map((bead) =>
+        hiddenBeadId === bead.id ? null : (
+          <DraggableBeadView
+            key={bead.id}
+            bead={bead}
+            onMove={onMove}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            isDragging={draggingBeadId === bead.id}
+            isAlmostMerge={almostMergeBeadIds.has(bead.id)}
+            onTap={bead.id !== 'expression-wrap-preview' && canBurstBead(bead) ? onUnwrap : undefined}
+          />
+        ),
+      )}
+    </>
+  );
+});
+
+type DraggableBeadViewProps = {
   bead: BeadSnapshot;
   onMove: (beadId: string, x: number, y: number) => void;
   onDragStart: (beadId: string) => void;
   onDragEnd: (beadId: string) => void;
   isDragging: boolean;
   isAlmostMerge: boolean;
-  onTap?: () => void;
-}) {
+  onTap?: (beadId: string) => void;
+};
+
+const DraggableBeadView = memo(function DraggableBeadView({ bead, onMove, onDragStart, onDragEnd, isDragging, isAlmostMerge, onTap }: DraggableBeadViewProps) {
   const startPositionRef = useRef({ x: bead.x, y: bead.y });
   const hasDraggedRef = useRef(false);
   const radius = getEntityRadius(bead.value, bead.count);
@@ -3965,7 +4079,7 @@ function DraggableBeadView({
         onPanResponderRelease: () => {
           onDragEnd(bead.id);
           if (!hasDraggedRef.current) {
-            onTap?.();
+            onTap?.(bead.id);
           }
         },
         onPanResponderTerminate: () => {
@@ -4003,6 +4117,25 @@ function DraggableBeadView({
         isAlmostMerge={isAlmostMerge}
       />
     </View>
+  );
+}, areDraggableBeadPropsEqual);
+
+/** A maru that did not move, change or get picked up does not need to be drawn again. */
+function areDraggableBeadPropsEqual(previous: DraggableBeadViewProps, next: DraggableBeadViewProps) {
+  return (
+    previous.bead.id === next.bead.id &&
+    previous.bead.x === next.bead.x &&
+    previous.bead.y === next.bead.y &&
+    previous.bead.value === next.bead.value &&
+    previous.bead.count === next.bead.count &&
+    previous.bead.sign === next.bead.sign &&
+    previous.bead.role === next.bead.role &&
+    previous.isDragging === next.isDragging &&
+    previous.isAlmostMerge === next.isAlmostMerge &&
+    previous.onMove === next.onMove &&
+    previous.onDragStart === next.onDragStart &&
+    previous.onDragEnd === next.onDragEnd &&
+    previous.onTap === next.onTap
   );
 }
 
@@ -4184,6 +4317,29 @@ function formatResultExpression(tokens: string[], target: number) {
   }
 
   return meaningfulTokens.join(' ');
+}
+
+/**
+ * Shows the maru as they are now: the maru layer gets the new positions, and the game screen is
+ * told only if the set of maru changed.
+ */
+function publishBeads(
+  store: BeadFrameStore,
+  setBeads: Dispatch<SetStateAction<BeadSnapshot[]>>,
+  entities: BeadEntity[],
+  fieldWidth: number,
+  fieldHeight: number,
+) {
+  const next = toSnapshots(entities, { width: fieldWidth, height: fieldHeight });
+  // Positions are drawn on whole screen pixels anyway. Snapping them here means a maru that only
+  // swayed by a fraction of a pixel is not drawn again.
+  const pixelRatio = PixelRatio.get();
+  for (const bead of next) {
+    bead.x = snapToPixel(bead.x, pixelRatio);
+    bead.y = snapToPixel(bead.y, pixelRatio);
+  }
+  store.publish(next);
+  setBeads((current) => keepSameMaru(current, next));
 }
 
 function toSnapshots(entities: BeadEntity[], bounds?: { width: number; height: number }): BeadSnapshot[] {
