@@ -23,9 +23,9 @@ export const LONG_FORM_STAGES: DentakuStage[] = [
   ...createLongFormStageSet('multiplication', '×', [
     { title: '2けた × 1けた', id: 'long-form-multiplication-single-1' },
     { title: '2けた × 1けた くり上がり', id: 'long-form-multiplication-single-2' },
-    { title: '部分積', id: 'long-form-multiplication-1' },
-    { title: '位取りの0', id: 'long-form-multiplication-2' },
-    { title: '部分積の足し算', id: 'long-form-multiplication-3' },
+    { title: '2けた × 2けた', id: 'long-form-multiplication-1' },
+    { title: '2けた × 2けた くり上がり', id: 'long-form-multiplication-2' },
+    { title: '2けた × 2けた 大きい数', id: 'long-form-multiplication-3' },
     { title: '掛け算まとめ', id: 'long-form-multiplication-4' },
   ]),
   ...createLongFormStageSet('division', '÷', [

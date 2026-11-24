@@ -168,7 +168,9 @@ function createLongFormMultiplicationOperands(random: () => number, problemNumbe
   if (problemNumber === 4) {
     return { left: randomInt(random, 21 + questionNumber, 39), right: randomInt(random, 13, 19) };
   }
-  return { left: randomInt(random, 24 + questionNumber, 49), right: randomInt(random, 18, 29) };
+  // Not 20: its first row would be nothing but zeros, which school teaches as a case of its own.
+  const right = randomInt(random, 18, 28);
+  return { left: randomInt(random, 24 + questionNumber, 49), right: right >= 20 ? right + 1 : right };
 }
 
 function createLongFormDivisionOperands(random: () => number, problemNumber: number, questionNumber: number) {

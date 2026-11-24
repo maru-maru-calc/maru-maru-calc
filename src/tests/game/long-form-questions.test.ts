@@ -80,6 +80,8 @@ describe('long-form questions', () => {
           expect(left).toBeLessThanOrEqual(leftRange[1]);
           expect(right).toBeGreaterThanOrEqual(rightRange[0]);
           expect(right).toBeLessThanOrEqual(rightRange[1]);
+          // A multiplier ending in 0 would make a row of zeros.
+          expect(right % 10).not.toBe(0);
         }
       }
     }

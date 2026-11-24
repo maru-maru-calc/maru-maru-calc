@@ -1,6 +1,7 @@
 // ひっさん (written calculation): the steps of a problem and the rows and cells drawn for it.
 import { LAUNCH_INITIAL_TOTAL } from '@/components/marumaru/constants';
 import { createPendingBubbles } from '@/components/marumaru/field-layout';
+import { getLongMultiplicationWorking } from '@/game/long-form';
 import type {
   DentakuAutomationPractice,
   DentakuPractice,
@@ -149,21 +150,22 @@ function getLongFormMultiplicationStep(problem: LongFormProblem, stepIndex: numb
     return undefined;
   }
 
-  const partial = state.partialProducts[stepIndex];
-  if (partial) {
+  const lastStepIndex = state.digitSteps.length + state.additionSteps.length - 1;
+  const digitStep = state.digitSteps[stepIndex];
+  if (digitStep) {
     return {
-      expectedAnswer: partial.inputValue,
-      isFinal: false,
-      maxInputLength: String(partial.inputValue).length,
+      expectedAnswer: digitStep.expectedAnswer,
+      isFinal: stepIndex >= lastStepIndex,
+      maxInputLength: String(digitStep.expectedAnswer).length,
     };
   }
 
-  const additionStep = state.additionSteps[stepIndex - state.partialProducts.length];
+  const additionStep = state.additionSteps[stepIndex - state.digitSteps.length];
   if (!additionStep) {
     return undefined;
   }
 
-  const isFinal = stepIndex - state.partialProducts.length >= state.additionSteps.length - 1;
+  const isFinal = stepIndex >= lastStepIndex;
   return {
     expectedAnswer: additionStep.expectedAnswer,
     isFinal,
@@ -174,52 +176,7 @@ function getLongFormMultiplicationStep(problem: LongFormProblem, stepIndex: numb
 }
 
 function getLongFormMultiplicationState(problem: LongFormProblem) {
-  if (problem.operator !== '×' || problem.left < 10 || problem.left > 99 || problem.right < 2 || problem.right > 99) {
-    return undefined;
-  }
-
-  const leftTens = Math.floor(problem.left / 10);
-  const leftOnes = problem.left % 10;
-  const rightTens = Math.floor(problem.right / 10);
-  const rightOnes = problem.right % 10;
-  const partialProducts = [
-    { inputValue: leftOnes * rightOnes, value: leftOnes * rightOnes, leftColumn: 1, rightColumn: 1 },
-    { inputValue: leftTens * rightOnes, value: leftTens * 10 * rightOnes, leftColumn: 0, rightColumn: 1 },
-    // A multiplier of one digit has no tens to multiply by.
-    ...(rightTens > 0
-      ? [
-        { inputValue: leftOnes * rightTens, value: leftOnes * rightTens * 10, leftColumn: 1, rightColumn: 0 },
-        { inputValue: leftTens * rightTens, value: leftTens * 10 * rightTens * 10, leftColumn: 0, rightColumn: 0 },
-      ]
-      : []),
-  ];
-  const partialValues = partialProducts.map((partial) => partial.value);
-  const answerWidth = Math.max(String(problem.answer).length, ...partialValues.map((value) => String(value).length), 3);
-  const additionSteps = buildLongFormColumnAdditionSteps(partialValues, answerWidth);
-
-  return {
-    answerWidth,
-    partialProducts,
-    additionSteps,
-  };
-}
-
-function buildLongFormColumnAdditionSteps(values: number[], width: number) {
-  const steps: { column: number; expectedAnswer: number; carryIn: number }[] = [];
-  let carry = 0;
-
-  for (let column = width - 1; column >= 0; column -= 1) {
-    const place = 10 ** (width - 1 - column);
-    const expectedAnswer = values.reduce((sum, value) => sum + Math.floor(value / place) % 10, carry);
-    steps.push({ column, expectedAnswer, carryIn: carry });
-    carry = Math.floor(expectedAnswer / 10);
-  }
-
-  while (steps.length > 1 && steps[steps.length - 1].expectedAnswer === 0 && steps[steps.length - 1].carryIn === 0) {
-    steps.pop();
-  }
-
-  return steps;
+  return problem.operator === '×' ? getLongMultiplicationWorking(problem.left, problem.right) : undefined;
 }
 
 function getLongFormDivisionStep(problem: LongFormProblem, stepIndex: number): LongFormStep | undefined {
@@ -344,76 +301,64 @@ function buildMultiplicationLongFormRows(problem: LongFormProblem, answerText: s
   }
 
   const width = state.answerWidth;
-  const activeOperandColumns = getMultiplicationActiveOperandColumns(state, stepIndex);
-  const leftCells = activeOperandColumns.left == null
-    ? padLongFormCells(formatLongFormNumber(problem.left), width)
-    : formatLongFormPlaceNumber(problem.left, width, activeOperandColumns.left);
-  const rightCells = activeOperandColumns.right == null
-    ? padLongFormCells(formatLongFormNumber(problem.right), width)
-    : formatLongFormPlaceNumber(problem.right, width, activeOperandColumns.right);
-  const additionGuideRows = buildMultiplicationAdditionGuideRows(state, stepIndex);
-  const partialRows = buildMultiplicationPartialRows(state, answerText, stepIndex);
-  const answerCells = buildMultiplicationAnswerCells(problem, state, answerText, stepIndex);
-  const isAdditionStage = stepIndex >= state.partialProducts.length;
+  const digitStep = state.digitSteps[stepIndex];
+  const additionStep = state.additionSteps[stepIndex - state.digitSteps.length];
+  const isAdditionStage = stepIndex >= state.digitSteps.length;
+  const activeRow = digitStep ? state.rows[digitStep.rowIndex] : undefined;
+  // The two digits being multiplied are marked: one of the top number, one of the multiplier.
+  const leftCells = digitStep
+    ? formatLongFormPlaceNumber(problem.left, width, digitStep.part === 'ones' ? width - 1 : width - 2)
+    : padLongFormCells(formatLongFormNumber(problem.left), width);
+  const rightCells = activeRow
+    ? formatLongFormPlaceNumber(problem.right, width, width - 1 - activeRow.shift)
+    : padLongFormCells(formatLongFormNumber(problem.right), width);
+  // What was carried from "ones × digit" is shown small above the tens it is added to.
+  const carryRows: LongFormRow[] = digitStep?.part === 'tens' && activeRow && activeRow.carry > 0
+    ? [{ id: 'multiply-carry', isGuide: true, cells: placeLongFormGuideCell(width, width - 2, String(activeRow.carry)) }]
+    : [];
+  const additionCarryRows: LongFormRow[] = additionStep && additionStep.carryIn > 0
+    ? [{ id: 'multiply-addition-carry', isGuide: true, cells: placeLongFormGuideCell(width, additionStep.column, String(additionStep.carryIn)) }]
+    : [];
+  const visibleRowCount = digitStep ? digitStep.rowIndex + 1 : state.rows.length;
+  const lastRowIndex = state.rows.length - 1;
 
   return [
+    ...carryRows,
     { id: 'left', cells: leftCells },
     { id: 'right', operatorLabel: problem.operator, hasDivider: true, cells: rightCells },
-    ...additionGuideRows,
-    ...partialRows.map((row, index) => ({
-      id: `partial-${index}`,
-      cells: row,
-      operatorLabel: isAdditionStage && index === state.partialProducts.length - 1 ? '+' : undefined,
-      hasDivider: isAdditionStage && index === state.partialProducts.length - 1,
+    ...additionCarryRows,
+    ...state.rows.slice(0, visibleRowCount).map((row, rowIndex) => ({
+      id: `product-${rowIndex}`,
+      cells: buildMultiplicationProductCells(state, rowIndex, answerText, stepIndex),
+      operatorLabel: isAdditionStage && rowIndex === lastRowIndex ? '+' : undefined,
+      hasDivider: isAdditionStage && rowIndex === lastRowIndex,
     })),
-    ...(isAdditionStage ? [{ id: 'answer', cells: answerCells }] : []),
+    ...(isAdditionStage ? [{ id: 'answer', cells: buildMultiplicationAnswerCells(problem, state, answerText, stepIndex) }] : []),
   ];
 }
 
-function getMultiplicationActiveOperandColumns(state: NonNullable<ReturnType<typeof getLongFormMultiplicationState>>, stepIndex: number) {
-  const partial = state.partialProducts[stepIndex];
-  if (!partial) {
-    return {};
-  }
-
-  return {
-    left: state.answerWidth - 2 + partial.leftColumn,
-    right: state.answerWidth - 2 + partial.rightColumn,
-  };
-}
-
-function buildMultiplicationAdditionGuideRows(state: NonNullable<ReturnType<typeof getLongFormMultiplicationState>>, stepIndex: number): LongFormRow[] {
-  const additionStep = state.additionSteps[stepIndex - state.partialProducts.length];
-  if (!additionStep || additionStep.carryIn <= 0) {
-    return [];
-  }
-
-  return [{
-    id: 'multiply-addition-carry',
-    isGuide: true,
-    cells: placeLongFormGuideCell(state.answerWidth, additionStep.column, String(additionStep.carryIn)),
-  }];
-}
-
-function buildMultiplicationPartialRows(state: NonNullable<ReturnType<typeof getLongFormMultiplicationState>>, answerText: string, stepIndex: number): LongFormCell[][] {
+/** One row of the working: "left × one digit of the multiplier", ending `shift` places from the right. */
+function buildMultiplicationProductCells(state: NonNullable<ReturnType<typeof getLongFormMultiplicationState>>, rowIndex: number, answerText: string, stepIndex: number): LongFormCell[] {
   const width = state.answerWidth;
-  const rows: LongFormCell[][] = [];
-  const visibleRowCount = stepIndex >= state.partialProducts.length ? state.partialProducts.length : stepIndex + 1;
-  const additionStep = state.additionSteps[stepIndex - state.partialProducts.length];
+  const row = state.rows[rowIndex];
+  const endColumn = width - 1 - row.shift;
+  const digitStep = state.digitSteps[stepIndex];
 
-  for (let index = 0; index < visibleRowCount; index += 1) {
-    const partial = state.partialProducts[index];
-    if (index < stepIndex || stepIndex >= state.partialProducts.length) {
-      rows.push(markActiveLongFormColumn(formatLongFormNumberToWidth(partial.value, width), additionStep?.column));
-      continue;
-    }
-
-    const placeMultiplier = getMultiplicationPartialPlaceMultiplier(partial);
-    const visibleValue = answerText === '?' ? getMultiplicationPartialPlaceholder(placeMultiplier) : String(Number(answerText) * placeMultiplier);
-    rows.push(placeInputTextInLongFormCells(width, width - 1, visibleValue, true));
+  if (!digitStep || digitStep.rowIndex !== rowIndex) {
+    // A finished row. While the rows are being added, the column in work is marked.
+    const cells = placeInputTextInLongFormCells(width, endColumn, String(row.value), false);
+    return markActiveLongFormColumn(cells, state.additionSteps[stepIndex - state.digitSteps.length]?.column);
   }
 
-  return rows;
+  if (digitStep.part === 'ones') {
+    // "6 × 7": the product is typed whole (42); its ones digit is what stays in this place.
+    return placeInputTextInLongFormCells(width, endColumn, answerText, true);
+  }
+
+  // "6 × 4, and the 4 carried": typed to the left of the ones digit already written.
+  const cells = placeInputTextInLongFormCells(width, endColumn - 1, answerText, true);
+  cells[endColumn] = { value: String(row.onesProduct % 10) };
+  return cells;
 }
 
 function markActiveLongFormColumn(cells: LongFormCell[], activeColumn: number | undefined): LongFormCell[] {
@@ -427,27 +372,10 @@ function markActiveLongFormColumn(cells: LongFormCell[], activeColumn: number | 
   }));
 }
 
-function getMultiplicationPartialPlaceMultiplier(partial: { leftColumn: number; rightColumn: number }) {
-  return 10 ** ((1 - partial.leftColumn) + (1 - partial.rightColumn));
-}
-
-function getMultiplicationPartialPlaceholder(placeMultiplier: number) {
-  const zeroCount = Math.max(0, String(placeMultiplier).length - 1);
-  return `${'?'}${'0'.repeat(zeroCount)}`;
-}
-
 function buildMultiplicationAnswerCells(problem: LongFormProblem, state: NonNullable<ReturnType<typeof getLongFormMultiplicationState>>, answerText: string, stepIndex: number): LongFormCell[] {
   const width = state.answerWidth;
-  if (stepIndex < state.partialProducts.length) {
-    return placeLongFormGuideCell(width, width - 1, '?').map((cell) => ({
-      ...cell,
-      isActive: false,
-      isUnknown: cell.value === '?',
-    }));
-  }
-
   const completedDigits = String(problem.answer).padStart(width, ' ').split('');
-  const activeColumn = state.additionSteps[stepIndex - state.partialProducts.length]?.column ?? 0;
+  const activeColumn = state.additionSteps[stepIndex - state.digitSteps.length]?.column ?? 0;
   const currentAnswerText = answerText === '?' ? '?' : answerText;
   return Array.from({ length: width }, (_, index) => {
     if (index < activeColumn) {
