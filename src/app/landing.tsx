@@ -6,6 +6,7 @@ import type { TextStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandLogo } from '@/components/BrandLogo';
+import { a11yLabel } from '@/i18n/a11y-label';
 import { DESKTOP_MIN_WIDTH, shouldUsePhoneFrame } from '@/layout/phone-frame';
 import { usePrefersReducedMotion } from '@/layout/reduced-motion';
 
@@ -461,7 +462,7 @@ export default function LandingPage() {
         <HeroWaterScene />
         <SafeAreaView style={styles.heroSafe}>
           <View style={styles.heroTopBar}>
-            <Pressable accessibilityLabel="maru maru calc logo" accessibilityRole="link" onPress={() => router.push('/')} style={({ pressed }) => pressed && styles.pressedLogo}>
+            <Pressable accessibilityLabel={a11yLabel('maru maru calc logo')} accessibilityRole="link" onPress={() => router.push('/')} style={({ pressed }) => pressed && styles.pressedLogo}>
               <BrandLogo />
             </Pressable>
           </View>
@@ -622,7 +623,7 @@ function AppPreview({ ageNote, children, compact }: { ageNote: string; children?
         <AutoPlayVideo
           borderRadius={RADIUS_XL}
           compact={compact}
-          label="maru maru calc gameplay preview"
+          label={a11yLabel('maru maru calc gameplay preview')}
           testID="landing-gameplay-video"
           uris={videoUris}
         />
@@ -776,17 +777,17 @@ function ModeFlowRow({
         </View>
         <Text style={styles.flowDescription}>{description}</Text>
       </View>
-      <ModePoster uri={imageUri} testID={testID} compact={compact} />
+      <ModePoster uri={imageUri} label={`${label} ${expression}`} testID={testID} compact={compact} />
     </View>
   );
 }
 
-function ModePoster({ uri, testID, compact }: { uri: string; testID: string; compact: boolean }) {
+function ModePoster({ uri, label, testID, compact }: { uri: string; label: string; testID: string; compact: boolean }) {
   return (
     <View style={[styles.modeVideoFrame, compact && styles.modeVideoFrameCompact]} testID={testID}>
       {Platform.OS === 'web'
         ? createElement('img', {
-            alt: testID,
+            alt: label,
             src: uri,
             'data-testid': `${testID}-image`,
             style: {
@@ -797,7 +798,7 @@ function ModePoster({ uri, testID, compact }: { uri: string; testID: string; com
               backgroundColor: WATER_COLOR,
             },
           })
-        : <Image accessibilityLabel={testID} source={{ uri }} resizeMode="contain" style={styles.modePosterImage} testID={`${testID}-image`} />}
+        : <Image accessibilityLabel={label} source={{ uri }} resizeMode="contain" style={styles.modePosterImage} testID={`${testID}-image`} />}
     </View>
   );
 }
@@ -906,18 +907,18 @@ function FlowRow({
         </View>
         <Text style={styles.flowDescription}>{description}</Text>
       </View>
-      <OperationVideo uris={videoUris} testID={testID} playbackRate={playbackRate} compact={compact} />
+      <OperationVideo uris={videoUris} label={`${label} ${expression}`} testID={testID} playbackRate={playbackRate} compact={compact} />
     </View>
   );
 }
 
-function OperationVideo({ uris, testID, playbackRate, compact }: { uris: VideoUris; testID: string; playbackRate: number; compact: boolean }) {
+function OperationVideo({ uris, label, testID, playbackRate, compact }: { uris: VideoUris; label: string; testID: string; playbackRate: number; compact: boolean }) {
   return (
     <View style={[styles.operationVideoFrame, compact && styles.operationVideoFrameCompact]} testID={testID}>
       <AutoPlayVideo
         borderRadius={RADIUS_LG}
         compact={compact}
-        label={testID}
+        label={label}
         playbackRate={playbackRate}
         testID={`${testID}-media`}
         uris={uris}

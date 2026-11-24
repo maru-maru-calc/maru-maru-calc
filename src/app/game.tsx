@@ -17,6 +17,7 @@ import { createInitialNavState } from '@/game/navigation';
 import type { NavOptions, NavState } from '@/game/navigation';
 import { getStageIndexById, STAGE_ISLANDS, STAGES } from '@/game/stages';
 import { Stage } from '@/game/types';
+import { a11yLabel } from '@/i18n/a11y-label';
 import { isSidewaysPhone } from '@/layout/phone-frame';
 import { usePrefersReducedMotion } from '@/layout/reduced-motion';
 import { loadProgress, saveProgress } from '@/storage/progress';
@@ -142,7 +143,7 @@ export default function GameRoute() {
 // Like the rest of the game it speaks in pictures: a sideways phone, a turn arrow, an upright phone.
 function RotateHint() {
   return (
-    <View accessibilityLabel="スマホを縦向きにしてください" accessibilityRole="alert" style={styles.rotateHint} testID="rotate-hint">
+    <View accessibilityLabel={a11yLabel('turn the phone upright')} accessibilityRole="alert" style={styles.rotateHint} testID="rotate-hint">
       <View style={[styles.rotateHintPhone, styles.rotateHintPhoneSideways]}>
         <View style={styles.rotateHintPhoneScreen} />
       </View>
@@ -558,7 +559,7 @@ function ModeNode({
 }) {
   return (
     <Pressable
-      accessibilityLabel={label}
+      accessibilityLabel={a11yLabel(label)}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [
@@ -661,7 +662,7 @@ function DentakuWorldSelect({
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
         <SoundToggleButton />
         <Pressable
-          accessibilityLabel="Back"
+          accessibilityLabel={a11yLabel('Back')}
           accessibilityRole="button"
           onPress={() => {
             playActionSfx();
@@ -733,7 +734,7 @@ function WorldSelect({
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
         <SoundToggleButton />
         <Pressable
-          accessibilityLabel="Back"
+          accessibilityLabel={a11yLabel('Back')}
           accessibilityRole="button"
           onPress={() => {
             playActionSfx();
@@ -821,7 +822,7 @@ function SoundToggleButton() {
 
   return (
     <Pressable
-      accessibilityLabel={isMuted ? 'turn sound on' : 'turn sound off'}
+      accessibilityLabel={a11yLabel(isMuted ? 'turn sound on' : 'turn sound off')}
       accessibilityRole="switch"
       accessibilityState={{ checked: !isMuted }}
       onPress={toggleMute}
@@ -884,7 +885,7 @@ function DepthBackdrop({
         return (
           <Pressable
             key={bubble.id}
-            accessibilityLabel="decorative bubble"
+            accessibilityLabel={a11yLabel('decorative bubble')}
             accessibilityRole="button"
             focusable={false}
             tabIndex={-1}
@@ -970,7 +971,7 @@ function DepthCreature({
 
   return (
     <Pressable
-      accessibilityLabel={`sea creature ${spec.kind}`}
+      accessibilityLabel={a11yLabel(`sea creature ${spec.kind}`)}
       accessibilityRole="button"
       focusable={false}
       tabIndex={-1}
@@ -1145,7 +1146,7 @@ function WorldNode({
 }) {
   return (
     <Pressable
-      accessibilityLabel={label}
+      accessibilityLabel={a11yLabel(label)}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [
@@ -1186,7 +1187,7 @@ function MixedWorldNode({
 }) {
   return (
     <Pressable
-      accessibilityLabel={label}
+      accessibilityLabel={a11yLabel(label)}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [
@@ -1236,7 +1237,7 @@ function DentakuWorldNode({
 
   return (
     <Pressable
-      accessibilityLabel={label}
+      accessibilityLabel={a11yLabel(label)}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [
@@ -1301,7 +1302,7 @@ function StageSelect({
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
         <SoundToggleButton />
         <Pressable
-          accessibilityLabel="Back"
+          accessibilityLabel={a11yLabel('Back')}
           accessibilityRole="button"
           onPress={() => {
             playActionSfx();
@@ -1376,7 +1377,7 @@ function DentakuStageSelect({
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
         <SoundToggleButton />
         <Pressable
-          accessibilityLabel="Back"
+          accessibilityLabel={a11yLabel('Back')}
           accessibilityRole="button"
           onPress={() => {
             playActionSfx();
@@ -1432,7 +1433,7 @@ function DentakuStageNode({
 
   return (
     <Pressable
-      accessibilityLabel={stage.title}
+      accessibilityLabel={a11yLabel(stage.title)}
       accessibilityRole="button"
       testID={`kuku-stage-${stage.id}`}
       onPress={onPress}
@@ -1474,6 +1475,7 @@ function StageNode({
 
   return (
     <Pressable
+      accessibilityLabel={a11yLabel(`stage ${number}: make ${stage.target}`)}
       accessibilityRole="button"
       accessibilityState={{ disabled: isLocked }}
       disabled={isLocked}
@@ -1619,7 +1621,7 @@ function SingingMermaid({
 
   return (
     <Pressable
-      accessibilityLabel={isVocalEnabled ? 'turn off mermaid song' : 'turn on mermaid song'}
+      accessibilityLabel={a11yLabel(isVocalEnabled ? 'turn off mermaid song' : 'turn on mermaid song')}
       accessibilityRole="switch"
       accessibilityState={{ checked: isVocalEnabled }}
       onPress={onPress}

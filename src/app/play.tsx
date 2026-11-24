@@ -5,6 +5,7 @@ import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandLogo } from '@/components/BrandLogo';
+import { a11yLabel } from '@/i18n/a11y-label';
 import { getPhoneFrameLayout, shouldUsePhoneFrame } from '@/layout/phone-frame';
 
 const TEXT_BASE_COLOR = '#12334A';
@@ -63,7 +64,7 @@ export default function PlayPage() {
 
       <View style={styles.header}>
         <View>
-          <Pressable accessibilityLabel="maru maru calc logo" accessibilityRole="link" onPress={openLanding} style={({ pressed }) => pressed && styles.pressedLogo}>
+          <Pressable accessibilityLabel={a11yLabel('maru maru calc logo')} accessibilityRole="link" onPress={openLanding} style={({ pressed }) => pressed && styles.pressedLogo}>
             <BrandLogo />
           </Pressable>
         </View>
@@ -89,7 +90,7 @@ export default function PlayPage() {
             <View style={styles.phoneViewport}>
               {createElement('iframe', {
                 src: `${BASE_PATH}/game?preview=${PLAY_FRAME_VERSION}`,
-                title: 'maru maru calc playable web app',
+                title: a11yLabel('maru maru calc playable web app'),
                 'data-testid': 'play-frame',
                 style: {
                   width: '100%',

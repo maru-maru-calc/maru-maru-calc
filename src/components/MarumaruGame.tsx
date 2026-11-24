@@ -27,6 +27,7 @@ import { BeadRole, BeadSign, BeadSnapshot, MergeCluster, OperatorUsageLimit, Ope
 import type { Stage } from '@/game/types';
 import type { DentakuOperator } from '@/game/dentaku';
 import { matchesLongFormStepAnswer } from '@/game/long-form';
+import { a11yLabel } from '@/i18n/a11y-label';
 import { usePrefersReducedMotion } from '@/layout/reduced-motion';
 
 type BeadEntity = {
@@ -203,6 +204,7 @@ const BUBBLE_BURST_DROP_COUNT = 6;
 const BUBBLE_BURST_SHARD_COUNT = 3;
 const MERGE_POP_PARTICLE_COUNT = 4;
 const OPERATORS: OperatorButtonSymbol[] = ['+', '-', '×', '÷'];
+const OPERATOR_NAMES: Record<OperatorButtonSymbol, string> = { '+': 'plus', '-': 'minus', '×': 'times', '÷': 'divided by' };
 const PLAYFUL_FONT_FAMILY = 'Noto Sans Japanese';
 const LATIN_FONT_FAMILY = 'Helvetica';
 const TEXT_BASE_COLOR = '#12334A';
@@ -1775,13 +1777,13 @@ export function MarumaruGame({
       <View style={styles.header}>
         <View style={styles.headerTitleGroup}>
           {onBack && mode !== 'launch' ? (
-            <Pressable accessibilityLabel="Back" accessibilityRole="button" onPress={goBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressedButton]}>
+            <Pressable accessibilityLabel={a11yLabel('Back')} accessibilityRole="button" onPress={goBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressedButton]}>
               <NavImageIcon kind="back" size={29} />
             </Pressable>
           ) : null}
           {(!dentakuPractice && (mode !== 'launch' || isClear)) || (dentakuPractice && isClear && !dentakuPractice.autoAdvance) ? (
             <Pressable
-              accessibilityLabel={isClear ? 'next stage' : 'retry'}
+              accessibilityLabel={a11yLabel(isClear ? 'next stage' : 'retry')}
               accessibilityRole="button"
               onPress={isClear ? (mode === 'launch' ? completeLaunch : playNextStage) : retryStage}
               style={({ pressed }) => [
@@ -1953,7 +1955,7 @@ export function MarumaruGame({
 
 function LaunchLogo({ variant = 'header', onPress }: { variant?: 'header' | 'tada'; onPress?: () => void }) {
   const content = (
-    <View accessibilityLabel={onPress ? undefined : 'maru logo'} style={[styles.launchLogo, variant === 'tada' && styles.launchLogoTada]}>
+    <View accessibilityLabel={onPress ? undefined : a11yLabel('maru logo')} style={[styles.launchLogo, variant === 'tada' && styles.launchLogoTada]}>
       <BrandLogo size="medium" />
     </View>
   );
@@ -1963,7 +1965,7 @@ function LaunchLogo({ variant = 'header', onPress }: { variant?: 'header' | 'tad
   }
 
   return (
-    <Pressable accessibilityLabel="maru logo" accessibilityRole="link" onPress={onPress} style={({ pressed }) => pressed && styles.pressedButton}>
+    <Pressable accessibilityLabel={a11yLabel('maru logo')} accessibilityRole="link" onPress={onPress} style={({ pressed }) => pressed && styles.pressedButton}>
       {content}
     </Pressable>
   );
@@ -2893,6 +2895,7 @@ function KukuAnswerPad({
 function KukuKey({ label, testIDLabel = label, accent = false, disabled = false, onPress }: { label: string; testIDLabel?: string; accent?: boolean; disabled?: boolean; onPress: () => void }) {
   return (
     <Pressable
+      accessibilityLabel={label === 'delete' ? a11yLabel('delete') : label === 'submit' ? a11yLabel('answer') : undefined}
       accessibilityRole="button"
       disabled={disabled}
       testID={`kuku-key-${testIDLabel}`}
@@ -3492,6 +3495,7 @@ function OperatorRail({
         return (
           <Pressable
             key={operator}
+            accessibilityLabel={a11yLabel(OPERATOR_NAMES[operator])}
             accessibilityRole="button"
             accessibilityState={{ selected: isSelected, disabled: isDisabled }}
             disabled={isDisabled}
@@ -3655,7 +3659,7 @@ function BackgroundBubbleLayer({
         return (
           <Pressable
             key={bubble.id}
-            accessibilityLabel="decorative bubble"
+            accessibilityLabel={a11yLabel('decorative bubble')}
             accessibilityRole="button"
             focusable={false}
             tabIndex={-1}
@@ -3810,7 +3814,7 @@ function DraggableBubbleView({
   return (
     <View
       accessibilityRole="button"
-      accessibilityLabel={`${isDivider ? 'divide' : isMultiplier ? 'multiply' : 'bubble'}-${bubble.count}`}
+      accessibilityLabel={a11yLabel(`${isDivider ? 'divide' : isMultiplier ? 'multiply' : 'bubble'}-${bubble.count}`)}
       testID={`pending-bubble-${bubble.count}-${bubble.id}`}
       hitSlop={16}
       style={[
@@ -3973,7 +3977,7 @@ function DraggableBeadView({
 
   return (
     <View
-      accessibilityLabel={`bead-${bead.role}-${bead.count}`}
+      accessibilityLabel={a11yLabel(`bead-${bead.role}-${bead.count}`)}
       testID={`bead-${bead.role}-${bead.count}-${bead.id}`}
       style={[
         styles.draggableBeadHitArea,
@@ -4023,7 +4027,7 @@ function StageResultOverlay({
       <View style={styles.resultMain}>
         {isClearResult ? <ResultStar /> : <BrokenResultStar />}
         <Text
-          accessibilityLabel={isClearResult ? 'clear equation' : 'failed equation'}
+          accessibilityLabel={a11yLabel(isClearResult ? 'clear equation' : 'failed equation')}
           style={[
             styles.resultEquation,
             { fontSize: equationFontSize, lineHeight: Math.round(equationFontSize * 1.2) },
@@ -4038,7 +4042,7 @@ function StageResultOverlay({
         </Text>
       </View>
       <View style={[styles.resultActions, !isClearResult && styles.resultActionsFailed]}>
-        <ResultActionButton accessibilityLabel={isClearResult ? 'Next stage' : 'Retry'} primary onPress={isClearResult && onNextStage ? onNextStage : onRetry}>
+        <ResultActionButton accessibilityLabel={a11yLabel(isClearResult ? 'Next stage' : 'Retry')} primary onPress={isClearResult && onNextStage ? onNextStage : onRetry}>
           <NavImageIcon kind={isClearResult ? 'next' : 'retry'} size={36} />
         </ResultActionButton>
       </View>
@@ -4061,7 +4065,7 @@ function getResultEquationFontSize(equation: string) {
 
 function ResultStar() {
   return (
-    <View accessibilityLabel="clear starfish" style={styles.resultStar}>
+    <View accessibilityLabel={a11yLabel('clear starfish')} style={styles.resultStar}>
       <RoundedStarfish size={58} />
     </View>
   );
@@ -4129,7 +4133,7 @@ function RoundedStarfish({ size, style }: { size: number; style?: StyleProp<View
 
 function BrokenResultStar() {
   return (
-    <View accessibilityLabel="broken medal" style={styles.brokenMedal}>
+    <View accessibilityLabel={a11yLabel('broken medal')} style={styles.brokenMedal}>
       <View style={[styles.brokenMedalHalf, styles.brokenMedalLeft]}>
         <View style={[styles.brokenMedalFace, styles.brokenMedalFaceLeft]}>
           <Text style={styles.brokenMedalStar}>★</Text>
