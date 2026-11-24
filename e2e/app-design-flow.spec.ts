@@ -10,6 +10,8 @@ declare global {
   }
 }
 
+// This file runs in Japanese, so controls are found by their Japanese screen reader names
+// (src/i18n/a11y-label.ts). The other spec files run in the default locale and use the English names.
 test.use({ locale: 'ja-JP', viewport: { width: 390, height: 844 } });
 
 test('landing page presents the core copy and opens the app', async ({ page }) => {
@@ -53,7 +55,7 @@ test('landing page presents the core copy and opens the app', async ({ page }) =
 
   await page.getByTestId('landing-play-button').click();
   await expect(page).toHaveURL(/\/game$/);
-  await expect(page.getByLabel('maru logo')).toBeVisible();
+  await expect(page.getByLabel('まるまる電卓', { exact: true })).toBeVisible();
 });
 
 test('landing page switches copy for non-Japanese browser languages', async ({ browser }) => {
@@ -101,7 +103,7 @@ test('landing page switches copy for Chinese, Korean, and German browser languag
 });
 
 test('desktop landing play button opens the framed play page in a new tab', async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const context = await browser.newContext({ locale: 'ja-JP', viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   await page.goto('/');
 
@@ -114,7 +116,7 @@ test('desktop landing play button opens the framed play page in a new tab', asyn
 });
 
 test('desktop play page presents the app inside a phone frame', async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const context = await browser.newContext({ locale: 'ja-JP', viewport: { width: 1280, height: 900 } });
   const page = await context.newPage();
   await page.goto('/play');
 
@@ -124,7 +126,7 @@ test('desktop play page presents the app inside a phone frame', async ({ browser
   await expect(page.getByTestId('play-background-fish-blue-tang')).toBeVisible();
   await expect(page.getByTestId('play-background-fish-puffer')).toBeVisible();
   await expect(page.getByText('© 2026 nozomitaguchi')).toBeVisible();
-  await expect(page.frameLocator('[data-testid="play-frame"]').getByLabel('maru logo')).toBeVisible();
+  await expect(page.frameLocator('[data-testid="play-frame"]').getByLabel('まるまる電卓', { exact: true })).toBeVisible();
 
   await context.close();
 });
@@ -133,25 +135,25 @@ test('mobile play page redirects to the app itself', async ({ page }) => {
   await page.goto('/play');
 
   await expect(page).toHaveURL(/\/game$/);
-  await expect(page.getByLabel('maru logo')).toBeVisible();
+  await expect(page.getByLabel('まるまる電卓', { exact: true })).toBeVisible();
 });
 
 test('web logos link back to the landing page', async ({ browser }) => {
-  const mobileContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const mobileContext = await browser.newContext({ locale: 'ja-JP', viewport: { width: 390, height: 844 } });
   const mobilePage = await mobileContext.newPage();
   await mobilePage.goto('/game');
-  await expect(mobilePage.getByLabel('maru logo')).toBeVisible();
+  await expect(mobilePage.getByLabel('まるまる電卓', { exact: true })).toBeVisible();
   await expect(mobilePage).toHaveURL(/\/game$/);
   await mobileContext.close();
 
-  const landingContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const landingContext = await browser.newContext({ locale: 'ja-JP', viewport: { width: 390, height: 844 } });
   const landingPage = await landingContext.newPage();
   await landingPage.goto('/');
-  await landingPage.getByLabel('maru maru calc logo').click();
+  await landingPage.getByLabel('まるまる電卓 トップページ').click();
   await expect(landingPage).toHaveURL(/\/$/);
   await landingContext.close();
 
-  const desktopContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const desktopContext = await browser.newContext({ locale: 'ja-JP', viewport: { width: 1280, height: 900 } });
   await desktopContext.addInitScript(() => {
     window.__mediaPauseCalls = 0;
     const originalPause = window.HTMLMediaElement.prototype.pause;
@@ -167,7 +169,7 @@ test('web logos link back to the landing page', async ({ browser }) => {
   if (!appFrame) {
     throw new Error('play iframe was not available');
   }
-  await desktopPage.getByLabel('maru maru calc logo').click();
+  await desktopPage.getByLabel('まるまる電卓 トップページ').click();
   await desktopPage.waitForTimeout(25);
   await expect.poll(() => appFrame.evaluate(() => window.__mediaPauseCalls)).toBeGreaterThan(0);
   await expect(desktopPage).toHaveURL(/\/$/);
@@ -247,7 +249,7 @@ test('mermaid song toggle keeps the background music position', async ({ page })
     window.__testAudioSeekLog = [];
   });
 
-  await page.getByLabel('turn on mermaid song').click();
+  await page.getByLabel('にんぎょのうたをながす').click();
 
   await expect
     .poll(() =>
@@ -257,6 +259,10 @@ test('mermaid song toggle keeps the background music position', async ({ page })
       }),
     )
     .toBeGreaterThan(41);
+
+  // The app re-syncs the new track shortly after a switch. Let that finish first; otherwise it
+  // overwrites the position set below and the next switch starts from the wrong place.
+  await page.waitForTimeout(300);
 
   await page.evaluate(() => {
     const normalBgm = window.__testAudioElements.find((audio) => audio.src.includes('/bgm.') && !audio.src.includes('bgm-vocal'));
@@ -269,7 +275,7 @@ test('mermaid song toggle keeps the background music position', async ({ page })
     window.__testAudioSeekLog = [];
   });
 
-  await page.getByLabel('turn off mermaid song').click();
+  await page.getByLabel('にんぎょのうたをとめる').click();
 
   await expect
     .poll(() =>
@@ -284,37 +290,37 @@ test('mermaid song toggle keeps the background music position', async ({ page })
 test('moves through the depth path into the existing game', async ({ page }) => {
   await page.goto('/game');
 
-  await expect(page.getByLabel('maru logo')).toBeVisible();
-  await expect(page.getByLabel('bubble-5')).toBeVisible();
-  await expect(page.getByLabel('bead-normal-1')).toHaveCount(8);
+  await expect(page.getByLabel('まるまる電卓', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('あわ 5')).toBeVisible();
+  await expect(page.getByLabel('まる 1')).toHaveCount(8);
   await expect(page.getByTestId('current-total-value')).toHaveText('8');
   await expect(page.getByTestId('expression-display-text')).toHaveText('8 +');
   await page.screenshot({ path: 'test-results/app-launch.png' });
 
-  await page.getByLabel('bubble-5').click();
+  await page.getByLabel('あわ 5').click();
   await expect(page.getByTestId('current-total-value')).toHaveText('13');
-  await expect(page.getByLabel('next stage')).toBeVisible();
+  await expect(page.getByLabel('つぎへ')).toBeVisible();
   await expect(page.getByTestId('world-select')).toHaveCount(0);
-  await page.getByLabel('next stage').click();
+  await page.getByLabel('つぎへ').click();
   await expect(page.getByTestId('mode-select')).toBeVisible();
-  await page.getByLabel('marumaru mode', { exact: true }).click();
+  await page.getByLabel('まるまるモード', { exact: true }).click();
   await expect(page.getByTestId('world-select')).toBeVisible();
   await expect(page.locator('[data-testid^="depth-background-bubble-"]')).toHaveCount(6);
   await expect(page.locator('[data-testid^="depth-fish-"]')).toHaveCount(5);
   await expect(page.getByTestId('depth-shade')).toBeVisible();
-  await expect(page.getByLabel('mixed-3', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('mixed-4', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('×', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('÷', { exact: true })).toBeVisible();
-  await page.getByLabel('mixed-5', { exact: true }).scrollIntoViewIfNeeded();
-  await expect(page.getByLabel('mixed-5', { exact: true })).toBeVisible();
-  await page.getByLabel('mixed-5-free', { exact: true }).scrollIntoViewIfNeeded();
-  await expect(page.getByLabel('mixed-3-free', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('mixed-4-free', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('mixed-5-free', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('3つのあわ', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('4つのあわ', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('かけざん', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('わりざん', { exact: true })).toBeVisible();
+  await page.getByLabel('5つのあわ', { exact: true }).scrollIntoViewIfNeeded();
+  await expect(page.getByLabel('5つのあわ', { exact: true })).toBeVisible();
+  await page.getByLabel('5つのあわ じゆう', { exact: true }).scrollIntoViewIfNeeded();
+  await expect(page.getByLabel('3つのあわ じゆう', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('4つのあわ じゆう', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('5つのあわ じゆう', { exact: true })).toBeVisible();
   await page.screenshot({ path: 'test-results/app-worlds.png' });
 
-  await page.getByLabel('+', { exact: true }).click();
+  await page.getByLabel('たしざん', { exact: true }).click();
   await expect(page.getByTestId('stage-addition-10-ones')).toBeVisible();
   await expect(page.locator('[data-testid^="depth-background-bubble-"]')).toHaveCount(6);
   await expect(page.locator('[data-testid^="depth-fish-"]')).toHaveCount(5);
@@ -334,7 +340,7 @@ test('stage routes can scroll to later mixed problems', async ({ page }) => {
 
   await clearLaunch(page);
   await expect(page.getByTestId('world-select')).toBeVisible();
-  await page.getByLabel('mixed-3', { exact: true }).click();
+  await page.getByLabel('3つのあわ', { exact: true }).click();
 
   await expect(page.getByTestId('stage-mixed3-1')).toBeVisible();
   await page.getByTestId('stage-mixed3-10').scrollIntoViewIfNeeded();
@@ -346,19 +352,19 @@ test('going back from an uncleared next stage does not mark it complete', async 
 
   await clearLaunch(page);
   await expect(page.getByTestId('world-select')).toBeVisible();
-  await page.getByLabel('+', { exact: true }).click();
+  await page.getByLabel('たしざん', { exact: true }).click();
   await page.getByTestId('stage-addition-10-twos').click();
 
   for (let index = 0; index < 5; index += 1) {
-    await page.getByLabel('bubble-2').first().click();
+    await page.getByLabel('あわ 2').first().click();
   }
 
   await expect(page.getByTestId('current-total-value')).toHaveText('10');
-  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
-  await page.getByLabel('next stage').click();
+  await expect(page.getByLabel('つぎへ')).toBeVisible({ timeout: 4000 });
+  await page.getByLabel('つぎへ').click();
   await expect(page.getByTestId('operator-+')).toBeVisible();
 
-  await page.getByLabel('Back', { exact: true }).click();
+  await page.getByLabel('もどる', { exact: true }).click();
   await expect(page.getByTestId('stage-addition-10-twos').getByTestId('stage-done-starfish')).toBeVisible();
   await expect(page.getByTestId('stage-addition-10-five-five').getByTestId('stage-done-starfish')).toHaveCount(0);
 });
@@ -368,16 +374,16 @@ test('back button position is consistent between stage select and game', async (
 
   await clearLaunch(page);
   await expect(page.getByTestId('world-select')).toBeVisible();
-  await page.getByLabel('+', { exact: true }).click();
+  await page.getByLabel('たしざん', { exact: true }).click();
   await expect(page.getByTestId('stage-addition-10-ones')).toBeVisible();
 
-  const stageBackBox = await page.getByLabel('Back', { exact: true }).boundingBox();
+  const stageBackBox = await page.getByLabel('もどる', { exact: true }).boundingBox();
   expect(stageBackBox).not.toBeNull();
 
   await page.getByTestId('stage-addition-10-twos').click();
   await expect(page.getByTestId('operator-+')).toBeVisible();
 
-  const gameBackBox = await page.getByLabel('Back', { exact: true }).boundingBox();
+  const gameBackBox = await page.getByLabel('もどる', { exact: true }).boundingBox();
   expect(gameBackBox).not.toBeNull();
   expect(Math.abs((gameBackBox?.x ?? 0) - (stageBackBox?.x ?? 0))).toBeLessThanOrEqual(1);
   expect(Math.abs((gameBackBox?.y ?? 0) - (stageBackBox?.y ?? 0))).toBeLessThanOrEqual(1);
@@ -399,7 +405,7 @@ test('launch and game operator buttons are aligned', async ({ page }) => {
 
   await clearLaunch(page);
   await expect(page.getByTestId('world-select')).toBeVisible();
-  await page.getByLabel('+', { exact: true }).click();
+  await page.getByLabel('たしざん', { exact: true }).click();
   await expect(page.getByTestId('stage-addition-10-twos')).toBeVisible();
   await page.getByTestId('stage-addition-10-twos').click();
   await expect(page.getByTestId('operator-+')).toBeVisible();
@@ -433,7 +439,7 @@ test('launch and game operator corners and expression metrics are identical', as
 
   await clearLaunch(page);
   await expect(page.getByTestId('world-select')).toBeVisible();
-  await page.getByLabel('+', { exact: true }).click();
+  await page.getByLabel('たしざん', { exact: true }).click();
   await expect(page.getByTestId('stage-addition-10-twos')).toBeVisible();
   await page.getByTestId('stage-addition-10-twos').click();
   await expect(page.getByTestId('operator-+')).toBeVisible();
@@ -463,7 +469,7 @@ test('launch and game expression boxes are aligned', async ({ page }) => {
 
   await clearLaunch(page);
   await expect(page.getByTestId('world-select')).toBeVisible();
-  await page.getByLabel('+', { exact: true }).click();
+  await page.getByLabel('たしざん', { exact: true }).click();
   await expect(page.getByTestId('stage-addition-10-twos')).toBeVisible();
   await page.getByTestId('stage-addition-10-twos').click();
   await expect(page.getByTestId('expression-display')).toBeVisible();
@@ -524,16 +530,16 @@ function assertStyleMatch(
 test('launch bubbles can be touched directly', async ({ page }) => {
   await page.goto('/game');
 
-  await page.getByLabel('bubble-5').click();
+  await page.getByLabel('あわ 5').click();
   await expect(page.getByTestId('current-total-value')).toHaveText('13');
   await expect(page.getByTestId('world-select')).toHaveCount(0);
-  await expect(page.getByLabel('next stage')).toBeVisible();
+  await expect(page.getByLabel('つぎへ')).toBeVisible();
 });
 
 test('pending bubbles show an idle tap hint', async ({ page }) => {
   await page.goto('/game');
 
-  await expect(page.getByLabel('bubble-5')).toBeVisible();
+  await expect(page.getByLabel('あわ 5')).toBeVisible();
   await expect(page.getByTestId('pending-bubble-hint')).toBeVisible({ timeout: 4000 });
 });
 
@@ -550,15 +556,15 @@ test('background bubbles float behind the field and can be popped', async ({ pag
       break;
     }
   }
-  await expect(page.getByLabel('bubble-5')).toBeVisible();
+  await expect(page.getByLabel('あわ 5')).toBeVisible();
 });
 
 async function clearLaunch(page: Page) {
-  await page.getByLabel('bubble-5').click();
-  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
-  await page.getByLabel('next stage').click();
+  await page.getByLabel('あわ 5').click();
+  await expect(page.getByLabel('つぎへ')).toBeVisible({ timeout: 4000 });
+  await page.getByLabel('つぎへ').click();
   await expect(page.getByTestId('mode-select')).toBeVisible();
-  await page.getByLabel('marumaru mode', { exact: true }).click();
+  await page.getByLabel('まるまるモード', { exact: true }).click();
   await expect(page.getByTestId('world-select')).toBeVisible();
 }
 
