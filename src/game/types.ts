@@ -29,7 +29,9 @@ export type Stage = {
     | 'mixed5'
     | 'mixed3Free'
     | 'mixed4Free'
-    | 'mixed5Free';
+    | 'mixed5Free'
+    // The puzzle game's own stages; its operator limits are always given in full.
+    | 'puzzle';
   islandTitle: string;
   setTitle: string;
   bubbleCounts: number[];
