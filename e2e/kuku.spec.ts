@@ -173,7 +173,7 @@ test('long form subtraction advances by ones then tens', async ({ page }) => {
   await expect(page.getByTestId('dentaku-world-select')).toHaveCount(0);
 });
 
-test('long form multiplication advances through partial products and addition', async ({ page }) => {
+test('long form multiplication works row by row as written at school, then adds the rows', async ({ page }) => {
   await page.goto('/game');
 
   await clearLaunch(page);
@@ -194,28 +194,19 @@ test('long form multiplication advances through partial products and addition', 
   const right = Number(match[2]);
   const leftTens = Math.floor(left / 10);
   const leftOnes = left % 10;
-  const rightTens = Math.floor(right / 10);
-  const rightOnes = right % 10;
-  const partialInputs = [
-    leftOnes * rightOnes,
-    leftTens * rightOnes,
-    leftOnes * rightTens,
-    leftTens * rightTens,
-  ];
-  const partials = [
-    partialInputs[0],
-    leftTens * 10 * rightOnes,
-    leftOnes * rightTens * 10,
-    leftTens * 10 * rightTens * 10,
-  ];
 
-  for (const partialInput of partialInputs) {
-    await enterDentakuAnswer(page, partialInput);
+  // One row per digit of the multiplier: "ones × digit", then "tens × digit" plus what was carried.
+  for (const digit of [right % 10, Math.floor(right / 10)]) {
+    const onesProduct = leftOnes * digit;
+    await enterDentakuAnswer(page, onesProduct);
+    await enterDentakuAnswer(page, leftTens * digit + Math.floor(onesProduct / 10));
   }
 
+  // Then the two rows are added; the second one stands one place to the left.
+  const rows = [left * (right % 10), left * Math.floor(right / 10) * 10];
   const answer = left * right;
-  const width = Math.max(String(answer).length, ...partials.map((partial) => String(partial).length), 3);
-  for (const step of getColumnAdditionSteps(partials, width)) {
+  const width = Math.max(String(answer).length, ...rows.map((row) => String(row).length), 3);
+  for (const step of getColumnAdditionSteps(rows, width)) {
     await enterDentakuAnswer(page, step);
   }
 
@@ -240,18 +231,13 @@ test('long form multiplication starts with two digits times one digit', async ({
   const left = Number(match[1]);
   const right = Number(match[2]);
   const ones = (left % 10) * right;
-  const tens = Math.floor(left / 10) * right;
   expect(ones).toBeGreaterThanOrEqual(10);
 
-  // Two partial products, then their sum column by column.
+  // One row: "ones × digit" (write its ones digit, carry the rest), then "tens × digit" plus the carry.
   await enterDentakuAnswer(page, ones);
-  await enterDentakuAnswer(page, tens);
-  const partials = [ones, tens * 10];
+  await expect(page.getByTestId('long-form-panel')).toContainText(String(Math.floor(ones / 10)));
+  await enterDentakuAnswer(page, Math.floor(left / 10) * right + Math.floor(ones / 10));
   const answer = left * right;
-  const width = Math.max(String(answer).length, ...partials.map((partial) => String(partial).length), 3);
-  for (const step of getColumnAdditionSteps(partials, width)) {
-    await enterDentakuAnswer(page, step);
-  }
 
   await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 15000 });
   await expect(page.getByTestId('expression-display-text')).toHaveText(`${left} × ${right} = ${answer}`);
