@@ -24,13 +24,13 @@ export const STAGE_ISLANDS: StageIsland[] = [
     id: 'multiplication',
     title: 'かけざんのしま',
     description: 'まとまりをふやして、かけざんをためす',
-    stageSetTitles: ['まとまりをふやす', 'くみあわせてふやす'],
+    stageSetTitles: ['まとまりをふやす', 'たすか かけるか', 'くみあわせてふやす'],
   },
   {
     id: 'division',
     title: 'わりざんのしま',
     description: 'まとまりをわけて、わりざんをためす',
-    stageSetTitles: ['まとまりをわける', 'くみあわせてわける'],
+    stageSetTitles: ['まとまりをわける', 'ひくか わるか', 'くみあわせてわける'],
   },
   {
     id: 'mixed3',
@@ -58,15 +58,15 @@ export const STAGE_ISLANDS: StageIsland[] = [
   },
   {
     id: 'mixed4Free',
-    title: '4つのあわ free',
+    title: '4つのあわ ∞',
     description: '4つのあわを、きごうの回数制限なしでとく',
-    stageSetTitles: ['4つのあわ free'],
+    stageSetTitles: ['4つのあわ ∞'],
   },
   {
     id: 'mixed5Free',
-    title: '5つのあわ free',
+    title: '5つのあわ ∞',
     description: '5つのあわを、きごうの回数制限なしでとく',
-    stageSetTitles: ['5つのあわ free'],
+    stageSetTitles: ['5つのあわ ∞'],
   },
 ];
 
@@ -129,6 +129,8 @@ function createAdditionStages(): Stage[] {
 }
 
 function createSubtractionStages(): Stage[] {
+  // The first stages of each set only take away. After that some need one bubble added back
+  // (9 - 4 + 2), so the player has to decide which bubbles to take away.
   const specs: Array<[string, number[], number]> = [
     ['ちいさなひきざん', [7, 2], 5],
     ['ちいさなひきざん', [9, 4], 5],
@@ -136,25 +138,25 @@ function createSubtractionStages(): Stage[] {
     ['ちいさなひきざん', [14, 6], 8],
     ['ちいさなひきざん', [16, 7], 9],
     ['ちいさなひきざん', [15, 3, 4], 8],
-    ['ちいさなひきざん', [18, 5, 3], 10],
-    ['ちいさなひきざん', [20, 8, 5], 7],
+    ['ちいさなひきざん', [9, 4, 2], 7],
+    ['ちいさなひきざん', [12, 5, 3], 10],
     ['10と20のひきざん', [18, 8], 10],
     ['10と20のひきざん', [24, 9], 15],
     ['10と20のひきざん', [30, 10], 20],
     ['10と20のひきざん', [28, 6, 2], 20],
-    ['10と20のひきざん', [35, 10, 5], 20],
+    ['10と20のひきざん', [25, 10, 5], 20],
     ['10と20のひきざん', [32, 7, 5], 20],
-    ['10と20のひきざん', [40, 15, 5], 20],
+    ['10と20のひきざん', [16, 8, 12], 20],
     ['10と20のひきざん', [45, 20, 5], 20],
-    ['10と20のひきざん', [50, 20, 10], 20],
+    ['10と20のひきざん', [40, 10, 15, 5], 20],
     ['おおきなひきざん', [60, 10], 50],
     ['おおきなひきざん', [75, 25], 50],
     ['おおきなひきざん', [90, 20, 10], 60],
-    ['おおきなひきざん', [100, 40], 60],
+    ['おおきなひきざん', [80, 30, 10], 60],
     ['おおきなひきざん', [120, 20], 100],
-    ['おおきなひきざん', [150, 30, 20], 100],
+    ['おおきなひきざん', [130, 50, 20], 100],
     ['おおきなひきざん', [180, 40, 40], 100],
-    ['おおきなひきざん', [200, 50, 25], 125],
+    ['おおきなひきざん', [200, 50, 30, 5], 125],
   ];
 
   return specs.map(([setTitle, bubbleCounts, target], index) => ({
@@ -170,31 +172,39 @@ function createSubtractionStages(): Stage[] {
 }
 
 function createMultiplicationStages(): Stage[] {
+  // 1. Only × is there: see what multiplying does.
   const multiplyOnly: Array<[number[], number]> = [
     [[2, 3], 6],
     [[2, 4], 8],
-    [[3, 3], 9],
     [[5, 2], 10],
     [[3, 4], 12],
-    [[7, 2], 14],
     [[4, 4], 16],
-    [[6, 3], 18],
-    [[4, 5], 20],
-    [[3, 7], 21],
     [[2, 3, 4], 24],
-    [[3, 2, 5], 30],
   ];
-  const plusMinusAndMultiply: Array<[number[], number]> = [
+  // 2. Two bubbles, + or ×: the first real choice. Two of them want +.
+  const plusOrMultiply: Array<[number[], number]> = [
+    [[3, 3], 9],
+    [[6, 3], 18],
+    [[4, 5], 9],
+    [[7, 2], 14],
+    [[6, 2], 8],
+    [[3, 7], 21],
+  ];
+  // 3. Three bubbles, + and ×: multiply two, add the third.
+  const plusAndMultiply: Array<[number[], number]> = [
     [[2, 3, 4], 10],
     [[2, 4, 3], 11],
     [[3, 4, 5], 17],
     [[5, 2, 8], 18],
     [[6, 3, 4], 22],
-    [[7, 2, 5], 9],
     [[8, 2, 3], 19],
-    [[3, 3, 7], 16],
-    [[4, 4, 2], 18],
-    [[5, 5, 10], 35],
+  ];
+  // 4. - joins in, then a fourth bubble.
+  const plusMinusAndMultiply: Array<[number[], number]> = [
+    [[7, 2, 5], 9],
+    [[6, 4, 3], 21],
+    [[5, 3, 8], 7],
+    [[4, 5, 6], 14],
     [[2, 3, 4, 5], 17],
     [[3, 2, 5, 4], 34],
     [[4, 3, 2, 8], 32],
@@ -202,40 +212,52 @@ function createMultiplicationStages(): Stage[] {
 
   return [
     ...operationStageGroup('multiplication', 'かけざんのしま', 'まとまりをふやす', multiplyOnly, { '+': 0, '-': 0, '×': 'infinite', '÷': 0 }),
-    ...operationStageGroup('multiplication', 'かけざんのしま', 'くみあわせてふやす', plusMinusAndMultiply, {
-      '+': 'infinite',
-      '-': 'infinite',
-      '×': 'infinite',
-      '÷': 0,
-    }, multiplyOnly.length),
+    ...operationStageGroup('multiplication', 'かけざんのしま', 'たすか かけるか', plusOrMultiply, { '+': 'infinite', '-': 0, '×': 'infinite', '÷': 0 }, multiplyOnly.length),
+    ...operationStageGroup('multiplication', 'かけざんのしま', 'くみあわせてふやす', plusAndMultiply, { '+': 'infinite', '-': 0, '×': 'infinite', '÷': 0 }, multiplyOnly.length + plusOrMultiply.length),
+    ...operationStageGroup(
+      'multiplication',
+      'かけざんのしま',
+      'くみあわせてふやす',
+      plusMinusAndMultiply,
+      { '+': 'infinite', '-': 'infinite', '×': 'infinite', '÷': 0 },
+      multiplyOnly.length + plusOrMultiply.length + plusAndMultiply.length,
+    ),
   ];
 }
 
 function createDivisionStages(): Stage[] {
+  // 1. Only ÷ is there: see what dividing does (and that the bigger number has to come first).
   const divideOnly: Array<[number[], number]> = [
     [[6, 2], 3],
     [[8, 2], 4],
     [[9, 3], 3],
-    [[10, 2], 5],
     [[12, 3], 4],
-    [[14, 2], 7],
     [[15, 3], 5],
-    [[16, 4], 4],
-    [[18, 3], 6],
-    [[20, 4], 5],
     [[24, 3, 2], 4],
-    [[36, 3, 3], 4],
   ];
-  const plusMinusAndDivide: Array<[number[], number]> = [
+  // 2. Two bubbles, - or ÷: the first real choice. Two of them want -.
+  const minusOrDivide: Array<[number[], number]> = [
+    [[10, 2], 5],
+    [[10, 5], 5],
+    [[14, 2], 7],
+    [[9, 3], 6],
+    [[16, 4], 4],
+    [[20, 4], 5],
+  ];
+  // 3. Three bubbles, + and ÷: divide, then add the third.
+  const plusAndDivide: Array<[number[], number]> = [
     [[12, 3, 5], 9],
-    [[20, 4, 3], 8],
     [[18, 3, 2], 8],
     [[16, 4, 7], 11],
     [[24, 6, 5], 9],
-    [[30, 5, 4], 2],
     [[36, 6, 8], 14],
     [[28, 4, 6], 13],
-    [[40, 5, 3], 11],
+  ];
+  // 4. - joins in (one of these adds first and divides after), then a fourth bubble.
+  const plusMinusAndDivide: Array<[number[], number]> = [
+    [[30, 5, 4], 2],
+    [[20, 4, 3], 8],
+    [[27, 3, 4], 5],
     [[45, 9, 5], 10],
     [[48, 6, 2, 7], 13],
     [[60, 5, 4, 3], 11],
@@ -244,12 +266,16 @@ function createDivisionStages(): Stage[] {
 
   return [
     ...operationStageGroup('division', 'わりざんのしま', 'まとまりをわける', divideOnly, { '+': 0, '-': 0, '×': 0, '÷': 'infinite' }),
-    ...operationStageGroup('division', 'わりざんのしま', 'くみあわせてわける', plusMinusAndDivide, {
-      '+': 'infinite',
-      '-': 'infinite',
-      '×': 0,
-      '÷': 'infinite',
-    }, divideOnly.length),
+    ...operationStageGroup('division', 'わりざんのしま', 'ひくか わるか', minusOrDivide, { '+': 0, '-': 'infinite', '×': 0, '÷': 'infinite' }, divideOnly.length),
+    ...operationStageGroup('division', 'わりざんのしま', 'くみあわせてわける', plusAndDivide, { '+': 'infinite', '-': 0, '×': 0, '÷': 'infinite' }, divideOnly.length + minusOrDivide.length),
+    ...operationStageGroup(
+      'division',
+      'わりざんのしま',
+      'くみあわせてわける',
+      plusMinusAndDivide,
+      { '+': 'infinite', '-': 'infinite', '×': 0, '÷': 'infinite' },
+      divideOnly.length + minusOrDivide.length + plusAndDivide.length,
+    ),
   ];
 }
 
@@ -334,42 +360,45 @@ function mixedStageGroup(
 }
 
 function createFreeMixedStages(): Stage[] {
+  // Every operator may be used as often as wanted, so these are chosen to still need thought:
+  // adding and taking away alone never reaches the goal, and each island goes from several
+  // winning ways down to a few. (They used to repeat the bubbles and goals of the islands above.)
   return [
     ...freeMixedStageGroup('mixed3Free', [
-      [[2, 3, 4], 10],
-      [[8, 2, 3], 7],
-      [[5, 4, 3], 6],
-      [[3, 3, 2], 7],
-      [[9, 3, 2], 6],
-      [[6, 2, 5], 28],
-      [[4, 2, 2], 4],
-      [[8, 4, 2], 8],
-      [[10, 2, 6], -1],
-      [[4, 6, 2], 16],
+      [[2, 3, 4], 20],
+      [[2, 5, 7], 45],
+      [[4, 5, 8], 52],
+      [[3, 4, 9], 15],
+      [[5, 6, 12], 30],
+      [[2, 3, 7], 3],
+      [[2, 3, 8], 2],
+      [[3, 4, 6], 2],
+      [[4, 6, 8], 3],
+      [[6, 6, 9], 4],
     ]),
     ...freeMixedStageGroup('mixed4Free', [
-      [[2, 3, 4, 5], 5],
-      [[8, 2, 3, 4], 16],
-      [[10, 4, 3, 2], 4],
-      [[6, 3, 2, 5], 9],
-      [[9, 3, 4, 2], 5],
-      [[4, 4, 3, 2], 10],
-      [[7, 2, 5, 3], 12],
-      [[12, 3, 2, 4], 12],
-      [[5, 5, 2, 3], 9],
-      [[14, 7, 3, 2], 8],
+      [[4, 5, 6, 9], 55],
+      [[2, 5, 8, 9], 15],
+      [[2, 4, 6, 8], 3],
+      [[3, 4, 7, 8], 20],
+      [[3, 5, 6, 8], 37],
+      [[3, 4, 6, 9], 13],
+      [[3, 4, 6, 8], 12],
+      [[3, 6, 7, 9], 4],
+      [[4, 7, 8, 9], 24],
+      [[2, 5, 6, 7], 22],
     ]),
     ...freeMixedStageGroup('mixed5Free', [
-      [[2, 3, 4, 5, 6], 11],
-      [[12, 3, 2, 5, 4], 9],
-      [[6, 4, 2, 3, 5], 16],
-      [[9, 3, 5, 2, 4], 13],
-      [[8, 2, 6, 3, 5], 23],
-      [[5, 5, 4, 2, 3], 9],
-      [[7, 3, 2, 4, 6], -1],
-      [[10, 2, 3, 5, 4], 11],
-      [[4, 4, 2, 6, 3], 11],
-      [[15, 3, 2, 4, 7], 7],
+      [[2, 3, 4, 5, 6], 21],
+      [[2, 3, 4, 5, 9], 14],
+      [[2, 3, 5, 8, 9], 26],
+      [[2, 4, 5, 6, 7], 13],
+      [[2, 3, 5, 7, 9], 29],
+      [[2, 3, 5, 6, 9], 17],
+      [[2, 3, 5, 6, 7], 45],
+      [[2, 4, 5, 6, 8], 49],
+      [[3, 4, 5, 6, 7], 37],
+      [[2, 3, 6, 7, 8], 58],
     ]),
   ];
 }
