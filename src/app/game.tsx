@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +16,8 @@ import type { HistoryWindow, NavController } from '@/game/nav-controller';
 import { createInitialNavState } from '@/game/navigation';
 import type { NavOptions, NavState } from '@/game/navigation';
 import { getStageIndexById, STAGE_ISLANDS, STAGES } from '@/game/stages';
+import { createValueStore } from '@/game/value-store';
+import type { ValueStore } from '@/game/value-store';
 import { Stage } from '@/game/types';
 import { a11yLabel } from '@/i18n/a11y-label';
 import { isSidewaysPhone } from '@/layout/phone-frame';
@@ -448,7 +450,8 @@ function ModeSelect({
   onSelectDentaku: () => void;
   onSelectLongForm: () => void;
 }) {
-  const [scrollDepth, setScrollDepth] = useState(0);
+  // How far the list is scrolled only matters to the backdrop, so scrolling does not redraw this screen.
+  const [scrollDepthStore] = useState(() => createValueStore(0));
   const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
   const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
   const centerX = mapWidth / 2;
@@ -460,13 +463,13 @@ function ModeSelect({
   return (
     <SafeAreaView style={styles.screen}>
       <View testID="mode-select" style={styles.depthScene}>
-        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepthStore={scrollDepthStore} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
         <SoundToggleButton />
         <ScrollView
           style={styles.worldScroll}
           contentContainerStyle={styles.modeScrollContent}
           showsVerticalScrollIndicator={false}
-          onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
+          onScroll={(event) => scrollDepthStore.set(event.nativeEvent.contentOffset.y)}
           scrollEventThrottle={16}
         >
           <View style={styles.modeRouteLayer}>
@@ -649,7 +652,8 @@ function DentakuWorldSelect({
   onBack: () => void;
   onSelectWorld: (worldId: DentakuWorldId) => void;
 }) {
-  const [scrollDepth, setScrollDepth] = useState(0);
+  // How far the list is scrolled only matters to the backdrop, so scrolling does not redraw this screen.
+  const [scrollDepthStore] = useState(() => createValueStore(0));
   const { isVocalEnabled, toggleVocal } = useBgmControl();
   const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
   const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
@@ -659,7 +663,7 @@ function DentakuWorldSelect({
   return (
     <SafeAreaView style={styles.screen}>
       <View testID="dentaku-world-select" style={styles.depthScene}>
-        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepthStore={scrollDepthStore} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
         <SoundToggleButton />
         <Pressable
           accessibilityLabel={a11yLabel('Back')}
@@ -676,7 +680,7 @@ function DentakuWorldSelect({
           style={styles.worldScroll}
           contentContainerStyle={[styles.dentakuWorldScrollContent, { minHeight: routeLayerHeight }]}
           showsVerticalScrollIndicator={false}
-          onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
+          onScroll={(event) => scrollDepthStore.set(event.nativeEvent.contentOffset.y)}
           scrollEventThrottle={16}
         >
           <View style={[styles.dentakuWorldRouteLayer, { minHeight: routeLayerHeight }]}>
@@ -720,7 +724,8 @@ function WorldSelect({
   onBack: () => void;
   onSelectWorld: (worldId: WorldId) => void;
 }) {
-  const [scrollDepth, setScrollDepth] = useState(0);
+  // How far the list is scrolled only matters to the backdrop, so scrolling does not redraw this screen.
+  const [scrollDepthStore] = useState(() => createValueStore(0));
   const { isVocalEnabled, toggleVocal } = useBgmControl();
   const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
   const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
@@ -731,7 +736,7 @@ function WorldSelect({
   return (
     <SafeAreaView style={styles.screen}>
       <View testID="world-select" style={styles.depthScene}>
-        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepthStore={scrollDepthStore} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
         <SoundToggleButton />
         <Pressable
           accessibilityLabel={a11yLabel('Back')}
@@ -748,7 +753,7 @@ function WorldSelect({
           style={styles.worldScroll}
           contentContainerStyle={[styles.worldScrollContent, { minHeight: routeLayerHeight }]}
           showsVerticalScrollIndicator={false}
-          onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
+          onScroll={(event) => scrollDepthStore.set(event.nativeEvent.contentOffset.y)}
           scrollEventThrottle={16}
         >
           <View style={[styles.routeLayer, { minHeight: routeLayerHeight }]}>
@@ -840,16 +845,17 @@ function SoundToggleButton() {
 function DepthBackdrop({
   width,
   height,
-  scrollDepth,
+  scrollDepthStore,
   onBubblePop,
   onCreaturePress,
 }: {
   width: number;
   height: number;
-  scrollDepth: number;
+  scrollDepthStore: ValueStore<number>;
   onBubblePop?: () => void;
   onCreaturePress?: () => void;
 }) {
+  const scrollDepth = useSyncExternalStore(scrollDepthStore.subscribe, scrollDepthStore.get, scrollDepthStore.get);
   const prefersReducedMotion = usePrefersReducedMotion();
   const [tick, setTick] = useState(() => Date.now());
   const [bubbleStarts, setBubbleStarts] = useState<Record<string, number>>({});
@@ -997,6 +1003,18 @@ function DepthCreature({
         },
       ]}
     >
+      <DepthCreatureArt spec={spec} />
+    </Pressable>
+  );
+}
+
+/** The drawing of one sea creature. It only depends on which creature it is, so it is not redrawn as the creature swims. */
+const DepthCreatureArt = memo(function DepthCreatureArt({ spec }: { spec: DepthFishSpec }) {
+  const isAngler = spec.kind === 'angler';
+  const isJelly = spec.kind === 'jelly';
+
+  return (
+    <>
       {isAngler ? <View style={[styles.anglerGlow, { width: spec.size * 1.45, height: spec.size * 1.45, borderRadius: spec.size, right: -spec.size * 0.9, top: -spec.size * 0.52 }]} /> : null}
       {isJelly ? (
         <>
@@ -1121,9 +1139,9 @@ function DepthCreature({
           {isAngler ? <View style={[styles.anglerLight, { right: -spec.size * 0.46, top: -spec.size * 0.06 }]} /> : null}
         </>
       )}
-    </Pressable>
+    </>
   );
-}
+});
 
 function WorldNode({
   label,
@@ -1287,7 +1305,8 @@ function StageSelect({
   onBack: () => void;
   onStartStage: (stage: Stage) => void;
 }) {
-  const [scrollDepth, setScrollDepth] = useState(0);
+  // How far the list is scrolled only matters to the backdrop, so scrolling does not redraw this screen.
+  const [scrollDepthStore] = useState(() => createValueStore(0));
   const { isVocalEnabled, toggleVocal } = useBgmControl();
   const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
   const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
@@ -1299,7 +1318,7 @@ function StageSelect({
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.depthScene}>
-        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepthStore={scrollDepthStore} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
         <SoundToggleButton />
         <Pressable
           accessibilityLabel={a11yLabel('Back')}
@@ -1316,7 +1335,7 @@ function StageSelect({
           style={styles.stageScroll}
           contentContainerStyle={[styles.stageScrollContent, { height: mapHeight }]}
           showsVerticalScrollIndicator={false}
-          onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
+          onScroll={(event) => scrollDepthStore.set(event.nativeEvent.contentOffset.y)}
           scrollEventThrottle={16}
         >
           <View style={[styles.stageMap, { height: mapHeight }]}>
@@ -1364,7 +1383,8 @@ function DentakuStageSelect({
   onBack: () => void;
   onStartStage: (stage: DentakuStage) => void;
 }) {
-  const [scrollDepth, setScrollDepth] = useState(0);
+  // How far the list is scrolled only matters to the backdrop, so scrolling does not redraw this screen.
+  const [scrollDepthStore] = useState(() => createValueStore(0));
   const { isVocalEnabled, toggleVocal } = useBgmControl();
   const { play: playBackgroundBubbleSfx } = useOneShotAudio(SFX.backgroundBubble.source, SFX.backgroundBubble.volume);
   const { play: playActionSfx } = useOneShotAudio(SFX.uiAction.source, SFX.uiAction.volume);
@@ -1374,7 +1394,7 @@ function DentakuStageSelect({
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.depthScene}>
-        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepth={scrollDepth} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
+        <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepthStore={scrollDepthStore} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
         <SoundToggleButton />
         <Pressable
           accessibilityLabel={a11yLabel('Back')}
@@ -1391,7 +1411,7 @@ function DentakuStageSelect({
           style={styles.stageScroll}
           contentContainerStyle={[styles.stageScrollContent, { height: mapHeight }]}
           showsVerticalScrollIndicator={false}
-          onScroll={(event) => setScrollDepth(event.nativeEvent.contentOffset.y)}
+          onScroll={(event) => scrollDepthStore.set(event.nativeEvent.contentOffset.y)}
           scrollEventThrottle={16}
         >
           <View style={[styles.stageMap, { height: mapHeight }]}>

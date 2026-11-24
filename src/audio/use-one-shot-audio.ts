@@ -1,32 +1,28 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createAudioPlayer } from 'expo-audio';
 import type { AudioPlayer } from 'expo-audio';
 import { Asset } from 'expo-asset';
 import { Platform } from 'react-native';
 
 import { isSoundMuted } from './sound-settings';
+import { createWebAudioPool } from './web-audio-pool';
+import type { WebAudioPool } from './web-audio-pool';
 
 const SFX_FADE_OUT_MS = 220;
 
 type FadeTimer = ReturnType<typeof setInterval>;
 
-function fadeOutWebAudio(audio: HTMLAudioElement, startingVolume: number, release: boolean) {
-  const steps = 8;
-  const intervalMs = SFX_FADE_OUT_MS / steps;
-  let step = 0;
-  const interval = setInterval(() => {
-    step += 1;
-    audio.volume = Math.max(0, startingVolume * (1 - step / steps));
-    if (step >= steps) {
-      clearInterval(interval);
-      audio.pause();
-      audio.currentTime = 0;
-      if (release) {
-        audio.src = '';
-      }
-    }
-  }, intervalMs);
-  return interval;
+// On the web every screen shares one audio element per sound file, so a sound is loaded once for
+// the whole visit instead of again each time a screen opens.
+let webAudioPool: WebAudioPool | undefined;
+
+function getWebAudioPool() {
+  if (Platform.OS !== 'web' || typeof Audio === 'undefined') {
+    return undefined;
+  }
+
+  webAudioPool ??= createWebAudioPool((uri) => new Audio(uri), undefined, SFX_FADE_OUT_MS);
+  return webAudioPool;
 }
 
 function fadeOutAudioPlayer(player: AudioPlayer, startingVolume: number, release: boolean) {
@@ -51,8 +47,10 @@ function fadeOutAudioPlayer(player: AudioPlayer, startingVolume: number, release
 
 export function useOneShotAudio(source: number, volume: number) {
   const playerRef = useRef<AudioPlayer | null>(null);
-  const webAudioRef = useRef<HTMLAudioElement | null>(null);
   const fadeTimersRef = useRef<FadeTimer[]>([]);
+  // Web only: the address of the sound, and a token that says which screen played it last.
+  const webUri = useMemo(() => (getWebAudioPool() ? Asset.fromModule(source).uri : undefined), [source]);
+  const ownerRef = useRef({});
 
   const clearFadeTimers = useCallback(() => {
     fadeTimersRef.current.forEach((timer) => clearInterval(timer));
@@ -61,33 +59,27 @@ export function useOneShotAudio(source: number, volume: number) {
 
   const fadeOut = useCallback(
     (release = false) => {
+      if (webUri !== undefined) {
+        // The shared element stays loaded; it only goes quiet, and only if this screen played it last.
+        getWebAudioPool()?.fadeOut(webUri, ownerRef.current);
+        return;
+      }
+
       clearFadeTimers();
 
       const player = playerRef.current;
       if (player) {
         fadeTimersRef.current.push(fadeOutAudioPlayer(player, player.volume, release));
       }
-
-      const webAudio = webAudioRef.current;
-      if (webAudio) {
-        fadeTimersRef.current.push(fadeOutWebAudio(webAudio, webAudio.volume, release));
-      }
     },
-    [clearFadeTimers],
+    [clearFadeTimers, webUri],
   );
 
   useEffect(() => {
-    let player: AudioPlayer | null = null;
-    let webAudio: HTMLAudioElement | null = null;
-
-    if (Platform.OS === 'web' && typeof Audio !== 'undefined') {
-      const asset = Asset.fromModule(source);
-      webAudio = new Audio(asset.uri);
-      webAudio.volume = volume;
-      webAudio.preload = 'auto';
-      webAudioRef.current = webAudio;
+    if (webUri !== undefined) {
+      getWebAudioPool()?.warm(webUri, volume);
     } else {
-      player = createAudioPlayer(source);
+      const player = createAudioPlayer(source);
       player.volume = volume;
       playerRef.current = player;
     }
@@ -95,24 +87,20 @@ export function useOneShotAudio(source: number, volume: number) {
     return () => {
       fadeOut(true);
       playerRef.current = null;
-      webAudioRef.current = null;
     };
-  }, [fadeOut, source, volume]);
+  }, [fadeOut, source, volume, webUri]);
 
   const play = useCallback(() => {
     if (isSoundMuted()) {
       return;
     }
 
-    clearFadeTimers();
-
-    const webAudio = webAudioRef.current;
-    if (webAudio) {
-      webAudio.volume = volume;
-      webAudio.currentTime = 0;
-      void webAudio.play().catch(() => {});
+    if (webUri !== undefined) {
+      getWebAudioPool()?.play(webUri, ownerRef.current, volume);
       return;
     }
+
+    clearFadeTimers();
 
     const player = playerRef.current;
     if (!player) {
@@ -123,7 +111,7 @@ export function useOneShotAudio(source: number, volume: number) {
     void player.seekTo(0).finally(() => {
       player.play();
     });
-  }, [clearFadeTimers, volume]);
+  }, [clearFadeTimers, volume, webUri]);
 
   return { fadeOut, play };
 }
