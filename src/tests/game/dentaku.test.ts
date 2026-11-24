@@ -89,6 +89,62 @@ describe('dentaku stages', () => {
     expect(Number.isInteger(question.answer)).toBe(true);
     expect(question.answer).toBeLessThanOrEqual(99);
   });
+
+  it('keeps chains of subtractions varied, with answers from 0 to 9', () => {
+    for (const [stageId, count] of [['dentaku-subtraction-26', 3], ['dentaku-subtraction-51', 4], ['dentaku-subtraction-76', 5]] as const) {
+      const stage = DENTAKU_STAGES.find((candidate) => candidate.id === stageId);
+      const questions = Array.from({ length: 400 }, (_, index) => createDentakuQuestions(stage!, 1000 + index * 7919)[0]);
+
+      for (const question of questions) {
+        expect(question.operands).toHaveLength(count);
+        expect(question.operators.every((operator) => operator === '-')).toBe(true);
+        expect(question.answer).toBeGreaterThanOrEqual(0);
+        expect(question.answer).toBeLessThanOrEqual(9);
+        expect(question.operands.slice(1).every((value) => value >= 1 && value <= 9)).toBe(true);
+        expect(question.operands[0]).toBe(question.operands.slice(1).reduce((sum, value) => sum + value, question.answer));
+        expect(question.prompt).not.toContain('(');
+      }
+      // It used to be 0 more than half of the time with five numbers.
+      expect(questions.filter((question) => question.answer === 0).length).toBeLessThan(400 * 0.2);
+      expect(new Set(questions.map((question) => question.prompt)).size).toBeGreaterThan(200);
+    }
+  });
+
+  it('keeps chains of divisions varied and within 99', () => {
+    for (const [stageId, count] of [['dentaku-division-26', 3], ['dentaku-division-51', 4], ['dentaku-division-76', 5]] as const) {
+      const stage = DENTAKU_STAGES.find((candidate) => candidate.id === stageId);
+      const questions = Array.from({ length: 400 }, (_, index) => createDentakuQuestions(stage!, 1000 + index * 7919)[0]);
+      const counts = new Map<string, number>();
+
+      for (const question of questions) {
+        counts.set(question.prompt, (counts.get(question.prompt) ?? 0) + 1);
+        expect(question.operands).toHaveLength(count);
+        expect(question.operators.every((operator) => operator === '÷')).toBe(true);
+        expect(Number.isInteger(question.answer)).toBe(true);
+        expect(question.answer).toBeGreaterThanOrEqual(1);
+        expect(question.answer).toBeLessThanOrEqual(9);
+        expect(question.operands[0]).toBeLessThanOrEqual(99);
+        expect(question.operands.slice(1).every((value) => value >= 2 && value <= 9)).toBe(true);
+        expect(question.prompt).not.toContain('(');
+      }
+      // With five numbers 83% used to be "16 ÷ 2 ÷ 2 ÷ 2 ÷ 2".
+      expect(Math.max(...counts.values())).toBeLessThan(400 * 0.05);
+      expect(counts.size).toBeGreaterThan(100);
+    }
+  });
+
+  it('the endless subtraction and division stages never fall back to something else', () => {
+    for (const stageId of ['dentaku-subtraction-random', 'dentaku-division-random']) {
+      const stage = DENTAKU_STAGES.find((candidate) => candidate.id === stageId);
+      for (let seed = 1; seed <= 200; seed += 1) {
+        const question = createDentakuQuestions(stage!, seed * 104729)[0];
+        expect(Number.isInteger(question.answer)).toBe(true);
+        expect(question.answer).toBeGreaterThanOrEqual(0);
+        expect(question.operands.length).toBeGreaterThanOrEqual(2);
+        expect(question.operands.length).toBeLessThanOrEqual(5);
+      }
+    }
+  });
 });
 
 function hasTrivialInversePair(operands: number[], operators: string[]) {
