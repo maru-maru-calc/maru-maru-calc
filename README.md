@@ -55,6 +55,8 @@ npm run export:web
 
 `main` ブランチへpushすると、GitHub ActionsでWeb版をエクスポートしてGitHub Pagesへデプロイします。
 
+Web版はホーム画面に追加でき(`public/manifest.webmanifest`)、一度開けばオフラインでも遊べます。オフライン用のService Worker(`dist/sw.js`)は `scripts/service-worker.js` をもとに `npm run export:web` の最後で生成します。BGMは容量が大きいためオフライン保存の対象外で、オフライン時はBGMなしになります。
+
 Web版は1ページ構成(SPA)なので、`npm run export:web` の最後に `index.html` を `game.html` / `play.html` / `404.html` としてコピーしています。これで `/game` と `/play` が「404 Not Found」ではなく通常のページとして配信されます。
 
 SNSやSlackで共有された時の表示用に、タイトル、description、OGP/Twitter Card、favicon、apple-touch-iconを設定しています。

@@ -11,13 +11,19 @@ const keywords = 'まるまる電卓,算数,計算,知育アプリ,子ども向�
 const assetBaseUrl = 'https://maru-maru-calc.github.io/maru-maru-calc';
 const ogpImageUrl = `${assetBaseUrl}/ogp.png`;
 
-for (const fileName of ['favicon.png', 'apple-touch-icon.png', 'ogp.png']) {
+for (const fileName of ['favicon.png', 'apple-touch-icon.png', 'ogp.png', 'manifest.webmanifest']) {
   const source = path.join(publicDir, fileName);
   const destination = path.join(distDir, fileName);
 
   if (fs.existsSync(source)) {
     fs.copyFileSync(source, destination);
   }
+}
+
+// Icons the web app manifest points to (home screen icon when the app is installed).
+const iconsDir = path.join(publicDir, 'icons');
+if (fs.existsSync(iconsDir)) {
+  fs.cpSync(iconsDir, path.join(distDir, 'icons'), { recursive: true });
 }
 
 const metadata = `    <title>${title}</title>
@@ -29,6 +35,9 @@ const metadata = `    <title>${title}</title>
     <link rel="canonical" href="${siteUrl}" />
     <link rel="icon" type="image/png" href="/maru-maru-calc/favicon.png" />
     <link rel="apple-touch-icon" href="/maru-maru-calc/apple-touch-icon.png" />
+    <link rel="manifest" href="/maru-maru-calc/manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ja_JP" />
     <meta property="og:site_name" content="まるまる電卓" />
