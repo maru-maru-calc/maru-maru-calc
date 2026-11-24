@@ -1,5 +1,6 @@
 // The puzzle game: one-way puzzles in a fixed order, and a start screen that is itself a puzzle.
 import { PUZZLE_START_GROUPS, PUZZLE_STAGES, PuzzleStage } from '@/game/puzzle-stages';
+import { applyMove } from '@/game/stage-rules';
 import type { OperatorSymbol, Stage } from '@/game/types';
 
 const OPERATOR_CODES: Record<OperatorSymbol, string> = { '+': 'a', '-': 's', '×': 'm', '÷': 'd' };
@@ -53,4 +54,66 @@ export function getPuzzleProgress(solvedIds: readonly string[]): { solved: numbe
     solved: PUZZLE_GAME_STAGES.filter((stage) => solved.has(stage.id)).length,
     next: nextIndex === -1 ? undefined : nextIndex + 1,
   };
+}
+
+const QUICK_OPERATORS: OperatorSymbol[] = ['+', '-', '×', '÷'];
+
+/**
+ * A puzzle for the one-minute game, made on the spot: three different numbers from 2 to 9 and a
+ * goal that can be reached in one way only, without leaving 1 to 99 on the way. There are 594 of
+ * these, so they are found by trying, not stored. `avoid` is a puzzle not to hand out again (the
+ * one just played).
+ */
+export function createQuickPuzzle(random: () => number = Math.random, avoid?: PuzzleStage): PuzzleStage {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const numbers: number[] = [];
+    while (numbers.length < 3) {
+      const value = 2 + (Math.floor(random() * 8) % 8);
+      if (!numbers.includes(value)) {
+        numbers.push(value);
+      }
+    }
+
+    // Every goal these numbers reach, with the ways to it ("3 + 2" and "2 + 3" are one way, as are "3 × 2" and "2 × 3").
+    const ways = new Map<number, Set<string>>();
+    const calmGoals = new Set<number>();
+    const visit = (total: number, rest: number[], way: string, isCalm: boolean) => {
+      if (rest.length === 0) {
+        ways.set(total, (ways.get(total) ?? new Set()).add(way));
+        if (isCalm) {
+          calmGoals.add(total);
+        }
+        return;
+      }
+      rest.forEach((value, index) => {
+        for (const operator of QUICK_OPERATORS) {
+          const next = applyMove(total, operator, value);
+          if (next === undefined) {
+            continue;
+          }
+          const first = rest.length === 2 ? Number(way) : undefined;
+          const isSwappedStart = first !== undefined && (operator === '+' || operator === '×') && value < first;
+          visit(next, [...rest.slice(0, index), ...rest.slice(index + 1)], isSwappedStart ? `${value} ${operator} ${first}` : `${way} ${operator} ${value}`, isCalm && next >= 1 && next <= 99);
+        }
+      });
+    };
+    numbers.forEach((value, index) => visit(value, [...numbers.slice(0, index), ...numbers.slice(index + 1)], String(value), true));
+
+    const goals = [...ways.entries()].filter(([goal, found]) => found.size === 1 && calmGoals.has(goal) && Number.isInteger(goal) && goal >= 1 && goal <= 99);
+    if (goals.length === 0) {
+      continue;
+    }
+    const [goal, found] = goals[Math.floor(random() * goals.length) % goals.length];
+    const puzzle: PuzzleStage = {
+      bubbles: numbers,
+      goal,
+      limits: { '+': 'infinite', '-': 'infinite', '×': 'infinite', '÷': 'infinite' },
+      solution: [...found][0],
+    };
+    if (!avoid || getPuzzleId(avoid) !== getPuzzleId(puzzle)) {
+      return puzzle;
+    }
+  }
+  // Not reached in practice: almost every draw has several one-way goals.
+  return PUZZLE_STAGES[0];
 }

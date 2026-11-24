@@ -1,23 +1,25 @@
 // The puzzle game: a separate entrance to the same board, with nothing to learn and no words.
 //
-// Start screen (itself a puzzle that shows a rule) → the puzzles in order → an end screen once
-// every puzzle is solved. Its progress is kept apart from the learning app's.
+// The start screen is itself a puzzle that shows a rule. Solving it offers the puzzles in order or
+// the one-minute game. Its progress is kept apart from the learning app's.
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MarumaruGame } from '@/components/MarumaruGame';
-import { NavImageIcon } from '@/components/NavImageIcon';
+import { PuzzleChoice, PuzzleEnd, puzzleScreenStyle, QuickResult } from '@/components/puzzle/parts';
+import { QuickGame } from '@/components/puzzle/quick-game';
 import { createPuzzleGameStage, getPuzzleProgress, pickStartPuzzle, PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
 import type { Stage } from '@/game/types';
-import { a11yLabel } from '@/i18n/a11y-label';
 import { loadPuzzleProgress, savePuzzleProgress } from '@/storage/puzzle-progress';
-import { addSolvedPuzzle } from '@/storage/puzzle-progress-codec';
+import { addQuickScore, addSolvedPuzzle } from '@/storage/puzzle-progress-codec';
 import type { PuzzleProgress } from '@/storage/puzzle-progress-codec';
 
 type Screen =
-  | { name: 'start'; stage: Stage; round: number }
+  | { name: 'start'; stage: Stage; round: number; isSolved: boolean }
   | { name: 'play'; firstIndex: number; round: number }
+  | { name: 'quick'; round: number }
+  | { name: 'quickResult'; solved: number; rank: number | undefined }
   | { name: 'end' };
 
 export default function PuzzlePage() {
@@ -29,7 +31,7 @@ export default function PuzzlePage() {
     void loadPuzzleProgress().then((loaded) => {
       if (isCurrent) {
         setProgress(loaded);
-        setScreen({ name: 'start', stage: createPuzzleGameStage(pickStartPuzzle(loaded.startVisits), 1), round: 0 });
+        setScreen({ name: 'start', stage: createPuzzleGameStage(pickStartPuzzle(loaded.startVisits), 1), round: 0, isSolved: false });
       }
     });
     return () => {
@@ -39,7 +41,7 @@ export default function PuzzlePage() {
 
   if (!progress || !screen) {
     // Saved progress loads within a moment; only the water is shown until then.
-    return <SafeAreaView style={styles.screen} />;
+    return <SafeAreaView style={puzzleScreenStyle} />;
   }
 
   const update = (next: PuzzleProgress) => {
@@ -49,22 +51,34 @@ export default function PuzzlePage() {
     }
   };
   const showStart = () => {
-    setScreen({ name: 'start', stage: createPuzzleGameStage(pickStartPuzzle(progress.startVisits), 1), round: Date.now() });
+    setScreen({ name: 'start', stage: createPuzzleGameStage(pickStartPuzzle(progress.startVisits), 1), round: Date.now(), isSolved: false });
+  };
+  const showPuzzles = () => {
+    const { next } = getPuzzleProgress(progress.solved);
+    setScreen(next === undefined ? { name: 'end' } : { name: 'play', firstIndex: next - 1, round: Date.now() });
+  };
+  const showQuick = () => {
+    setScreen({ name: 'quick', round: Date.now() });
   };
 
   if (screen.name === 'start') {
     return (
-      <MarumaruGame
-        key={`start-${screen.round}`}
-        stages={[screen.stage]}
-        showsStageNumber={false}
-        showsGoalAsMaru={false}
-        onStageClear={() => update({ ...progress, startVisits: progress.startVisits + 1 })}
-        onLastStageNext={() => {
-          const { next } = getPuzzleProgress(progress.solved);
-          setScreen(next === undefined ? { name: 'end' } : { name: 'play', firstIndex: next - 1, round: Date.now() });
-        }}
-      />
+      <View style={puzzleScreenStyle}>
+        <MarumaruGame
+          key={`start-${screen.round}`}
+          stages={[screen.stage]}
+          showsStageNumber={false}
+          showsGoalAsMaru={false}
+          onStageClear={() => {
+            update({ ...progress, startVisits: progress.startVisits + 1 });
+            setScreen({ ...screen, isSolved: true });
+          }}
+          onLastStageNext={showPuzzles}
+        />
+        {screen.isSolved ? (
+          <PuzzleChoice nextPuzzle={getPuzzleProgress(progress.solved).next} best={progress.quickScores[0]} onPuzzles={showPuzzles} onQuick={showQuick} />
+        ) : null}
+      </View>
     );
   }
 
@@ -82,64 +96,23 @@ export default function PuzzlePage() {
     );
   }
 
-  // Nothing is left to solve. The count says so without words.
-  const { solved } = getPuzzleProgress(progress.solved);
-  return (
-    <SafeAreaView style={styles.screen}>
-      <View testID="puzzle-end" style={styles.end}>
-        <Text style={styles.endMark}>✓</Text>
-        <Text testID="puzzle-end-count" style={styles.endCount}>{solved} / {PUZZLE_GAME_STAGES.length}</Text>
-        <Pressable
-          accessibilityLabel={a11yLabel('Back')}
-          accessibilityRole="button"
-          testID="puzzle-end-back"
-          onPress={showStart}
-          style={({ pressed }) => [styles.endButton, pressed && styles.endButtonPressed]}
-        >
-          <NavImageIcon kind="back" size={30} />
-        </Pressable>
-      </View>
-    </SafeAreaView>
-  );
-}
+  if (screen.name === 'quick') {
+    return (
+      <QuickGame
+        key={`quick-${screen.round}`}
+        onBack={showStart}
+        onFinish={(solved) => {
+          const added = addQuickScore(progress, solved);
+          update(added.progress);
+          setScreen({ name: 'quickResult', solved, rank: added.rank });
+        }}
+      />
+    );
+  }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#C6E8F4',
-  },
-  end: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  endMark: {
-    color: '#0284C7',
-    fontSize: 96,
-    lineHeight: 104,
-    fontWeight: '900',
-    fontFamily: 'Helvetica',
-  },
-  endCount: {
-    color: '#12334A',
-    fontSize: 32,
-    lineHeight: 40,
-    fontWeight: '900',
-    fontFamily: 'Helvetica',
-  },
-  endButton: {
-    marginTop: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.58)',
-    borderWidth: 3,
-    borderColor: 'rgba(186, 230, 253, 0.72)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  endButtonPressed: {
-    opacity: 0.6,
-  },
-});
+  if (screen.name === 'quickResult') {
+    return <QuickResult solved={screen.solved} scores={progress.quickScores} rank={screen.rank} onAgain={showQuick} onBack={showStart} />;
+  }
+
+  return <PuzzleEnd solved={getPuzzleProgress(progress.solved).solved} total={PUZZLE_GAME_STAGES.length} onBack={showStart} />;
+}

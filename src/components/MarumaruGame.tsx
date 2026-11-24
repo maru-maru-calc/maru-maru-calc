@@ -153,7 +153,19 @@ export function MarumaruGame({
   onLastStageNext,
   showsStageNumber = true,
   showsGoalAsMaru = true,
+  onAllBubblesUsed,
+  resetSignal = 0,
+  cornerBadge,
 }: {
+  /**
+   * Called the moment the last bubble goes in, with whether the amount is the goal. A game played
+   * against the clock moves on from here instead of waiting for the maru to settle.
+   */
+  onAllBubblesUsed?: (isGoal: boolean) => void;
+  /** Changing this number starts the stage over. */
+  resetSignal?: number;
+  /** A short text (a count) shown in the corner under the bowl, opposite the undo button. */
+  cornerBadge?: string;
   /** Whether the header also draws the goal as maru, beside the number. */
   showsGoalAsMaru?: boolean;
   /** The stages to play, numbered from 1 in this order. Left out: the stages of まるまるモード. */
@@ -404,6 +416,18 @@ export function MarumaruGame({
     mergeReadySinceRef.current = undefined;
     resultReadySinceRef.current = undefined;
   }, [bubbleRows, fadeOutResultSfx, fieldHeight, fieldWidth, markBubbleInteraction, mode, stage.bubbleCounts]);
+
+  const onAllBubblesUsedRef = useRef(onAllBubblesUsed);
+  onAllBubblesUsedRef.current = onAllBubblesUsed;
+
+  // The owner of the board can ask for the stage to be started over.
+  const lastResetSignalRef = useRef(resetSignal);
+  useEffect(() => {
+    if (lastResetSignalRef.current !== resetSignal) {
+      lastResetSignalRef.current = resetSignal;
+      resetStage();
+    }
+  }, [resetSignal, resetStage]);
 
   // A new stage or question starts on a fresh board. The id is watched as well as the bubbles:
   // the same question asked twice in a row has the same bubbles, and used to keep the old board
@@ -1025,6 +1049,10 @@ export function MarumaruGame({
       },
     ];
     setMovesMade(positionsRef.current.length);
+    const latest = positionsRef.current[positionsRef.current.length - 1];
+    if (latest.pendingBubbles.length === 0) {
+      onAllBubblesUsedRef.current?.(latest.total === target);
+    }
   };
 
   const canUndo = !dentakuPractice && mode !== 'launch' && movesMade > 0 && !isClear;
@@ -2062,6 +2090,11 @@ export function MarumaruGame({
           {divisionSplitAnimation ? <DivisionSplitOverlay animation={divisionSplitAnimation} /> : null}
           {divisionFailedAnimation ? <DivisionFailedOverlay animation={divisionFailedAnimation} /> : null}
           {isFailed ? <FailedWaterOverlay failedAt={failedAt} /> : null}
+          {cornerBadge === undefined ? null : (
+            <View pointerEvents="none" testID="corner-badge" style={styles.cornerBadge}>
+              <Text style={styles.cornerBadgeText}>{cornerBadge}</Text>
+            </View>
+          )}
           {/* In the corner under the bowl, just above the end of the calculation line. The line's own box stays as it is on the opening screen. */}
           {!dentakuPractice && mode !== 'launch' ? (
             <Pressable
