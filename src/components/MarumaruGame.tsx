@@ -48,9 +48,7 @@ import {
 } from '@/components/marumaru/effects';
 import {
   addNumberToExpression,
-  formatSignedCount,
   getDivisionExpressionTokens,
-  getMergeMessage,
   getMultiplicationExpressionTokens,
   multiplySigns,
 } from '@/components/marumaru/expression-tokens';
@@ -101,7 +99,6 @@ import {
   delay,
   getInitialOperatorUsage,
   getInitialSelectedOperator,
-  getOperatorHelpMessage,
   getStageNumberInIsland,
   hasExpressionValue,
 } from '@/components/marumaru/operators';
@@ -182,7 +179,6 @@ export function MarumaruGame({
   const [divisionFailedAnimation, setDivisionFailedAnimation] = useState<DivisionFailedAnimation | undefined>(undefined);
   const [multiplicationExpansionAnimation, setMultiplicationExpansionAnimation] = useState<MultiplicationExpansionAnimation | undefined>(undefined);
   const [bubbleBurstAnimations, setBubbleBurstAnimations] = useState<BubbleBurstAnimation[]>([]);
-  const [message, setMessage] = useState('あわをさわると まるがでるよ');
   const [operatorUsage, setOperatorUsage] = useState<OperatorUsageLimits>(() => getInitialOperatorUsage(getStage(initialStageIndex), mode));
   const [kukuInput, setKukuInput] = useState('');
   const [kukuInputState, setKukuInputState] = useState<'input' | 'wrong' | 'running'>('input');
@@ -263,7 +259,6 @@ export function MarumaruGame({
     setIsClear(true);
     setIsFailed(false);
     setFailedAt(undefined);
-    setMessage('できた!');
   }, [stage.id]);
 
   useEffect(() => {
@@ -339,7 +334,6 @@ export function MarumaruGame({
     setDivisionFailedAnimation(undefined);
     setMultiplicationExpansionAnimation(undefined);
     setBubbleBurstAnimations([]);
-    setMessage('');
     setIsClear(false);
     setClearedStageId(undefined);
     setIsFailed(false);
@@ -492,7 +486,6 @@ export function MarumaruGame({
     if (!isFailed && !hasMergeableCount(beads) && !mergeAnimation) {
       setIsFailed(true);
       setFailedAt(Date.now());
-      setMessage('もういっかい やってみよう');
     }
 
     return undefined;
@@ -677,7 +670,6 @@ export function MarumaruGame({
       expressionTokensRef.current = nextExpressionTokens;
       expressionHistoryRef.current = stripExpressionResult(nextExpressionTokens);
       setExpressionTokens(nextExpressionTokens);
-      setMessage(`${formatSignedCount(signedSourceCount)}のまとまりが ${formatSignedCount(signedMultiplier)}こ`);
       publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
       setTimeout(() => {
         if (engineRef.current !== engine) {
@@ -715,7 +707,6 @@ export function MarumaruGame({
           sign: multiplySigns(source.sign, operatorSignRef.current),
           startedAt: Date.now(),
         });
-        setMessage(`${source.count}は ${bubble.count}つに ぴったりわけられないよ`);
         return false;
       }
 
@@ -759,7 +750,6 @@ export function MarumaruGame({
       expressionTokensRef.current = nextExpressionTokens;
       expressionHistoryRef.current = stripExpressionResult(nextExpressionTokens);
       setExpressionTokens(nextExpressionTokens);
-      setMessage(`${formatSignedCount(signedSourceCount)}を ${formatSignedCount(signedDivisor)}つに わけたよ`);
       publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
       return true;
     },
@@ -780,13 +770,14 @@ export function MarumaruGame({
     removeBodies(engine, productGroups);
     entitiesRef.current = entitiesRef.current.filter((entity) => !productGroups.some((product) => product.id === entity.id));
 
-    const usedSimpleRelease = releaseCount > 0 ? addReleasedBeads(releaseCount, releaseSign, center) : false;
+    if (releaseCount > 0) {
+      addReleasedBeads(releaseCount, releaseSign, center);
+    }
 
     const evaluatedTokens = evaluateExpressionOnEquals(expressionTokens);
     expressionTokensRef.current = evaluatedTokens;
     expressionHistoryRef.current = stripExpressionResult(evaluatedTokens);
     setExpressionTokens(evaluatedTokens);
-    setMessage(usedSimpleRelease ? `${formatSignedCount(totalValue)}を まとまったまるでだしたよ` : `${formatSignedCount(totalValue)}この まるになったよ`);
     publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
     return true;
   }, [addReleasedBeads, expressionTokens, fieldHeight, fieldWidth]);
@@ -802,9 +793,7 @@ export function MarumaruGame({
       Matter.Composite.remove(engine.world, productGroup.body);
       entitiesRef.current = entitiesRef.current.filter((entity) => entity.id !== productGroup.id);
 
-      const usedSimpleRelease = addReleasedBeads(productGroup.count, productGroup.sign, productGroup.body.position);
-
-      setMessage(usedSimpleRelease ? `${productGroup.count}を まとまったまるでだしたよ` : `${productGroup.count}この まるに われたよ`);
+      addReleasedBeads(productGroup.count, productGroup.sign, productGroup.body.position);
       publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
       return true;
     },
@@ -831,7 +820,6 @@ export function MarumaruGame({
         });
       }
 
-      setMessage(`${group.count}この まるに われたよ`);
       publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
       return true;
     },
@@ -936,8 +924,7 @@ export function MarumaruGame({
         expressionHistoryRef.current = stripExpressionResult(nextTokens);
         return nextTokens;
       });
-      const usedPlaceValues = addReleasedBeads(bubble.count, sign, { x: bubble.x, y: bubble.y });
-      setMessage(usedPlaceValues ? `${bubble.count}を まとまったまるでだしたよ` : `${bubble.count}この まるがでたよ`);
+      addReleasedBeads(bubble.count, sign, { x: bubble.x, y: bubble.y });
       resetOperatorSelection();
     },
     [addReleasedBeads, divideWrappedGroup, isClear, isFailed, markBubbleInteraction, multiplyWrappedGroup, operatorUsage, playBubblePopSfx, triggerBubbleBurst],
@@ -1008,7 +995,6 @@ export function MarumaruGame({
         const toggledOperatorSign: BeadSign = (operator === '×' || operator === '÷') && operatorSignRef.current < 0 ? 1 : nextOperatorSign;
         operatorSignRef.current = toggledOperatorSign;
         setOperatorSign(toggledOperatorSign);
-        setMessage(getOperatorHelpMessage(operator, toggledOperatorSign));
         if (operator === '×' || operator === '÷') {
           const nextTokens = replaceTrailingOperator(expressionTokensRef.current, operator);
           expressionTokensRef.current = nextTokens;
@@ -1023,7 +1009,6 @@ export function MarumaruGame({
       selectedOperatorRef.current = operator;
       operatorSignRef.current = nextOperatorSign;
       setOperatorSign(nextOperatorSign);
-      setMessage(getOperatorHelpMessage(operator, nextOperatorSign));
       const nextTokens = replaceTrailingOperator(expressionTokensRef.current, operator);
       expressionTokensRef.current = nextTokens;
       expressionHistoryRef.current = stripExpressionResult(nextTokens);
@@ -1123,7 +1108,6 @@ export function MarumaruGame({
         expressionTokensRef.current = nextTokens;
         expressionHistoryRef.current = stripExpressionResult(nextTokens);
         setExpressionTokens(nextTokens);
-        setMessage('0から はじめるよ');
         resetOperatorSelection();
         await delay(220);
         continue;
@@ -1335,7 +1319,6 @@ export function MarumaruGame({
       addBead(mergeAnimation.nextValue, 1, mergeAnimation.sign, mergeAnimation.center.x, Math.max(58, mergeAnimation.center.y - 8), true);
       setMergeAnimation(undefined);
       lastMergeAtRef.current = now;
-      setMessage(getMergeMessage(mergeAnimation.value, mergeAnimation.nextValue));
     },
     [addBead, mergeAnimation],
   );
@@ -1376,7 +1359,6 @@ export function MarumaruGame({
       removeBodies(engine, annihilatingEntities);
       entitiesRef.current = entitiesRef.current.filter((entity) => !annihilatingIds.has(entity.id));
       setAnnihilationAnimation(undefined);
-      setMessage('');
     },
     [annihilationAnimation],
   );
@@ -1534,7 +1516,6 @@ export function MarumaruGame({
       });
       playMergeSfx();
       mergeReadySinceRef.current = undefined;
-      setMessage('ぎゅっと まとまるよ');
     },
     [fieldHeight, playMergeSfx],
   );
@@ -1577,12 +1558,10 @@ export function MarumaruGame({
             center: pair.center,
             startedAt: now,
           });
-          setMessage('');
         } else {
           const decomposition = productCollision ? undefined : findDecompositionPair(toSnapshots(entitiesRef.current));
           if (decomposition) {
             splitHigherBead(decomposition.higherBeadId, decomposition.lowerValue);
-            setMessage('おおきなまるが こまかくなったよ');
           } else {
             settleMergeIfReady(now);
           }

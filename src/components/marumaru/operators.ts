@@ -2,7 +2,7 @@
 import type { DentakuPractice, OperatorButtonSymbol } from '@/components/marumaru/types';
 import { isOperatorToken, stripExpressionResult } from '@/game/expression';
 import { getStage } from '@/game/stages';
-import { BeadSign, OperatorUsageLimit, OperatorUsageLimits } from '@/game/types';
+import { OperatorUsageLimit, OperatorUsageLimits } from '@/game/types';
 import type { Stage } from '@/game/types';
 
 export function getInitialOperatorUsage(stage: Stage, mode: 'stage' | 'launch'): OperatorUsageLimits {
@@ -62,19 +62,6 @@ export function canUseOperator(usage: OperatorUsageLimit) {
 
 export function hasExpressionValue(tokens: string[]) {
   return stripExpressionResult(tokens).some((token) => !isOperatorToken(token));
-}
-
-export function getOperatorHelpMessage(operator: OperatorButtonSymbol, sign: BeadSign) {
-  if (operator === '+') {
-    return 'まるを ふやすよ';
-  }
-  if (operator === '-') {
-    return 'まるを へらすよ';
-  }
-  if (operator === '×') {
-    return sign < 0 ? 'まとまりを マイナスで ふやすよ' : 'まとまりを ふやすよ';
-  }
-  return sign < 0 ? 'まとまりを マイナスで わるよ' : 'まとまりを わるよ';
 }
 
 export function getStageNumberInIsland(stageIndex: number) {
