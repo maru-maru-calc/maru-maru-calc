@@ -43,7 +43,7 @@ const landingCopy = {
     heroTitleAfter: 'さわろう',
     heroSubtitle: '"まる"がまるまる「まるまるでんたく」',
     playWeb: 'web であそぶ',
-    playApp: 'アプリであそぶ',
+    playApp: 'アプリは準備中',
     ageNote: '親子であそぶなら、3歳ごろから',
     featureTitle: '答えの前に発見を',
     features: [
@@ -92,7 +92,7 @@ const landingCopy = {
     heroTitleAfter: 'numbers',
     heroSubtitle: 'A hands-on math playground with little “maru” circles',
     playWeb: 'Play on web',
-    playApp: 'Play in app',
+    playApp: 'App coming soon',
     ageNote: 'Made for playing together, around age 3+',
     featureTitle: 'Discover before the answer',
     features: [
@@ -141,7 +141,7 @@ const landingCopy = {
     heroTitleAfter: '数字',
     heroSubtitle: '和小小的“maru”圆点一起玩的数学游戏',
     playWeb: '网页版开始',
-    playApp: '应用版开始',
+    playApp: '应用版即将推出',
     ageNote: '适合亲子一起玩，大约 3 岁起',
     featureTitle: '先发现，再找答案',
     features: [
@@ -190,7 +190,7 @@ const landingCopy = {
     heroTitleAfter: '數字',
     heroSubtitle: '和小小的「maru」圓點一起玩的數學遊戲',
     playWeb: '網頁版開始',
-    playApp: 'App 版開始',
+    playApp: 'App 版即將推出',
     ageNote: '適合親子一起玩，大約 3 歲起',
     featureTitle: '先發現，再找答案',
     features: [
@@ -239,7 +239,7 @@ const landingCopy = {
     heroTitleAfter: '만져 보자',
     heroSubtitle: '작은 “maru” 원으로 즐기는 수학 놀이터',
     playWeb: '웹에서 놀기',
-    playApp: '앱에서 놀기',
+    playApp: '앱은 준비 중',
     ageNote: '부모와 함께라면 만 3세쯤부터',
     featureTitle: '답보다 먼저 발견을',
     features: [
@@ -288,7 +288,7 @@ const landingCopy = {
     heroTitleAfter: 'anfassen',
     heroSubtitle: 'Ein Mathe-Spielplatz mit kleinen “maru”-Kreisen',
     playWeb: 'Im Web spielen',
-    playApp: 'In der App spielen',
+    playApp: 'App kommt bald',
     ageNote: 'Für gemeinsames Spielen, etwa ab 3 Jahren',
     featureTitle: 'Erst entdecken, dann lösen',
     features: [
@@ -389,6 +389,11 @@ function getPreferredLandingLocale(): LandingLocale {
   return 'en';
 }
 
+// Marks a title as a real heading (h1/h2 on the web) so the page has an outline for assistive tech and search engines.
+function getHeadingProps(level: 1 | 2) {
+  return { accessibilityRole: 'header' as const, 'aria-level': level };
+}
+
 export default function LandingPage() {
   const { width, height } = useWindowDimensions();
   const router = useRouter();
@@ -434,7 +439,7 @@ export default function LandingPage() {
             {isCompact ? (
               <>
                 <View style={[styles.heroCopy, styles.heroCopyCompact, styles.heroTitleGroupCompact]}>
-                  <Text style={[styles.heroTitle, styles.heroTitleCompact]}>
+                  <Text {...getHeadingProps(1)} style={[styles.heroTitle, styles.heroTitleCompact]}>
                     {copy.heroTitleBefore}
                     {copy.heroTitleParticle ? <Text style={[styles.heroTitleParticle, styles.heroTitleParticleCompact]}>{copy.heroTitleParticle}</Text> : copy.heroTitleJoiner}
                     {copy.heroTitleAfter}
@@ -465,7 +470,7 @@ export default function LandingPage() {
             ) : (
               <>
                 <View style={styles.heroCopy}>
-                  <Text style={styles.heroTitle}>
+                  <Text {...getHeadingProps(1)} style={styles.heroTitle}>
                     {copy.heroTitleBefore}
                     {copy.heroTitleParticle ? <Text style={styles.heroTitleParticle}>{copy.heroTitleParticle}</Text> : copy.heroTitleJoiner}
                     {copy.heroTitleAfter}
@@ -497,7 +502,7 @@ export default function LandingPage() {
 
       <View style={[styles.section, styles.decoratedSection]}>
         <LandingSectionAmbient variant="features" />
-        <Text style={styles.sectionTitle}>{copy.featureTitle}</Text>
+        <Text {...getHeadingProps(2)} style={styles.sectionTitle}>{copy.featureTitle}</Text>
         <View style={[styles.featureGrid, isCompact && styles.featureGridCompact]}>
           {copy.features.map((feature) => (
             <FeatureItem key={feature.title} compact={isCompact} title={feature.title} body={feature.body} variant={feature.variant} />
@@ -509,7 +514,7 @@ export default function LandingPage() {
 
       <View style={[styles.section, styles.flowSection, styles.decoratedSection]}>
         <LandingSectionAmbient variant="flow" />
-        <Text style={styles.sectionTitle}>
+        <Text {...getHeadingProps(2)} style={styles.sectionTitle}>
           {copy.flowTitleBefore}
           {copy.flowTitleParticle ? <Text style={styles.sectionTitleParticle}>{copy.flowTitleParticle}</Text> : ' '}
           {copy.flowTitleAfter}
@@ -527,7 +532,7 @@ export default function LandingPage() {
           {isCompact ? (
             <>
               <View style={[styles.finalCopy, styles.finalCopyCompact]}>
-                <Text style={styles.finalTitle}>{copy.finalTitle}</Text>
+                <Text {...getHeadingProps(2)} style={styles.finalTitle}>{copy.finalTitle}</Text>
               </View>
               <UnderwaterPlayScene accessibilityLabel={copy.underwaterSceneLabel} />
               <FinalDescription copy={copy} openApp={openApp} compact />
@@ -536,7 +541,7 @@ export default function LandingPage() {
             <>
               <UnderwaterPlayScene accessibilityLabel={copy.underwaterSceneLabel} />
               <View style={styles.finalCopy}>
-                <Text style={styles.finalTitle}>{copy.finalTitle}</Text>
+                <Text {...getHeadingProps(2)} style={styles.finalTitle}>{copy.finalTitle}</Text>
                 <FinalDescription copy={copy} openApp={openApp} compact={false} />
               </View>
             </>
@@ -678,7 +683,7 @@ function CalculationModeSection({ copy, compact }: { copy: typeof landingCopy[La
       </View>
       <View style={[styles.calculationModeContent, compact && styles.calculationModeContentCompact]}>
         <View style={[styles.calculationModeCopy, compact && styles.calculationModeCopyCompact]}>
-          <Text style={[styles.sectionTitle, styles.calculationModeTitle, compact && styles.calculationModeTitleCompact]}>
+          <Text {...getHeadingProps(2)} style={[styles.sectionTitle, styles.calculationModeTitle, compact && styles.calculationModeTitleCompact]}>
             {copy.calculationModeTitleBefore}
             {copy.calculationModeTitleParticle ? <Text style={styles.sectionTitleParticle}>{copy.calculationModeTitleParticle}</Text> : ' '}
             {copy.calculationModeTitleAfter}
