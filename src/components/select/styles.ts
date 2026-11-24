@@ -1472,6 +1472,14 @@ export const styles = StyleSheet.create({
     fontWeight: '900',
     fontFamily: LATIN_FONT_FAMILY,
   },
+  kukuStageSubLabel: {
+    color: TEXT_ACCENT_COLOR,
+    fontSize: 11,
+    lineHeight: 13,
+    fontWeight: '900',
+    fontFamily: LATIN_FONT_FAMILY,
+    letterSpacing: 1,
+  },
   stageNumberLocked: {
     color: TEXT_ACCENT_COLOR,
   },
