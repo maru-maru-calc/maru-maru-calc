@@ -100,6 +100,16 @@ function getHistoryWindow(): HistoryWindow | undefined {
   return window as unknown as HistoryWindow;
 }
 
+// Read while the bundle loads, before the router rewrites the entry (see `stateAtPageLoad`).
+// It describes the page load only, so only the first game screen after it may use it.
+let historyStateAtPageLoad: unknown = Platform.OS === 'web' && typeof window !== 'undefined' ? window.history?.state : undefined;
+
+function takeHistoryStateAtPageLoad() {
+  const state = historyStateAtPageLoad;
+  historyStateAtPageLoad = undefined;
+  return state;
+}
+
 function isGameRouteActive() {
   return typeof window === 'undefined' || !window.location || /\/game\/?$/.test(window.location.pathname);
 }
@@ -151,6 +161,7 @@ export default function IndexScreen() {
       initialNav: createInitialNavState(NAV_OPTIONS),
       onChange: setNav,
       isRouteActive: isGameRouteActive,
+      stateAtPageLoad: takeHistoryStateAtPageLoad(),
     });
     navControllerRef.current = navController;
 

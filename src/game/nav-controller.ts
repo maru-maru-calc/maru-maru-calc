@@ -63,6 +63,7 @@ export function createNavController({
   initialNav,
   onChange,
   isRouteActive,
+  stateAtPageLoad,
   repairIntervalMs = ENTRY_REPAIR_INTERVAL_MS,
 }: {
   /** Omit where there is no browser history (native apps); in-app back buttons still work. */
@@ -72,6 +73,11 @@ export function createNavController({
   onChange: (nav: NavState) => void;
   /** False while another route is on screen, so its history entries are left alone. */
   isRouteActive?: () => boolean;
+  /**
+   * `history.state` as it was when the page loaded. The router rewrites the entry while it
+   * starts up, before `start` runs, so after a reload this is the only place the screen survives.
+   */
+  stateAtPageLoad?: unknown;
   repairIntervalMs?: number;
 }): NavController {
   let nav = initialNav;
@@ -82,17 +88,7 @@ export function createNavController({
   let backGuardTimer: ReturnType<typeof setTimeout> | undefined;
   const recentEntryAtCreation = getRecentPopEntry(historyWindow);
 
-  const readEntry = (): HistoryNavEntry | undefined => {
-    if (!historyWindow) {
-      return undefined;
-    }
-
-    let state: unknown;
-    try {
-      state = historyWindow.history.state;
-    } catch {
-      return undefined;
-    }
+  const parseEntry = (state: unknown): HistoryNavEntry | undefined => {
     if (!state || typeof state !== 'object') {
       return undefined;
     }
@@ -106,6 +102,20 @@ export function createNavController({
     const entryDepth = record[HISTORY_DEPTH_KEY];
     return { nav: entryNav, depth: typeof entryDepth === 'number' && entryDepth > 0 ? entryDepth : 0 };
   };
+
+  const readEntry = (): HistoryNavEntry | undefined => {
+    if (!historyWindow) {
+      return undefined;
+    }
+
+    try {
+      return parseEntry(historyWindow.history.state);
+    } catch {
+      return undefined;
+    }
+  };
+
+  const entryAtPageLoad = historyWindow ? parseEntry(stateAtPageLoad) : undefined;
 
   const writeEntry = (method: 'push' | 'replace', entryNav: NavState, entryDepth: number) => {
     if (!historyWindow) {
@@ -186,10 +196,11 @@ export function createNavController({
     start: (nextBaseScreen) => {
       baseScreen = nextBaseScreen;
       hasStarted = true;
-      const restored = readEntry() ?? recentEntryAtCreation;
+      const restored = readEntry() ?? entryAtPageLoad ?? recentEntryAtCreation;
       if (restored) {
         depth = restored.depth;
         apply(restored.nav);
+        repairCurrentEntry();
         return;
       }
 

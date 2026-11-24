@@ -78,7 +78,10 @@ function createFakeWindow(initialState: unknown = null) {
 const REPAIR_INTERVAL_MS = 5;
 const createdControllers: NavController[] = [];
 
-function createController(fake: ReturnType<typeof createFakeWindow> | undefined, isRouteActive?: () => boolean) {
+function createController(
+  fake: ReturnType<typeof createFakeWindow> | undefined,
+  { isRouteActive, stateAtPageLoad }: { isRouteActive?: () => boolean; stateAtPageLoad?: unknown } = {},
+) {
   const screens: NavState['screen'][] = [];
   const controller = createNavController({
     historyWindow: fake?.fakeWindow,
@@ -88,6 +91,7 @@ function createController(fake: ReturnType<typeof createFakeWindow> | undefined,
       screens.push(nav.screen);
     },
     isRouteActive,
+    stateAtPageLoad,
     repairIntervalMs: REPAIR_INTERVAL_MS,
   });
   createdControllers.push(controller);
@@ -197,6 +201,33 @@ describe('navigation controller with browser history', () => {
     expect(afterReload.controller.getNav().screen).toBe('longFormWorld');
   });
 
+  it('returns to the same screen after a reload even though the router rewrites the entry on startup', () => {
+    const fake = createFakeWindow();
+    const beforeReload = createController(fake);
+    beforeReload.controller.start('mode');
+    beforeReload.controller.navigate({ screen: 'world' });
+    beforeReload.controller.navigate({ screen: 'stage', worldId: 'subtraction' });
+    beforeReload.controller.dispose();
+
+    const stateAtPageLoad = fake.fakeWindow.history.state;
+    fake.rewriteCurrentEntryLikeTheRouter();
+    const afterReload = createController(fake, { stateAtPageLoad });
+    afterReload.controller.start('mode');
+    expect(afterReload.controller.getNav().screen).toBe('stage');
+    expect(afterReload.controller.getNav().worldId).toBe('subtraction');
+    expect((fake.fakeWindow.history.state as { id?: string }).id).toBe('router-entry');
+
+    afterReload.controller.goBack();
+    expect(afterReload.controller.getNav().screen).toBe('world');
+    expect(fake.currentIndex()).toBe(1);
+  });
+
+  it('ignores a page-load state that holds no screen', () => {
+    const { controller } = createController(createFakeWindow(), { stateAtPageLoad: { id: 'router-entry' } });
+    controller.start('launch');
+    expect(controller.getNav().screen).toBe('launch');
+  });
+
   it('keeps the data the router stored in a history entry', () => {
     const fake = createFakeWindow({ id: 'router-entry' });
     const { controller } = createController(fake);
@@ -267,7 +298,7 @@ describe('navigation controller with browser history', () => {
   it('leaves the entries of other routes alone', async () => {
     const fake = createFakeWindow();
     let isGameOnScreen = true;
-    const { controller } = createController(fake, () => isGameOnScreen);
+    const { controller } = createController(fake, { isRouteActive: () => isGameOnScreen });
     controller.start('mode');
 
     isGameOnScreen = false;
