@@ -1,13 +1,6 @@
 // Building the expression shown under the field (for example "2 × 3 + 4") as the player goes.
 import { OperatorSymbol, evaluateExpressionTokens, isOperatorToken, stripExpressionResult } from '@/game/expression';
-import { BeadSign, PlaceValue } from '@/game/types';
-
-export function getMergeMessage(from: PlaceValue, to: PlaceValue) {
-  if (from === 1) {
-    return `1のまる 10こで ${to}`;
-  }
-  return `${from}のまる 10こで ${to}`;
-}
+import { BeadSign } from '@/game/types';
 
 export function addNumberToExpression(tokens: string[], value: number, selectedOperator: OperatorSymbol, totalValue: number) {
   const expressionTokens = stripExpressionResult(tokens);
@@ -26,10 +19,6 @@ export function addNumberToExpression(tokens: string[], value: number, selectedO
 
 function formatSignedInitialValue(value: number, selectedOperator: OperatorSymbol) {
   return selectedOperator === '-' ? `-${value}` : String(value);
-}
-
-export function formatSignedCount(value: number) {
-  return value < 0 ? `-${Math.abs(value)}` : String(value);
 }
 
 export function multiplySigns(left: BeadSign, right: BeadSign): BeadSign {
