@@ -77,6 +77,38 @@ test.describe('user-reported regressions', () => {
     await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 20000 });
   });
 
+  test('the last move can be taken back, one move at a time', async ({ page }) => {
+    await page.goto('/game');
+
+    await clearLaunch(page);
+    await openIsland(page, 'mixed-5-free');
+    await page.getByTestId('stage-mixed5Free-1').click();
+
+    const bubble = (count: number) => page.locator(`[data-testid^="pending-bubble-${count}-"]`).first();
+    await expect(page.getByLabel('undo')).toBeDisabled();
+
+    await bubble(2).click();
+    await page.getByTestId('operator-+').click();
+    await bubble(3).click();
+    await expect(page.getByTestId('current-total-value')).toHaveText('5');
+    await page.getByTestId('operator-×').click();
+    await bubble(4).click();
+    await expect(page.getByTestId('current-total-value')).toHaveText('20', { timeout: 10000 });
+
+    await page.getByLabel('undo').click();
+    await expect(page.getByTestId('current-total-value')).toHaveText('5');
+    await expect(page.getByTestId('expression-display-text')).toHaveText('2 + 3 = 5');
+    await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(3);
+    await expect(bubble(4)).toBeVisible();
+
+    await page.getByLabel('undo').click();
+    await expect(page.getByTestId('current-total-value')).toHaveText('2');
+    await page.getByLabel('undo').click();
+    await expect(page.getByTestId('current-total-value')).toHaveText('0');
+    await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(5);
+    await expect(page.getByLabel('undo')).toBeDisabled();
+  });
+
   test('multiplication preview bubble does not auto-burst while multiply is selected', async ({ page }) => {
     await page.goto('/game');
 

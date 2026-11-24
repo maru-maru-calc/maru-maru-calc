@@ -1,12 +1,15 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-type NavImageIconKind = 'back' | 'next' | 'retry' | 'skip';
+type NavImageIconKind = 'back' | 'next' | 'retry' | 'skip' | 'undo';
 
 const TEXT_BASE_COLOR = '#12334A';
 
 export function NavImageIcon({ kind, size }: { kind: NavImageIconKind; size: number }) {
   if (kind === 'retry') {
-    return <RetryIcon size={size} />;
+    return <GlyphIcon glyph="↻" testID="nav-icon-retry" size={size} />;
+  }
+  if (kind === 'undo') {
+    return <GlyphIcon glyph="↶" testID="nav-icon-undo" size={size} />;
   }
   if (kind === 'skip') {
     return <SkipIcon size={size} />;
@@ -83,9 +86,9 @@ function SkipIcon({ size }: { size: number }) {
   );
 }
 
-function RetryIcon({ size }: { size: number }) {
+function GlyphIcon({ glyph, testID, size }: { glyph: string; testID: string; size: number }) {
   return (
-    <View pointerEvents="none" testID="nav-icon-retry" style={{ width: size, height: size }}>
+    <View pointerEvents="none" testID={testID} style={{ width: size, height: size }}>
       <Text
         style={[
           styles.retryGlyph,
@@ -98,7 +101,7 @@ function RetryIcon({ size }: { size: number }) {
           },
         ]}
       >
-        ↻
+        {glyph}
       </Text>
     </View>
   );

@@ -11,6 +11,7 @@ const JAPANESE_LABELS: Record<string, string> = {
   Retry: 'やりなおす',
   'next stage': 'つぎへ',
   'skip the replay': 'とばす',
+  undo: 'ひとつもどす',
   'Next stage': 'つぎへ',
   'maru logo': 'まるまる電卓',
   'maru maru calc logo': 'まるまる電卓 トップページ',

@@ -940,6 +940,24 @@ export const styles = StyleSheet.create({
     width: '100%',
     gap: 0,
   },
+  undoButton: {
+    position: 'absolute',
+    // In line with the right end of the calculation line below.
+    right: GRID * 3,
+    bottom: 0,
+    zIndex: 45,
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS_LG,
+    backgroundColor: 'rgba(255, 255, 255, 0.58)',
+    borderWidth: 3,
+    borderColor: 'rgba(186, 230, 253, 0.72)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  undoButtonDisabled: {
+    opacity: 0.38,
+  },
   expressionBox: {
     width: '100%',
     flex: 1,
