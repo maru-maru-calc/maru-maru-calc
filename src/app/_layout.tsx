@@ -15,6 +15,7 @@ const BGM_END_TOLERANCE_SECONDS = 0.12;
 const BGM_DRIFT_TOLERANCE_SECONDS = 0.045;
 const BGM_WEB_SWITCH_RESYNC_MS = 90;
 const WEB_SITE_URL = 'https://maru-maru-calc.github.io/maru-maru-calc/';
+const WEB_BASE_PATH = '/maru-maru-calc';
 const WEB_ASSET_BASE_URL = 'https://maru-maru-calc.github.io/maru-maru-calc';
 const WEB_SITE_TITLE = 'まるまる電卓 | すうじをさわる計算あそび';
 const WEB_SITE_DESCRIPTION = 'まるをさわって、動かして。足し算から割り算まで、数を見た目で感じる子ども向け計算あそび。';
@@ -40,6 +41,30 @@ export default function RootLayout() {
 
   useEffect(() => {
     loadStoredSoundMuted();
+  }, []);
+
+  useEffect(() => {
+    // The service worker (scripts/service-worker.js) only exists in an exported build.
+    if (Platform.OS !== 'web' || __DEV__ || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+      return undefined;
+    }
+
+    const register = () => {
+      navigator.serviceWorker.register(`${WEB_BASE_PATH}/sw.js`, { scope: `${WEB_BASE_PATH}/` }).catch(() => {
+        // Without it the app still works; it just cannot open offline.
+      });
+    };
+
+    // After load, so storing the app for offline use never competes with showing the page.
+    if (document.readyState === 'complete') {
+      register();
+      return undefined;
+    }
+
+    window.addEventListener('load', register, { once: true });
+    return () => {
+      window.removeEventListener('load', register);
+    };
   }, []);
 
   useEffect(() => {
