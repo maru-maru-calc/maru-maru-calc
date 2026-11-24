@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandLogo } from '@/components/BrandLogo';
 import { DESKTOP_MIN_WIDTH, shouldUsePhoneFrame } from '@/layout/phone-frame';
+import { usePrefersReducedMotion } from '@/layout/reduced-motion';
 
 const TEXT_BASE_COLOR = '#12334A';
 const TEXT_ACCENT_COLOR = '#0284C7';
@@ -22,11 +23,35 @@ const RADIUS_PILL = 999;
 const COPYRIGHT_TEXT = '© 2026 nozomitaguchi';
 const LANDING_DESKTOP_MIN_WIDTH = 1100;
 const BASE_PATH = __DEV__ ? '' : process.env.EXPO_BASE_URL ?? '';
-const demoVideoSource = require('../../assets/landing/maru-demo-field-wide-short.webm');
-const operationAddVideoSource = require('../../assets/landing/operation-add.webm');
-const operationSubtractVideoSource = require('../../assets/landing/operation-subtract.webm');
-const operationMultiplyVideoSource = require('../../assets/landing/operation-multiply-short.webm');
-const operationDivideVideoSource = require('../../assets/landing/operation-divide-short.webm');
+// Each video comes as MP4 (H.264), which every browser plays and which is far smaller for this
+// flat artwork, with the original WebM kept as a fallback.
+type VideoSource = { mp4: number; webm: number };
+const demoVideoSource: VideoSource = {
+  mp4: require('../../assets/landing/maru-demo-field-wide-short.mp4'),
+  webm: require('../../assets/landing/maru-demo-field-wide-short.webm'),
+};
+const operationAddVideoSource: VideoSource = {
+  mp4: require('../../assets/landing/operation-add.mp4'),
+  webm: require('../../assets/landing/operation-add.webm'),
+};
+const operationSubtractVideoSource: VideoSource = {
+  mp4: require('../../assets/landing/operation-subtract.mp4'),
+  webm: require('../../assets/landing/operation-subtract.webm'),
+};
+const operationMultiplyVideoSource: VideoSource = {
+  mp4: require('../../assets/landing/operation-multiply-short.mp4'),
+  webm: require('../../assets/landing/operation-multiply-short.webm'),
+};
+const operationDivideVideoSource: VideoSource = {
+  mp4: require('../../assets/landing/operation-divide-short.mp4'),
+  webm: require('../../assets/landing/operation-divide-short.webm'),
+};
+
+type VideoUris = { mp4: string; webm: string };
+
+function getVideoUris(source: VideoSource): VideoUris {
+  return { mp4: Asset.fromModule(source.mp4).uri, webm: Asset.fromModule(source.webm).uri };
+}
 const modeMarumaruPosterSource = require('../../assets/landing/mode-marumaru-poster.png');
 const modeDentakuPosterSource = require('../../assets/landing/mode-dentaku-poster.png');
 const modeLongFormPosterSource = require('../../assets/landing/mode-long-form-poster.png');
@@ -589,7 +614,7 @@ function FloatingBubble({ size, left, top, opacity }: { size: number; left: `${n
 }
 
 function AppPreview({ ageNote, children, compact }: { ageNote: string; children?: ReactNode; compact: boolean }) {
-  const videoUri = Asset.fromModule(demoVideoSource).uri;
+  const videoUris = getVideoUris(demoVideoSource);
 
   return (
     <View style={[styles.previewBlock, compact && styles.previewBlockCompact]}>
@@ -599,7 +624,7 @@ function AppPreview({ ageNote, children, compact }: { ageNote: string; children?
           compact={compact}
           label="maru maru calc gameplay preview"
           testID="landing-gameplay-video"
-          uri={videoUri}
+          uris={videoUris}
         />
       </View>
       <Text style={[styles.heroAgeNote, compact && styles.heroAgeNoteCompact]}>{ageNote}</Text>
@@ -865,12 +890,12 @@ function FlowRow({
   label: string;
   expression: string;
   description: string;
-  source: number;
+  source: VideoSource;
   testID: string;
   playbackRate: number;
   compact: boolean;
 }) {
-  const videoUri = Asset.fromModule(source).uri;
+  const videoUris = getVideoUris(source);
 
   return (
     <View style={[styles.flowRow, compact && styles.flowRowCompact]}>
@@ -881,12 +906,12 @@ function FlowRow({
         </View>
         <Text style={styles.flowDescription}>{description}</Text>
       </View>
-      <OperationVideo uri={videoUri} testID={testID} playbackRate={playbackRate} compact={compact} />
+      <OperationVideo uris={videoUris} testID={testID} playbackRate={playbackRate} compact={compact} />
     </View>
   );
 }
 
-function OperationVideo({ uri, testID, playbackRate, compact }: { uri: string; testID: string; playbackRate: number; compact: boolean }) {
+function OperationVideo({ uris, testID, playbackRate, compact }: { uris: VideoUris; testID: string; playbackRate: number; compact: boolean }) {
   return (
     <View style={[styles.operationVideoFrame, compact && styles.operationVideoFrameCompact]} testID={testID}>
       <AutoPlayVideo
@@ -895,7 +920,7 @@ function OperationVideo({ uri, testID, playbackRate, compact }: { uri: string; t
         label={testID}
         playbackRate={playbackRate}
         testID={`${testID}-media`}
-        uri={uri}
+        uris={uris}
       />
     </View>
   );
@@ -907,16 +932,17 @@ function AutoPlayVideo({
   label,
   playbackRate = 1,
   testID,
-  uri,
+  uris,
 }: {
   borderRadius: number;
   compact: boolean;
   label: string;
   playbackRate?: number;
   testID: string;
-  uri: string;
+  uris: VideoUris;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const prefersReducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof IntersectionObserver === 'undefined') {
@@ -926,6 +952,12 @@ function AutoPlayVideo({
     const video = videoRef.current;
 
     if (!video) {
+      return;
+    }
+
+    if (prefersReducedMotion) {
+      // Nothing plays by itself; the video shows its controls so it can be started by hand.
+      video.pause();
       return;
     }
 
@@ -976,7 +1008,7 @@ function AutoPlayVideo({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       video.pause();
     };
-  }, [playbackRate]);
+  }, [playbackRate, prefersReducedMotion]);
 
   if (Platform.OS !== 'web') {
     return null;
@@ -984,11 +1016,11 @@ function AutoPlayVideo({
 
   return createElement('video', {
     ref: videoRef,
-    src: uri,
-    autoPlay: true,
+    autoPlay: !prefersReducedMotion,
+    controls: prefersReducedMotion,
     muted: true,
     defaultMuted: true,
-    loop: true,
+    loop: !prefersReducedMotion,
     playsInline: true,
     preload: 'metadata',
     'aria-label': label,
@@ -1010,9 +1042,11 @@ function AutoPlayVideo({
       display: 'block',
       backgroundColor: WATER_COLOR,
       borderRadius,
-      pointerEvents: 'none',
+      pointerEvents: prefersReducedMotion ? 'auto' : 'none',
     },
-  });
+  },
+  createElement('source', { key: 'mp4', src: uris.mp4, type: 'video/mp4' }),
+  createElement('source', { key: 'webm', src: uris.webm, type: 'video/webm' }));
 }
 
 function LandingSectionAmbient({ variant }: { variant: 'features' | 'flow' | 'final' }) {
