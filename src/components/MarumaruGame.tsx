@@ -134,6 +134,7 @@ import {
 } from '@/game/expression';
 import { matchesLongFormStepAnswer } from '@/game/long-form';
 import { findMergeCluster, getTotalValue, hasMergeableCount } from '@/game/merge';
+import { BoardPosition, spendOperatorUse, takeBackLastMove } from '@/game/move-history';
 import { hasLegalMove } from '@/game/stage-rules';
 import { getStage } from '@/game/stages';
 import { BeadRole, BeadSign, BeadSnapshot, OperatorUsageLimits, PlaceValue } from '@/game/types';
@@ -201,6 +202,9 @@ export function MarumaruGame({
   const heldTapsRef = useRef<HeldTap[]>([]);
   const [heldTapCount, setHeldTapCount] = useState(0);
   const carryingOutWaitingMoveRef = useRef(false);
+  // The position after each move of this attempt, for taking the last move back.
+  const positionsRef = useRef<BoardPosition<PendingBubble>[]>([]);
+  const [movesMade, setMovesMade] = useState(0);
   const setWaitingBubble = (bubbleId: string | undefined) => {
     queuedBubbleIdRef.current = bubbleId;
     setQueuedBubbleId(bubbleId);
@@ -366,6 +370,8 @@ export function MarumaruGame({
     setQueuedOperator(undefined);
     setWaitingBubble(undefined);
     clearHeldTaps();
+    positionsRef.current = [];
+    setMovesMade(0);
     stuckPositionRef.current = undefined;
     setMergeAnimation(undefined);
     setAnnihilationAnimation(undefined);
@@ -953,6 +959,7 @@ export function MarumaruGame({
         if (multiplyWrappedGroup(bubble)) {
           playBubblePopSfx();
           resetOperatorSelection();
+          notePositionAfterMove(activeOperator);
         } else {
           restoreOperatorUsage(activeOperator);
           consumedPendingBubbleIdsRef.current.delete(bubble.id);
@@ -965,6 +972,7 @@ export function MarumaruGame({
         if (divideWrappedGroup(bubble)) {
           playBubblePopSfx();
           resetOperatorSelection();
+          notePositionAfterMove(activeOperator);
         } else {
           restoreOperatorUsage(activeOperator);
           consumedPendingBubbleIdsRef.current.delete(bubble.id);
@@ -981,17 +989,66 @@ export function MarumaruGame({
       triggerBubbleBurst(bubble, false, sign);
       setPendingBubbles((current) => current.filter((candidate) => candidate.id !== bubble.id));
       expressionTotalRef.current += bubble.count * sign;
-      setExpressionTokens((current) => {
-        const nextTokens = addNumberToExpression(current, bubble.count, activeOperator, expressionTotalRef.current);
-        expressionTokensRef.current = nextTokens;
-        expressionHistoryRef.current = stripExpressionResult(nextTokens);
-        return nextTokens;
-      });
+      const nextTokens = addNumberToExpression(expressionTokensRef.current, bubble.count, activeOperator, expressionTotalRef.current);
+      expressionTokensRef.current = nextTokens;
+      expressionHistoryRef.current = stripExpressionResult(nextTokens);
+      setExpressionTokens(nextTokens);
       addReleasedBeads(bubble.count, sign, { x: bubble.x, y: bubble.y });
       resetOperatorSelection();
+      notePositionAfterMove(hasPriorValue ? activeOperator : undefined);
     },
     [addReleasedBeads, divideWrappedGroup, isClear, isFailed, markBubbleInteraction, multiplyWrappedGroup, operatorUsage, playBubblePopSfx, triggerBubbleBurst],
   );
+
+  // Called once a bubble has gone in. Everything is read from refs that the move has just set, so
+  // the note is right whether or not the screen has been drawn again since.
+  const notePositionAfterMove = (usedOperator: OperatorButtonSymbol | undefined) => {
+    const positions = positionsRef.current;
+    const usageBefore = positions[positions.length - 1]?.operatorUsage ?? operatorUsage;
+    positionsRef.current = [
+      ...positions,
+      {
+        tokens: expressionTokensRef.current,
+        total: expressionTotalRef.current,
+        pendingBubbles: pendingBubblesRef.current.filter((candidate) => !consumedPendingBubbleIdsRef.current.has(candidate.id)),
+        operatorUsage: spendOperatorUse(usageBefore, usedOperator),
+      },
+    ];
+    setMovesMade(positionsRef.current.length);
+  };
+
+  const canUndo = !dentakuPractice && mode !== 'launch' && movesMade > 0 && !isClear;
+
+  // Takes the last move back: the board is set up again as it stood after the move before it,
+  // with that amount as plain maru. Also after a wrong result, so one slip need not cost the stage.
+  const undoLastMove = () => {
+    const taken = canUndo ? takeBackLastMove(positionsRef.current) : undefined;
+    if (!taken) {
+      return;
+    }
+
+    playUiActionSfx();
+    resetStage();
+    const position = taken.restore;
+    if (!position) {
+      return;
+    }
+
+    positionsRef.current = taken.positions;
+    setMovesMade(taken.positions.length);
+    pendingBubblesRef.current = position.pendingBubbles;
+    setPendingBubbles(position.pendingBubbles);
+    setOperatorUsage(position.operatorUsage);
+    if (position.total !== 0) {
+      addReleasedBeads(Math.abs(position.total), position.total < 0 ? -1 : 1, { x: fieldWidth / 2, y: fieldHeight * 0.42 });
+      publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
+    }
+    expressionTokensRef.current = position.tokens;
+    expressionHistoryRef.current = stripExpressionResult(position.tokens);
+    expressionTotalRef.current = position.total;
+    setExpressionTokens(position.tokens);
+    resetOperatorSelection();
+  };
 
   const consumeOperatorUsage = (operator: OperatorButtonSymbol) => {
     setOperatorUsage((current) => {
@@ -1991,6 +2048,20 @@ export function MarumaruGame({
           {divisionSplitAnimation ? <DivisionSplitOverlay animation={divisionSplitAnimation} /> : null}
           {divisionFailedAnimation ? <DivisionFailedOverlay animation={divisionFailedAnimation} /> : null}
           {isFailed ? <FailedWaterOverlay failedAt={failedAt} /> : null}
+          {/* In the corner under the bowl, just above the end of the calculation line. The line's own box stays as it is on the opening screen. */}
+          {!dentakuPractice && mode !== 'launch' ? (
+            <Pressable
+              accessibilityLabel={a11yLabel('undo')}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !canUndo }}
+              disabled={!canUndo}
+              testID="undo-move"
+              onPress={undoLastMove}
+              style={({ pressed }) => [styles.undoButton, !canUndo && styles.undoButtonDisabled, pressed && styles.pressedButton]}
+            >
+              <NavImageIcon kind="undo" size={27} />
+            </Pressable>
+          ) : null}
           {/* The whole board skips too; the button in the header is the one that says so. */}
           {canSkipReplay ? <Pressable aria-hidden focusable={false} testID="skip-replay-field" onPress={skipReplay} style={styles.skipReplayField} /> : null}
         </View>
