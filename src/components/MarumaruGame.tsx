@@ -48,7 +48,6 @@ import {
 } from '@/components/marumaru/effects';
 import {
   addNumberToExpression,
-  formatResultExpression,
   formatSignedCount,
   getDivisionExpressionTokens,
   getMergeMessage,
@@ -1612,12 +1611,6 @@ export function MarumaruGame({
     wrapMultiplicandForMultiplication,
   ]);
 
-  const playPendingBubbles = () => {
-    markBubbleInteraction();
-    pendingBubbles.forEach((bubble, index) => {
-      setTimeout(() => burstBubble(bubble), index * 220);
-    });
-  };
   const playNextStage = () => {
     playUiActionSfx();
     fadeOutResultSfx();
@@ -1682,8 +1675,6 @@ export function MarumaruGame({
       document.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [hasAnswerPad]);
-  const clearEquation = `${formatResultExpression(expressionTokens, target)} = ${target}`;
-  const failedEquation = `${total} ≠ ${target}`;
   const longFormProblem = dentakuPractice?.longFormMode ? getLongFormProblem(dentakuPractice) : undefined;
 
   return (

@@ -190,23 +190,6 @@ export function getBackgroundBubbleSpecs(fieldWidth: number): BackgroundBubbleSp
   ];
 }
 
-function getGroupDotPositions(count: number, radius: number, dotSize: number) {
-  const center = radius - dotSize / 2;
-  if (count === 1) {
-    return [{ x: center, y: center }];
-  }
-
-  const innerRadius = Math.max(0, radius - dotSize / 2 - 7);
-  return Array.from({ length: count }, (_, index) => {
-    const angle = -Math.PI / 2 + (Math.PI * 2 * index) / count;
-    const ringRadius = count <= 4 ? innerRadius * 0.58 : innerRadius * 0.86;
-    return {
-      x: center + Math.cos(angle) * ringRadius,
-      y: center + Math.sin(angle) * ringRadius,
-    };
-  });
-}
-
 export function getContainedBeadParts(count: number): ContainedBeadPart[] {
   const parts: ContainedBeadPart[] = [];
   const placeValues: PlaceValue[] = [100000, 10000, 1000, 100, 10, 1];

@@ -2,19 +2,6 @@
 import { OperatorSymbol, evaluateExpressionTokens, isOperatorToken, stripExpressionResult } from '@/game/expression';
 import { BeadSign, PlaceValue } from '@/game/types';
 
-export function formatResultExpression(tokens: string[], target: number) {
-  const expressionTokens = stripExpressionResult(tokens);
-  const meaningfulTokens = isOperatorToken(expressionTokens[expressionTokens.length - 1])
-    ? expressionTokens.slice(0, -1)
-    : expressionTokens;
-
-  if (meaningfulTokens.length === 0) {
-    return String(target);
-  }
-
-  return meaningfulTokens.join(' ');
-}
-
 export function getMergeMessage(from: PlaceValue, to: PlaceValue) {
   if (from === 1) {
     return `1のまる 10こで ${to}`;
@@ -110,14 +97,6 @@ function getPreviousExpressionForValue(tokens: string[], value: number) {
   }
 
   return expressionTokens;
-}
-
-function getCurrentExpressionResult(tokens: string[]) {
-  const expressionTokens = stripExpressionResult(tokens);
-  if (expressionTokens.length === 0 || isOperatorToken(expressionTokens[expressionTokens.length - 1])) {
-    return undefined;
-  }
-  return evaluateExpressionTokens(expressionTokens);
 }
 
 function completeExpression(tokens: string[], result: number) {

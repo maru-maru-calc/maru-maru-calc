@@ -64,22 +64,6 @@ export function hasExpressionValue(tokens: string[]) {
   return stripExpressionResult(tokens).some((token) => !isOperatorToken(token));
 }
 
-function getOperatorButtonLabel(operator: OperatorButtonSymbol) {
-  if (operator === '+') {
-    return 'たす';
-  }
-  if (operator === '-') {
-    return 'ひく';
-  }
-  if (operator === '×') {
-    return 'かける';
-  }
-  if (operator === '÷') {
-    return 'わる';
-  }
-  return 'こたえ';
-}
-
 export function getOperatorHelpMessage(operator: OperatorButtonSymbol, sign: BeadSign) {
   if (operator === '+') {
     return 'まるを ふやすよ';

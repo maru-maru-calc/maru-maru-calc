@@ -1,5 +1,6 @@
 // Short-lived effects on the field: merges, bursts, division animations, fireworks and the failed look.
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
 
 import { BeadView } from '@/components/marumaru/beads';
 import {
@@ -14,7 +15,6 @@ import {
   RESULT_TICK_MS,
 } from '@/components/marumaru/constants';
 import { clamp, getEntityRadius } from '@/components/marumaru/field-layout';
-import { RoundedStarfish } from '@/components/marumaru/result-overlay';
 import { styles } from '@/components/marumaru/styles';
 import type {
   BubbleBurstAnimation,
@@ -255,60 +255,6 @@ export function BubbleBurst({ animation }: { animation: BubbleBurstAnimation }) 
   );
 }
 
-function ClearSplash() {
-  const splashes = [
-    { left: 44, top: 122, size: 18 },
-    { left: 94, top: 92, size: 9 },
-    { right: 76, top: 98, size: 16 },
-    { right: 38, top: 148, size: 10 },
-    { left: 142, top: 176, size: 7 },
-    { right: 154, top: 182, size: 8 },
-  ];
-  const sparkles = [
-    { left: 118, top: 136, size: 22 },
-    { right: 116, top: 132, size: 18 },
-    { left: 0, right: 0, top: 82, size: 15 },
-  ];
-
-  return (
-    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.clearCelebrationLayer]}>
-      {splashes.map((splash, index) => (
-        <View
-          key={`clear-splash-${index}`}
-          style={[
-            styles.clearSplashDrop,
-            {
-              left: splash.left,
-              right: splash.right,
-              top: splash.top,
-              width: splash.size,
-              height: splash.size,
-              borderRadius: splash.size / 2,
-            },
-          ]}
-        />
-      ))}
-      {sparkles.map((sparkle, index) => (
-        <Text
-          key={`clear-sparkle-${index}`}
-          style={[
-            styles.clearSparkle,
-            {
-              left: sparkle.left,
-              right: sparkle.right,
-              top: sparkle.top,
-              fontSize: sparkle.size,
-              textAlign: sparkle.left === 0 && sparkle.right === 0 ? 'center' : undefined,
-            },
-          ]}
-        >
-          ✦
-        </Text>
-      ))}
-    </View>
-  );
-}
-
 export function DivisionSplitOverlay({ animation }: { animation: DivisionSplitAnimation }) {
   const radius = getEntityRadius(1, animation.quotient);
   const spread = Math.min(86, Math.max(42, radius * 1.15));
@@ -503,6 +449,66 @@ export function ClearBubbleFireworks({ fieldWidth, fieldHeight }: { fieldWidth: 
               top: item.y,
               opacity: item.opacity,
               transform: [{ rotate: `${item.rotate}deg` }],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+function RoundedStarfish({ size, style }: { size: number; style?: StyleProp<ViewStyle> }) {
+  const armWidth = size * 0.34;
+  const armHeight = size * 0.5;
+  const center = size / 2;
+  const armRadius = size * 0.23;
+  const dotSize = size * 0.12;
+
+  return (
+    <View style={[{ width: size, height: size }, style]}>
+      {[0, 1, 2, 3, 4].map((index) => {
+        const angle = -90 + index * 72;
+        const radians = (angle * Math.PI) / 180;
+        return (
+          <View
+            key={index}
+            style={[
+              styles.roundedStarfishArm,
+              {
+                width: armWidth,
+                height: armHeight,
+                borderRadius: armWidth,
+                left: center + Math.cos(radians) * armRadius - armWidth / 2,
+                top: center + Math.sin(radians) * armRadius - armHeight / 2,
+                transform: [{ rotate: `${angle + 90}deg` }],
+              },
+            ]}
+          />
+        );
+      })}
+      <View
+        style={[
+          styles.roundedStarfishCenter,
+          {
+            width: size * 0.42,
+            height: size * 0.42,
+            borderRadius: size * 0.21,
+            left: center - size * 0.21,
+            top: center - size * 0.21,
+          },
+        ]}
+      />
+      {[0, 1, 2].map((index) => (
+        <View
+          key={index}
+          style={[
+            styles.roundedStarfishDot,
+            {
+              width: dotSize,
+              height: dotSize,
+              borderRadius: dotSize / 2,
+              left: center + Math.cos((-72 + index * 72) * (Math.PI / 180)) * (size * 0.18) - dotSize / 2,
+              top: center + Math.sin((-72 + index * 72) * (Math.PI / 180)) * (size * 0.18) - dotSize / 2,
             },
           ]}
         />
