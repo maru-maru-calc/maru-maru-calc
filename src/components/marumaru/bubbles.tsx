@@ -3,6 +3,7 @@ import { useMemo, useRef } from 'react';
 import { PanResponder, Pressable, View } from 'react-native';
 
 import { BeadView, BubbleNumberBadge } from '@/components/marumaru/beads';
+import { useBoardScale } from '@/components/marumaru/board-viewport';
 import { BACKGROUND_BUBBLE_TICK_MS } from '@/components/marumaru/constants';
 import {
   getEntityRadius,
@@ -91,6 +92,7 @@ export function DraggableBubbleView({
   onMove: (bubbleId: string, x: number, y: number) => void;
 }) {
   const startPositionRef = useRef({ x: bubble.x, y: bubble.y });
+  const boardScale = useBoardScale();
   const isOperatorBubble = isMultiplier || isDivider;
   const radius = isOperatorBubble ? getMultiplierClusterRadius(bubble.count) : getEntityRadius(1, bubble.count);
   const panResponder = useMemo(
@@ -102,13 +104,13 @@ export function DraggableBubbleView({
           startPositionRef.current = { x: bubble.x, y: bubble.y };
         },
         onPanResponderMove: (_event, gesture) => {
-          onMove(bubble.id, startPositionRef.current.x + gesture.dx, startPositionRef.current.y + gesture.dy);
+          onMove(bubble.id, startPositionRef.current.x + gesture.dx / boardScale, startPositionRef.current.y + gesture.dy / boardScale);
         },
         onPanResponderRelease: () => {
           onBurst(bubble);
         },
       }),
-    [bubble, onBurst, onMove],
+    [boardScale, bubble, onBurst, onMove],
   );
 
   return (

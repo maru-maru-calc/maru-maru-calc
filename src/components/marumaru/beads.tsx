@@ -2,6 +2,7 @@
 import { memo, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { PanResponder, Text, View } from 'react-native';
 
+import { useBoardScale } from '@/components/marumaru/board-viewport';
 import { MIN_TOUCH_TARGET_SIZE, TAP_DRIFT_TO_BURST_THRESHOLD } from '@/components/marumaru/constants';
 import {
   getBasinFrameSegments,
@@ -251,6 +252,8 @@ const DraggableBeadView = memo(function DraggableBeadView(props: DraggableBeadVi
   // travelled: a held maru stayed where it was instead of following the finger.
   const latestRef = useRef(props);
   latestRef.current = props;
+  const boardScaleRef = useRef(1);
+  boardScaleRef.current = useBoardScale();
   const startPositionRef = useRef({ x: bead.x, y: bead.y });
   const hasDraggedRef = useRef(false);
   const isHeldRef = useRef(false);
@@ -274,7 +277,8 @@ const DraggableBeadView = memo(function DraggableBeadView(props: DraggableBeadVi
             hasDraggedRef.current = true;
           }
           const latest = latestRef.current;
-          latest.onMove(latest.bead.id, startPositionRef.current.x + gesture.dx, startPositionRef.current.y + gesture.dy);
+          // The finger's travel is in screen points; the board may be shown shrunk.
+          latest.onMove(latest.bead.id, startPositionRef.current.x + gesture.dx / boardScaleRef.current, startPositionRef.current.y + gesture.dy / boardScaleRef.current);
         },
         onPanResponderRelease: () => {
           const latest = latestRef.current;

@@ -8,6 +8,7 @@ import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MarumaruGame } from '@/components/MarumaruGame';
+import { FitToScreen } from '@/components/puzzle/fit-to-screen';
 import { PuzzleChoice, PuzzleEnd, puzzleScreenStyle, QuickResult } from '@/components/puzzle/parts';
 import { QuickGame } from '@/components/puzzle/quick-game';
 import { createPuzzleGameStage, getPuzzleProgress, pickStartPuzzle, PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
@@ -25,6 +26,14 @@ type Screen =
   | { name: 'end' };
 
 export function PuzzleGame({ host }: { host: GameHost }) {
+  return (
+    <FitToScreen>
+      <PuzzleScreens host={host} />
+    </FitToScreen>
+  );
+}
+
+function PuzzleScreens({ host }: { host: GameHost }) {
   const [progress, setProgress] = useState<PuzzleProgress | undefined>(undefined);
   const [screen, setScreen] = useState<Screen | undefined>(undefined);
 
