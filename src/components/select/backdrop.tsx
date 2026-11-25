@@ -1,8 +1,12 @@
 // The sea behind the select screens: rising bubbles, sea creatures by depth, and the water getting darker.
 //
 // It is two layers with the buttons of the screen between them. The creatures' pictures are in the
-// back layer, so they swim behind the buttons and never cover a number. What can be pressed (the
-// bubbles, and a see-through target over each creature) is in the front layer, where a finger reaches it.
+// back layer, so they swim behind the buttons and never cover a number. The bubbles and the shade
+// of the deep water are in the front layer.
+//
+// A press goes through both layers: a tap on a button must reach it even while a bubble or a
+// creature is passing over it. A bubble pops and a creature darts away when plain water is tapped
+// where they are (see `useWaterTaps`).
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Pressable, View } from 'react-native';
 
@@ -12,9 +16,13 @@ import { DEPTH_BUBBLE_TICK_MS, DEPTH_CREATURE_REACTION_MS } from '@/components/s
 import { clamp } from '@/components/select/map-layout';
 import { styles } from '@/components/select/styles';
 import type { DepthBubbleSpec, DepthFishSpec } from '@/components/select/types';
+import { HAS_WATER_TAPS, useWaterTaps } from '@/components/use-water-taps';
 import type { ValueStore } from '@/game/value-store';
 import { a11yLabel } from '@/i18n/a11y-label';
 import { usePrefersReducedMotion } from '@/layout/reduced-motion';
+
+// How far outside its picture a creature still takes a tap.
+const CREATURE_TAP_SLOP = 18;
 
 export function DepthBackdrop({
   width,
@@ -58,6 +66,33 @@ export function DepthBackdrop({
     const placement = getDepthCreaturePlacement(spec, width, height, tick, scrollDepth, creatureStarts[spec.id]);
     return placement ? [{ spec, placement }] : [];
   });
+  const popBubble = (bubbleId: string) => {
+    onBubblePop?.();
+    setBubbleStarts((current) => ({ ...current, [bubbleId]: Date.now() }));
+  };
+  const startleCreature = (creatureId: string) => {
+    onCreaturePress?.();
+    setCreatureStarts((current) => ({ ...current, [creatureId]: Date.now() }));
+  };
+  useWaterTaps(frontRef, (x, y) => {
+    // A creature is small and moving, so a tap near it counts. The one drawn last is the one on top.
+    const creature = [...creatures].reverse().find(({ placement }) => {
+      const { left, top, width: creatureWidth, height: creatureHeight } = placement.box;
+      return x >= left - CREATURE_TAP_SLOP && x <= left + creatureWidth + CREATURE_TAP_SLOP && y >= top - CREATURE_TAP_SLOP && y <= top + creatureHeight + CREATURE_TAP_SLOP;
+    });
+    if (creature) {
+      startleCreature(creature.spec.id);
+      return;
+    }
+    const bubble = [...bubbles].reverse().find((spec) => {
+      const place = getDepthBubblePlace(spec, bubbleStarts[spec.id] ?? 0, tick, scrollDepth, width, height);
+      const radius = spec.size / 2;
+      return Math.hypot(x - (place.x + radius), y - (place.y + radius)) <= radius;
+    });
+    if (bubble) {
+      popBubble(bubble.id);
+    }
+  });
 
   return (
     <>
@@ -68,18 +103,11 @@ export function DepthBackdrop({
           </View>
         ))}
       </View>
-      <View ref={frontRef} pointerEvents="box-none" style={styles.depthBackdrop}>
+      <View ref={frontRef} pointerEvents={HAS_WATER_TAPS ? 'none' : 'box-none'} style={styles.depthBackdrop}>
         <View pointerEvents="none" style={[styles.softPatch, styles.softPatchLeft]} />
         <View pointerEvents="none" style={[styles.softPatch, styles.softPatchBottom]} />
         {bubbles.map((bubble) => {
-          const startAt = bubbleStarts[bubble.id] ?? 0;
-          const elapsedSeconds = Math.max(0, (tick - startAt - bubble.delay) / 1000);
-          const travel = height + bubble.size * 5;
-          const cycle = (elapsedSeconds * bubble.speed + scrollDepth * 0.58) % travel;
-          const y = height + bubble.size - cycle;
-          const drift = Math.sin(elapsedSeconds * 0.58 + bubble.delay * 0.001) * bubble.drift;
-          const x = bubble.xRatio * width + drift - bubble.size / 2;
-          const opacity = elapsedSeconds < 0.24 ? elapsedSeconds / 0.24 : 1;
+          const place = getDepthBubblePlace(bubble, bubbleStarts[bubble.id] ?? 0, tick, scrollDepth, width, height);
 
           return (
             <Pressable
@@ -89,19 +117,16 @@ export function DepthBackdrop({
               focusable={false}
               tabIndex={-1}
               testID={`depth-background-bubble-${bubble.id}`}
-              onPress={() => {
-                onBubblePop?.();
-                setBubbleStarts((current) => ({ ...current, [bubble.id]: Date.now() }));
-              }}
+              onPress={() => popBubble(bubble.id)}
               style={[
                 styles.depthBackgroundBubble,
                 {
-                  left: x,
-                  top: y,
+                  left: place.x,
+                  top: place.y,
                   width: bubble.size,
                   height: bubble.size,
                   borderRadius: bubble.size / 2,
-                  opacity: opacity * 0.74,
+                  opacity: place.opacity * 0.74,
                 },
               ]}
             />
@@ -114,11 +139,8 @@ export function DepthBackdrop({
             accessibilityRole="button"
             focusable={false}
             tabIndex={-1}
-            hitSlop={18}
-            onPress={() => {
-              onCreaturePress?.();
-              setCreatureStarts((current) => ({ ...current, [spec.id]: Date.now() }));
-            }}
+            hitSlop={CREATURE_TAP_SLOP}
+            onPress={() => startleCreature(spec.id)}
             testID={`depth-fish-${spec.id}`}
             style={[styles.depthFish, placement.box]}
           />
@@ -127,6 +149,20 @@ export function DepthBackdrop({
       </View>
     </>
   );
+}
+
+/** Where a rising bubble is at this moment: its top left corner, and how far it has faded in. */
+function getDepthBubblePlace(bubble: DepthBubbleSpec, startAt: number, tick: number, scrollDepth: number, width: number, height: number) {
+  const elapsedSeconds = Math.max(0, (tick - startAt - bubble.delay) / 1000);
+  const travel = height + bubble.size * 5;
+  const cycle = (elapsedSeconds * bubble.speed + scrollDepth * 0.58) % travel;
+  const drift = Math.sin(elapsedSeconds * 0.58 + bubble.delay * 0.001) * bubble.drift;
+
+  return {
+    x: bubble.xRatio * width + drift - bubble.size / 2,
+    y: height + bubble.size - cycle,
+    opacity: elapsedSeconds < 0.24 ? elapsedSeconds / 0.24 : 1,
+  };
 }
 
 /** Where a creature is at this moment, or nothing while it is too far above or below to be seen. */

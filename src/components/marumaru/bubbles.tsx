@@ -1,4 +1,4 @@
-// The bubbles: the ones waiting to be popped and the decorative ones drifting behind the game.
+// The bubbles: the ones waiting to be popped and the decorative ones drifting over the game.
 import { useMemo, useRef } from 'react';
 import { PanResponder, Pressable, View } from 'react-native';
 
@@ -13,12 +13,20 @@ import {
 } from '@/components/marumaru/field-layout';
 import { styles } from '@/components/marumaru/styles';
 import type { BackgroundBubbleSpec, PendingBubble } from '@/components/marumaru/types';
+import { HAS_WATER_TAPS, useWaterTaps } from '@/components/use-water-taps';
 import { BeadSign } from '@/game/types';
 import { useTick } from '@/game/use-tick';
 import { a11yLabel } from '@/i18n/a11y-label';
 
 export const NO_BACKGROUND_BUBBLES: BackgroundBubbleSpec[] = [];
 
+/**
+ * The decorative bubbles that drift up over the board.
+ *
+ * They are drawn in front of everything, but a press goes through them: a tap on an operator or on
+ * a number bubble must reach it even while a decorative bubble is passing over it. A bubble pops
+ * when plain water is tapped where it is (see `useWaterTaps`).
+ */
 export function BackgroundBubbleLayer({
   bubbles,
   fieldWidth,
@@ -34,17 +42,23 @@ export function BackgroundBubbleLayer({
 }) {
   // The drift is drawn from this layer's own clock, so it never redraws the game around it.
   const tick = useTick(BACKGROUND_BUBBLE_TICK_MS, bubbles.length > 0);
+  const layerRef = useRef<View>(null);
+  useWaterTaps(layerRef, (x, y) => {
+    // The one drawn last is the one on top.
+    const tapped = [...bubbles].reverse().find((bubble) => {
+      const place = getBackgroundBubblePlace(bubble, bubbleStarts[bubble.id] ?? 0, tick, fieldWidth, fieldHeight);
+      const radius = bubble.size / 2;
+      return Math.hypot(x - (place.x + radius), y - (place.y + radius)) <= radius;
+    });
+    if (tapped) {
+      onPop(tapped.id);
+    }
+  });
+
   return (
-    <View pointerEvents="box-none" style={styles.backgroundBubbleLayer}>
+    <View ref={layerRef} pointerEvents={HAS_WATER_TAPS ? 'none' : 'box-none'} style={styles.backgroundBubbleLayer}>
       {bubbles.map((bubble) => {
-        const startAt = bubbleStarts[bubble.id] ?? 0;
-        const elapsedSeconds = Math.max(0, (tick - startAt - bubble.delay) / 1000);
-        const travel = fieldHeight + bubble.size * 3;
-        const cycle = (elapsedSeconds * bubble.speed) % travel;
-        const y = fieldHeight + bubble.size - cycle;
-        const drift = Math.sin(elapsedSeconds * 0.62 + bubble.delay * 0.001) * bubble.drift;
-        const x = bubble.xRatio * fieldWidth + drift - bubble.size / 2;
-        const opacity = elapsedSeconds < 0.24 ? elapsedSeconds / 0.24 : 1;
+        const place = getBackgroundBubblePlace(bubble, bubbleStarts[bubble.id] ?? 0, tick, fieldWidth, fieldHeight);
 
         return (
           <Pressable
@@ -59,12 +73,12 @@ export function BackgroundBubbleLayer({
               styles.backgroundBubble,
               pressed && styles.backgroundBubblePressed,
               {
-                left: x,
-                top: y,
+                left: place.x,
+                top: place.y,
                 width: bubble.size,
                 height: bubble.size,
                 borderRadius: bubble.size / 2,
-                opacity: opacity * 0.78,
+                opacity: place.opacity * 0.78,
               },
             ]}
           />
@@ -72,6 +86,20 @@ export function BackgroundBubbleLayer({
       })}
     </View>
   );
+}
+
+/** Where a decorative bubble is at this moment: its top left corner, and how far it has faded in. */
+function getBackgroundBubblePlace(bubble: BackgroundBubbleSpec, startAt: number, tick: number, fieldWidth: number, fieldHeight: number) {
+  const elapsedSeconds = Math.max(0, (tick - startAt - bubble.delay) / 1000);
+  const travel = fieldHeight + bubble.size * 3;
+  const cycle = (elapsedSeconds * bubble.speed) % travel;
+  const drift = Math.sin(elapsedSeconds * 0.62 + bubble.delay * 0.001) * bubble.drift;
+
+  return {
+    x: bubble.xRatio * fieldWidth + drift - bubble.size / 2,
+    y: fieldHeight + bubble.size - cycle,
+    opacity: elapsedSeconds < 0.24 ? elapsedSeconds / 0.24 : 1,
+  };
 }
 
 export function DraggableBubbleView({
