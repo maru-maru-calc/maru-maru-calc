@@ -28,6 +28,47 @@ test('kuku world opens a dan stage and retries the same question after a wrong a
   await expect(page.getByTestId('kuku-question-title')).toHaveText('2 × 3 = ?', { timeout: 10000 });
 });
 
+test('after two wrong answers the maru act the question out, without giving the number', async ({ page }) => {
+  await page.goto('/game');
+  await clearLaunch(page);
+  await page.getByLabel('dentaku mode', { exact: true }).click();
+  await page.getByLabel('9×9', { exact: true }).click();
+  await page.getByTestId('kuku-stage-dentaku-kuku-dan-2').click();
+  const title = page.getByTestId('kuku-question-title');
+  const waitingBubbles = page.locator('[data-testid^="pending-bubble-"]');
+  await expect(title).toHaveText('2 × 1 = ?');
+  await enterDentakuAnswer(page, 2);
+  await expect(title).toHaveText('2 × 2 = ?', { timeout: 10000 });
+
+  // One wrong answer: asked again, nothing else happens.
+  await enterDentakuAnswer(page, 5);
+  await expect(title).toHaveText('2 × 2 = ?');
+  await page.waitForTimeout(1500);
+  await expect(waitingBubbles).toHaveCount(2);
+  await expect(page.getByTestId('current-total-value')).toHaveText('0');
+
+  // A second one: the answer pad steps aside and the two bubbles of 2 are worked out as maru.
+  await enterDentakuAnswer(page, 9);
+  await expect(waitingBubbles).toHaveCount(0, { timeout: 10000 });
+  await expect(page.getByTestId('current-total-value')).toHaveText('4', { timeout: 15000 });
+
+  // The maru stay in full view to be counted: the pad (which lies over the bowl) keeps away, and
+  // the number is not written anywhere.
+  await expect(page.getByTestId('look-at-maru-field')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByTestId('kuku-key-submit')).toHaveCount(0);
+  await expect(title).toHaveText('2 × 2 = ?');
+  await expect(page.getByTestId('expression-display-text')).not.toContainText('4');
+  await expect(page.getByLabel('next stage')).toHaveCount(0);
+
+  // A tap brings the pad back, and the same question is asked again.
+  await page.getByTestId('look-at-maru-field').click();
+  await expect(page.getByTestId('kuku-key-submit')).toBeVisible();
+  await expect(title).toHaveText('2 × 2 = ?');
+
+  await enterDentakuAnswer(page, 4);
+  await expect(title).toHaveText('2 × 3 = ?', { timeout: 10000 });
+});
+
 test('a missed times-table question comes back after the others, and the replay can be skipped', async ({ page }) => {
   await page.goto('/game');
 

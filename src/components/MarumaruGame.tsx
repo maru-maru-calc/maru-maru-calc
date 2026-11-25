@@ -34,6 +34,8 @@ import {
   PREVIEW_Y,
   QUEUED_MOVE_CHECK_MS,
   RESULT_READY_DELAY_MS,
+  WRONG_ANSWERS_BEFORE_MARU,
+  LOOK_AT_MARU_MS,
   STUCK_AFTER_REFUSAL_MS,
   STUCK_WITHOUT_TRYING_MS,
   UNIT_MERGE_ANIMATION_MS,
@@ -220,7 +222,14 @@ export function MarumaruGame({
   const [bubbleBurstAnimations, setBubbleBurstAnimations] = useState<BubbleBurstAnimation[]>([]);
   const [operatorUsage, setOperatorUsage] = useState<OperatorUsageLimits>(() => getInitialOperatorUsage(stages ? stages[Math.max(0, Math.min(initialStageIndex, stages.length - 1))] : getStage(initialStageIndex), mode));
   const [kukuInput, setKukuInput] = useState('');
-  const [kukuInputState, setKukuInputState] = useState<'input' | 'wrong' | 'running'>('input');
+  // 'showing': after two wrong answers the maru act the calculation out, and then stay in full
+  // view for the child to read. The answer pad lies over the bowl, so it stays away until the
+  // child taps (or a while has passed).
+  const [kukuInputState, setKukuInputState] = useState<'input' | 'wrong' | 'running' | 'showing'>('input');
+  const wrongAnswersRef = useRef(0);
+  // The maru of the answer are on the board for the child to read; the number itself is not shown.
+  const [isAnswerShownAsMaru, setIsAnswerShownAsMaru] = useState(false);
+  const isReadingAnswerFromMaru = kukuInputState === 'showing' || (isAnswerShownAsMaru && kukuInputState !== 'running');
   const [longFormStepIndex, setLongFormStepIndex] = useState(0);
   const [longFormQuestionChangedAt, setLongFormQuestionChangedAt] = useState(() => Date.now());
   const [hasReleasedBubble, setHasReleasedBubble] = useState(false);
@@ -259,6 +268,8 @@ export function MarumaruGame({
   const [isClear, setIsClear] = useState(false);
   const [clearedStageId, setClearedStageId] = useState<string | undefined>(undefined);
   const [isFailed, setIsFailed] = useState(false);
+  // The maru have come to rest and nothing covers them: the child is looking.
+  const isLookingAtMaru = kukuInputState === 'showing' && isAnswerShownAsMaru && !isClear && !isFailed;
   const [failedAt, setFailedAt] = useState<number | undefined>(undefined);
   // -1 while the player is active; once they have been idle for a while it counts the hint's pulses.
   const [idleHintStep, setIdleHintStep] = useState(-1);
@@ -498,6 +509,8 @@ export function MarumaruGame({
     }
 
     dentakuAutomationRunRef.current += 1;
+    wrongAnswersRef.current = 0;
+    setIsAnswerShownAsMaru(false);
     setKukuInput('');
     setKukuInputState('input');
     setLongFormStepIndex(0);
@@ -559,6 +572,12 @@ export function MarumaruGame({
       return checkAgainIn(RESULT_READY_DELAY_MS);
     }
 
+    // The maru shown after two wrong answers are a help, not a result: the question is finished
+    // by the child's own answer.
+    if (isReadingAnswerFromMaru) {
+      return;
+    }
+
     const currentTotal = getTotalValue(beads);
     if (currentTotal === target) {
       completeCurrentStage();
@@ -575,7 +594,7 @@ export function MarumaruGame({
     }
 
     return undefined;
-  }, [annihilationAnimation, beads, completeCurrentStage, dentakuPractice, divisionFailedAnimation, divisionSplitAnimation, isClear, isFailed, kukuInputState, mergeAnimation, multiplicationExpansionAnimation, pendingBubbles, resultCheckRetry, target]);
+  }, [annihilationAnimation, beads, completeCurrentStage, dentakuPractice, divisionFailedAnimation, divisionSplitAnimation, isClear, isFailed, isReadingAnswerFromMaru, kukuInputState, mergeAnimation, multiplicationExpansionAnimation, pendingBubbles, resultCheckRetry, target]);
 
   const addBead = useCallback(
     (
@@ -1457,6 +1476,15 @@ export function MarumaruGame({
     return isIdle;
   };
 
+  // A child who does not find the way back to the pad is not left without it.
+  useEffect(() => {
+    if (!isLookingAtMaru) {
+      return undefined;
+    }
+    const timeout = setTimeout(() => setKukuInputState('input'), LOOK_AT_MARU_MS);
+    return () => clearTimeout(timeout);
+  }, [isLookingAtMaru]);
+
   const canSkipReplay = Boolean(dentakuPractice && !dentakuPractice.longFormMode && kukuInputState === 'running' && !isClear && !isFailed);
 
   // After a right answer the maru act the calculation out, which takes a while with several
@@ -1487,6 +1515,30 @@ export function MarumaruGame({
     completeCurrentStage();
   };
 
+  // After two wrong answers: the maru act the calculation out, then the question is asked again
+  // with the result on the board as maru (and not as a number) for the child to read.
+  const showAnswerAsMaru = (practice: DentakuPractice) => {
+    setKukuInputState('showing');
+    const runId = dentakuAutomationRunRef.current + 1;
+    dentakuAutomationRunRef.current = runId;
+    void (async () => {
+      await runDentakuAutomation(practice, runId);
+      await waitForDentakuAutomationIdle(runId);
+      if (dentakuAutomationRunRef.current !== runId) {
+        return;
+      }
+      // The state stays 'showing': the maru are left in view until the child asks for the pad.
+      setIsAnswerShownAsMaru(true);
+    })();
+  };
+
+  const answerAfterLooking = () => {
+    if (isLookingAtMaru) {
+      playUiActionSfx();
+      setKukuInputState('input');
+    }
+  };
+
   const submitKukuAnswer = () => {
     if (!dentakuPractice || kukuInputState !== 'input' || isClear || isFailed || kukuInput.length === 0) {
       return;
@@ -1496,15 +1548,36 @@ export function MarumaruGame({
     const expectedAnswer = longFormStep?.expectedAnswer ?? dentakuPractice.answer;
 
     if (!matchesLongFormStepAnswer(kukuInput, expectedAnswer, longFormStep?.acceptsWrittenDigit ?? false)) {
+      let showsMaru = false;
       if (!longFormStep) {
         dentakuPractice.onWrongAnswer?.();
+        wrongAnswersRef.current += 1;
+        showsMaru = wrongAnswersRef.current >= WRONG_ANSWERS_BEFORE_MARU && !isAnswerShownAsMaru;
       }
       playFailSfx();
       setKukuInputState('wrong');
+      const runAtSubmit = dentakuAutomationRunRef.current;
       setTimeout(() => {
+        // The question may have changed while the "wrong" shake played.
+        if (dentakuAutomationRunRef.current !== runAtSubmit) {
+          return;
+        }
         setKukuInput('');
-        setKukuInputState('input');
+        if (showsMaru) {
+          showAnswerAsMaru(dentakuPractice);
+        } else if (isAnswerShownAsMaru) {
+          // Wrong again with the maru already out: the pad steps aside for another look.
+          setKukuInputState('showing');
+        } else {
+          setKukuInputState('input');
+        }
       }, 560);
+      return;
+    }
+
+    if (isAnswerShownAsMaru) {
+      // The maru are already there; the right answer just ends the question.
+      setKukuInputState('running');
       return;
     }
 
@@ -2016,6 +2089,17 @@ export function MarumaruGame({
               onPress={isClear ? (mode === 'launch' ? completeLaunch : playNextStage) : retryStage}
             />
           ) : null}
+          {isLookingAtMaru ? (
+            <Pressable
+              accessibilityLabel={a11yLabel('answer')}
+              accessibilityRole="button"
+              testID="answer-after-looking"
+              onPress={answerAfterLooking}
+              style={({ pressed }) => [styles.headerRetryButton, pressed && styles.pressedButton]}
+            >
+              <NavImageIcon kind="skip" size={29} />
+            </Pressable>
+          ) : null}
           {canSkipReplay ? (
             <Pressable
               accessibilityLabel={a11yLabel('skip the replay')}
@@ -2115,15 +2199,17 @@ export function MarumaruGame({
           ) : null}
           {/* The whole board skips too; the button in the header is the one that says so. */}
           {canSkipReplay ? <Pressable aria-hidden focusable={false} testID="skip-replay-field" onPress={skipReplay} style={styles.skipReplayField} /> : null}
+          {isLookingAtMaru ? <Pressable aria-hidden focusable={false} testID="look-at-maru-field" onPress={answerAfterLooking} style={styles.skipReplayField} /> : null}
         </View>
       </View>
 
       <View style={[styles.footer, { width: fieldWidth }]}>
         <View style={styles.footerControls}>
-          <ExpressionDisplay tokens={footerExpressionTokens} />
+          {/* While the child reads the answer from the maru, the line stops before the "= result". */}
+          <ExpressionDisplay tokens={isReadingAnswerFromMaru ? stripExpressionResult(footerExpressionTokens) : footerExpressionTokens} />
         </View>
       </View>
-      {dentakuPractice && !isClear && kukuInputState !== 'running' ? (
+      {dentakuPractice && !isClear && (kukuInputState === 'input' || kukuInputState === 'wrong') ? (
         <KukuAnswerPad
           state={kukuInputState}
           canSubmit={kukuInput.length > 0 && kukuInputState === 'input' && !isFailed}

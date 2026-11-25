@@ -45,6 +45,10 @@ export const IDLE_HINT_PULSE_MS = 720;
 export const FEEDBACK_TICK_MS = 90;
 export const IDLE_CHECK_MS = 90;
 export const RESULT_READY_DELAY_MS = 1400;
+// でんたく and くく: after this many wrong answers to one question, the maru act the calculation out.
+export const WRONG_ANSWERS_BEFORE_MARU = 2;
+// How long those maru stay in full view before the answer pad comes back over them by itself.
+export const LOOK_AT_MARU_MS = 8000;
 export const QUEUED_MOVE_CHECK_MS = 80;
 export const STUCK_AFTER_REFUSAL_MS = 700;
 export const STUCK_WITHOUT_TRYING_MS = 5000;
