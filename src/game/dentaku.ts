@@ -1,3 +1,5 @@
+import { pickMixedKukuRound } from '@/game/kuku-weak-facts';
+
 export type DentakuOperator = '+' | '-' | '×' | '÷';
 export type DentakuWorldId = 'kuku' | 'addition' | 'subtraction' | 'multiplication' | 'division' | 'mixed2' | 'mixed3' | 'mixed4';
 
@@ -75,7 +77,7 @@ export const DENTAKU_STAGES: DentakuStage[] = [
   ...createMixedProblemStages(),
 ];
 
-export function createDentakuQuestions(stage: DentakuStage, seed = Date.now()): DentakuQuestion[] {
+export function createDentakuQuestions(stage: DentakuStage, seed = Date.now(), weakKukuFacts: string[] = []): DentakuQuestion[] {
   const random = createSeededRandom(seed);
   if (stage.kind === 'kukuDan') {
     const inOrder = createKukuDanQuestions(stage.dan ?? 1);
@@ -94,8 +96,11 @@ export function createDentakuQuestions(stage: DentakuStage, seed = Date.now()): 
   }
 
   if (stage.kind === 'kukuRandomAll') {
-    const allQuestions = Array.from({ length: 9 }, (_, index) => createKukuDanQuestions(index + 1)).flat();
-    return shuffleQuestions(allQuestions, random).slice(0, 9);
+    // Facts missed before come back here first; see kuku-weak-facts.
+    return pickMixedKukuRound(weakKukuFacts, random).map((factId) => {
+      const [left, right] = factId.split('x').map(Number);
+      return createQuestion(factId, [left, right], ['×']);
+    });
   }
 
   if (stage.kind === 'binary') {

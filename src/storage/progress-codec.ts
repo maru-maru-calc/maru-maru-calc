@@ -1,3 +1,5 @@
+import { isKukuFactId } from '@/game/kuku-weak-facts';
+
 export type StoredProgress = {
   /** Cleared stage ids of まるまるモード. */
   marumaru: string[];
@@ -5,6 +7,8 @@ export type StoredProgress = {
   dentaku: string[];
   /** Cleared stage ids of 筆算モード. */
   longForm: string[];
+  /** Times-table facts that were missed and not yet shown to be known, like "7x8". */
+  kukuWeak: string[];
   /** True once the launch demo has been finished at least once. */
   hasSeenIntro: boolean;
 };
@@ -12,7 +16,7 @@ export type StoredProgress = {
 export const PROGRESS_STORAGE_VERSION = 1;
 
 export function createEmptyProgress(): StoredProgress {
-  return { marumaru: [], dentaku: [], longForm: [], hasSeenIntro: false };
+  return { marumaru: [], dentaku: [], longForm: [], kukuWeak: [], hasSeenIntro: false };
 }
 
 export function serializeProgress(progress: StoredProgress): string {
@@ -21,6 +25,7 @@ export function serializeProgress(progress: StoredProgress): string {
     marumaru: uniqueStrings(progress.marumaru),
     dentaku: uniqueStrings(progress.dentaku),
     longForm: uniqueStrings(progress.longForm),
+    kukuWeak: uniqueStrings(progress.kukuWeak).filter(isKukuFactId),
     hasSeenIntro: progress.hasSeenIntro,
   });
 }
@@ -47,6 +52,8 @@ export function parseStoredProgress(raw: string | null | undefined): StoredProgr
     marumaru: uniqueStrings(candidate.marumaru),
     dentaku: uniqueStrings(candidate.dentaku),
     longForm: uniqueStrings(candidate.longForm),
+    // Absent in progress saved before the facts were remembered.
+    kukuWeak: uniqueStrings(candidate.kukuWeak).filter(isKukuFactId),
     hasSeenIntro: candidate.hasSeenIntro === true,
   };
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { MarumaruGame } from '@/components/MarumaruGame';
 import { createDentakuQuestions, DentakuQuestion, DentakuStage } from '@/game/dentaku';
+import { getKukuFactId } from '@/game/kuku-weak-facts';
 import { createLongFormQuestions } from '@/game/long-form-questions';
 
 // A missed times-table question comes back at most this often, so a stage always ends.
@@ -11,19 +12,32 @@ const REPEAT_ID_MARK = '-again-';
 type DentakuGameProps = {
   stage: DentakuStage;
   longFormMode?: boolean;
+  /** Times-table facts missed on earlier visits; the mixed stage brings them back. */
+  weakKukuFacts?: string[];
+  /** A times-table fact was answered: missed, or right at the first try. */
+  onKukuFactAnswered?: (factId: string, answer: 'missed' | 'rightAtFirstTry', showsKnowing: boolean) => void;
   onBack: () => void;
   onNextStage: () => void;
   onStageClear: (stageId: string) => void;
 };
 
-export function DentakuGame({ stage, longFormMode = false, onBack, onNextStage, onStageClear }: DentakuGameProps) {
+const NO_FACTS: string[] = [];
+
+export function DentakuGame({ stage, longFormMode = false, weakKukuFacts = NO_FACTS, onKukuFactAnswered, onBack, onNextStage, onStageClear }: DentakuGameProps) {
   const [seed, setSeed] = useState(() => Date.now());
   const [endlessQuestionIndex, setEndlessQuestionIndex] = useState(0);
+  // The remembered misses as they were when this round began. A miss made during the round must
+  // not redraw the round's questions under the child's hands.
+  const [weakFactsOfRound, setWeakFactsOfRound] = useState(weakKukuFacts);
+  const latestWeakFactsRef = useRef(weakKukuFacts);
+  useEffect(() => {
+    latestWeakFactsRef.current = weakKukuFacts;
+  }, [weakKukuFacts]);
   const stageQuestions = useMemo(() => (
     longFormMode
       ? createLongFormQuestions(stage, seed + endlessQuestionIndex * 9973)
-      : createDentakuQuestions(stage, seed + endlessQuestionIndex * 9973)
-  ), [endlessQuestionIndex, longFormMode, stage, seed]);
+      : createDentakuQuestions(stage, seed + endlessQuestionIndex * 9973, weakFactsOfRound)
+  ), [endlessQuestionIndex, longFormMode, stage, seed, weakFactsOfRound]);
   // Times-table questions that took more than one try come round again after the others.
   const [repeatedQuestions, setRepeatedQuestions] = useState<DentakuQuestion[]>([]);
   const questions = useMemo(() => [...stageQuestions, ...repeatedQuestions], [repeatedQuestions, stageQuestions]);
@@ -36,6 +50,7 @@ export function DentakuGame({ stage, longFormMode = false, onBack, onNextStage, 
     setSeed(Date.now());
     setEndlessQuestionIndex(0);
     setQuestionIndex(0);
+    setWeakFactsOfRound(latestWeakFactsRef.current);
   }, [stage.id]);
 
   useEffect(() => {
@@ -53,6 +68,18 @@ export function DentakuGame({ stage, longFormMode = false, onBack, onNextStage, 
   }, []);
 
   const goNextQuestion = useCallback(() => {
+    const factId = repeatsWrongAnswers ? getKukuFactId(question.operands, question.operators) : null;
+    if (factId) {
+      // Right on a second asking, just after seeing the answer, says little; only a miss counts there.
+      const isFirstAsking = !question.id.includes(REPEAT_ID_MARK);
+      const showsKnowing = stage.kind === 'kukuRandomAll' || stage.isShuffled === true;
+      if (wasAnsweredWrongRef.current) {
+        onKukuFactAnswered?.(factId, 'missed', showsKnowing);
+      } else if (isFirstAsking) {
+        onKukuFactAnswered?.(factId, 'rightAtFirstTry', showsKnowing);
+      }
+    }
+
     const firstAskedId = question.id.split(REPEAT_ID_MARK)[0];
     const timesRepeated = repeatedQuestions.filter((repeated) => repeated.id.split(REPEAT_ID_MARK)[0] === firstAskedId).length;
     if (repeatsWrongAnswers && wasAnsweredWrongRef.current && timesRepeated < MAX_REPEATS_PER_QUESTION) {
@@ -76,7 +103,7 @@ export function DentakuGame({ stage, longFormMode = false, onBack, onNextStage, 
     }
 
     setQuestionIndex((current) => current + 1);
-  }, [onNextStage, onStageClear, question, questionIndex, questions.length, repeatedQuestions, repeatsWrongAnswers, stage.id, stage.isEndless]);
+  }, [onKukuFactAnswered, onNextStage, onStageClear, question, questionIndex, questions.length, repeatedQuestions, repeatsWrongAnswers, stage.id, stage.isEndless, stage.isShuffled, stage.kind]);
 
   const dentakuPractice = useMemo(
     () => ({

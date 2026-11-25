@@ -8,6 +8,7 @@ describe('stored progress', () => {
       marumaru: ['addition-1', 'addition-10-twos'],
       dentaku: ['dentaku-kuku-dan-3'],
       longForm: ['long-form-addition-2'],
+      kukuWeak: ['7x8', '6x7'],
       hasSeenIntro: true,
     };
 
@@ -37,7 +38,27 @@ describe('stored progress', () => {
       marumaru: ['addition-1'],
       dentaku: [],
       longForm: [],
+      kukuWeak: [],
       hasSeenIntro: false,
     });
+  });
+
+  it('reads progress saved before times-table misses were remembered', () => {
+    const raw = JSON.stringify({ version: 1, marumaru: ['addition-1'], dentaku: ['dentaku-kuku-dan-3'], longForm: [], hasSeenIntro: true });
+
+    expect(parseStoredProgress(raw)).toEqual({
+      marumaru: ['addition-1'],
+      dentaku: ['dentaku-kuku-dan-3'],
+      longForm: [],
+      kukuWeak: [],
+      hasSeenIntro: true,
+    });
+  });
+
+  it('keeps only real times-table facts among the remembered misses', () => {
+    const raw = JSON.stringify({ kukuWeak: ['7x8', '7x8', '12x3', 'addition-1', 56, null, '9x9'] });
+
+    expect(parseStoredProgress(raw).kukuWeak).toEqual(['7x8', '9x9']);
+    expect(JSON.parse(serializeProgress({ ...createEmptyProgress(), kukuWeak: ['7x8', 'x', '7x8'] })).kukuWeak).toEqual(['7x8']);
   });
 });
