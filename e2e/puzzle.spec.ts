@@ -239,6 +239,36 @@ test('the board cannot be left scrolled sideways by a script or by focus', async
 });
 
 /** Opens the numbered puzzle `number` (1 is the first), with every puzzle before it solved. */
+test('a tap on an operator reaches it while a decorative bubble is passing over it', async ({ page }) => {
+  // The big bubble on the right takes about a minute to drift up to the operators, so the clock is wound forward.
+  await page.clock.install();
+  await openPuzzle(page, 1);
+  await page.locator('[data-testid^="pending-bubble-"]').first().click();
+  await expect(page.getByTestId('operator-÷')).toBeEnabled();
+
+  const bubbleOverDivide = () =>
+    page.evaluate(() => {
+      const bubble = (document.querySelector('[data-testid="background-bubble-large-right"]') as HTMLElement).getBoundingClientRect();
+      const operator = (document.querySelector('[data-testid="operator-÷"]') as HTMLElement).getBoundingClientRect();
+      const distance = Math.hypot(operator.x + operator.width / 2 - (bubble.x + bubble.width / 2), operator.y + operator.height / 2 - (bubble.y + bubble.height / 2));
+      return distance < bubble.width / 2 - 6 ? bubble.y : null;
+    });
+  for (let step = 0; step < 480 && (await bubbleOverDivide()) === null; step += 1) {
+    await page.clock.fastForward(250);
+  }
+  const bubbleTop = await bubbleOverDivide();
+  expect(bubbleTop).not.toBeNull();
+
+  // A real click: it fails if anything but the operator would receive it.
+  await page.getByTestId('operator-÷').click({ timeout: 5000 });
+
+  // The waiting bubbles now read as divisors, so ÷ was taken...
+  await expect(page.getByLabel(/^divide-/).first()).toBeVisible();
+  // ...and the decorative bubble drifts on. Popped, it would have started again from under the screen.
+  const bubbleTopNow = await page.getByTestId('background-bubble-large-right').evaluate((element) => element.getBoundingClientRect().y);
+  expect(bubbleTopNow).toBeLessThan((bubbleTop as number) + 100);
+});
+
 async function openPuzzle(page: Page, number: number) {
   await openPuzzleGame(page, { version: 1, solved: PUZZLE_GAME_STAGES.slice(0, number - 1).map((stage) => stage.id), startVisits: 9, quickScores: [] });
   await solveStartPuzzle(page);

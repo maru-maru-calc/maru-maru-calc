@@ -47,30 +47,86 @@ test('a creature keeps the shape of its picture', async ({ page }) => {
   expect(box.width / box.height).toBeCloseTo(128 / 92, 1);
 });
 
-test('a creature swims behind the buttons, and can still be pressed', async ({ page }) => {
+test('a creature swims behind the buttons, and darts away when the water is tapped where it is', async ({ page }) => {
+  // Where the creatures are depends on the time of day; the clock is wound forward until one is in open water.
+  await page.clock.install();
   await openModeSelect(page);
 
-  // The picture is under the buttons and what takes the press is over them: two elements, which
-  // have to stay on the same spot.
+  // The picture is under the buttons. Its counterpart for screen readers is over them, on the same
+  // spot, but lets every press through.
   const places = await page.evaluate(() => {
     const place = (testId: string) => {
       const element = document.querySelector(`[data-testid="${testId}"]`) as HTMLElement;
-      return { left: element.style.left, top: element.style.top, width: element.offsetWidth, height: element.offsetHeight, layer: Number(getComputedStyle(element.parentElement as HTMLElement).zIndex) };
+      const layer = element.parentElement as HTMLElement;
+      return { width: element.offsetWidth, height: element.offsetHeight, layer: Number(getComputedStyle(layer).zIndex), takesPresses: getComputedStyle(element).pointerEvents !== 'none' };
     };
     const scroll = document.querySelector('[data-testid="mode-select-scroll"]') as HTMLElement;
-    return { picture: place('depth-creature-art-shallow-clownfish'), target: place('depth-fish-shallow-clownfish'), buttons: Number(getComputedStyle(scroll).zIndex) };
+    return { picture: place('depth-creature-art-shallow-clownfish'), named: place('depth-fish-shallow-clownfish'), buttons: Number(getComputedStyle(scroll).zIndex) };
   });
   expect(places.picture.layer).toBeLessThan(places.buttons);
-  expect(places.target.layer).toBeGreaterThan(places.buttons);
-  expect(places.picture.width).toBe(places.target.width);
-  expect(places.picture.height).toBe(places.target.height);
+  expect(places.named.layer).toBeGreaterThan(places.buttons);
+  expect(places.named.takesPresses).toBe(false);
+  expect(places.picture.width).toBe(places.named.width);
+  expect(places.picture.height).toBe(places.named.height);
 
-  // Pressed, it darts away, and the picture goes with it.
-  const calm = await page.getByTestId('depth-creature-art-shallow-clownfish').evaluate((element) => (element as HTMLElement).style.transform);
-  await page.getByTestId('depth-fish-shallow-clownfish').dispatchEvent('click');
-  await expect
-    .poll(() => page.getByTestId('depth-creature-art-shallow-clownfish').evaluate((element) => (element as HTMLElement).style.transform))
-    .not.toBe(calm);
+  // A creature that is on the screen with nothing but water over its middle.
+  const findCreatureOverWater = () =>
+    page.evaluate(() => {
+      for (const picture of Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="depth-creature-art-"]'))) {
+        const box = picture.getBoundingClientRect();
+        const x = box.x + box.width / 2;
+        const y = box.y + box.height / 2;
+        const over = document.elementFromPoint(x, y);
+        if (x > 30 && y > 30 && x < window.innerWidth - 30 && y < window.innerHeight - 30 && over && !over.closest('[role], [aria-label], [tabindex]')) {
+          return { testId: picture.dataset.testid as string, x, y, transform: picture.style.transform };
+        }
+      }
+      return null;
+    });
+  for (let step = 0; step < 600 && (await findCreatureOverWater()) === null; step += 1) {
+    await page.clock.fastForward(500);
+  }
+  const creature = await findCreatureOverWater();
+  expect(creature).not.toBeNull();
+
+  await page.mouse.click(creature!.x, creature!.y);
+
+  await expect.poll(() => page.getByTestId(creature!.testId).evaluate((element) => (element as HTMLElement).style.transform)).not.toBe(creature!.transform);
+  // The tap was the creature's: the screen has not moved on.
+  await expect(page.getByTestId('mode-select')).toBeVisible();
+});
+
+test('a tap on a mode reaches it while a decorative bubble is passing over it', async ({ page }) => {
+  await page.clock.install();
+  await openModeSelect(page);
+
+  // A point that is inside both the big bubble on the right and the mode it drifts across.
+  const sharedPoint = () =>
+    page.evaluate(() => {
+      const circle = (element: Element) => {
+        const box = element.getBoundingClientRect();
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2, radius: box.width / 2 };
+      };
+      const bubble = circle(document.querySelector('[data-testid="depth-background-bubble-large-right"]') as HTMLElement);
+      const mode = circle(document.querySelector('[aria-label="dentaku mode"]') as HTMLElement);
+      const distance = Math.hypot(bubble.x - mode.x, bubble.y - mode.y);
+      if (distance > bubble.radius + mode.radius - 24) {
+        return null;
+      }
+      // On the line between the two middles, 12 points inside the mode's edge.
+      const along = (mode.radius - 12) / distance;
+      const point = { x: mode.x + (bubble.x - mode.x) * along, y: mode.y + (bubble.y - mode.y) * along };
+      return Math.hypot(point.x - bubble.x, point.y - bubble.y) < bubble.radius - 6 && point.x < window.innerWidth - 2 ? point : null;
+    });
+  for (let step = 0; step < 480 && (await sharedPoint()) === null; step += 1) {
+    await page.clock.fastForward(250);
+  }
+  const point = await sharedPoint();
+  expect(point).not.toBeNull();
+
+  await page.mouse.click(point!.x, point!.y);
+
+  await expect(page.getByTestId('dentaku-world-select')).toBeVisible();
 });
 
 async function openModeSelect(page: Page) {

@@ -553,20 +553,53 @@ test('pending bubbles show an idle tap hint', async ({ page }) => {
   await expect(page.getByTestId('pending-bubble-hint')).toBeVisible({ timeout: 4000 });
 });
 
-test('background bubbles float behind the field and can be popped', async ({ page }) => {
+test('a decorative bubble pops when the water under it is tapped', async ({ page }) => {
+  // Where the bubbles are depends on the time; the clock is wound forward until one is in open water.
+  await page.clock.install();
   await page.goto('/game');
 
   const backgroundBubbles = page.locator('[data-testid^="background-bubble-"]');
   await expect(backgroundBubbles).toHaveCount(6);
-  for (let index = 0; index < (await backgroundBubbles.count()); index += 1) {
-    const bubble = backgroundBubbles.nth(index);
-    const box = await bubble.boundingBox();
-    if (box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 390 && box.y + box.height <= 844) {
-      await bubble.click({ force: true });
-      break;
-    }
+
+  // One that is on the screen, with nothing but water under its middle.
+  const findBubbleOverWater = () =>
+    page.evaluate(() => {
+      for (const bubble of Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="background-bubble-"]'))) {
+        const box = bubble.getBoundingClientRect();
+        const x = box.x + box.width / 2;
+        const y = box.y + box.height / 2;
+        const under = document.elementFromPoint(x, y);
+        if (x > 0 && y > 0 && x < window.innerWidth && y < window.innerHeight && under && !under.closest('[role], [aria-label], [tabindex]')) {
+          return { testId: bubble.dataset.testid as string, x, y, top: box.y };
+        }
+      }
+      return null;
+    });
+  for (let step = 0; step < 480 && (await findBubbleOverWater()) === null; step += 1) {
+    await page.clock.fastForward(250);
   }
+  const bubble = (await findBubbleOverWater())!;
+  expect(bubble).not.toBeNull();
+
+  await page.mouse.click(bubble.x, bubble.y);
+
+  // Popped, it starts again from under the screen.
+  await expect.poll(() => page.getByTestId(bubble.testId).evaluate((element) => element.getBoundingClientRect().y)).toBeGreaterThan(bubble.top + 100);
   await expect(page.getByLabel('あわ 5')).toBeVisible();
+});
+
+test('a decorative bubble never takes a tap itself', async ({ page }) => {
+  await page.goto('/game');
+  await expect(page.locator('[data-testid^="background-bubble-"]')).toHaveCount(6);
+
+  // Whatever is under a bubble is what a tap there reaches: the bubble is never it.
+  const takers = await page.evaluate(() =>
+    Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="background-bubble-"]')).filter((bubble) => {
+      const box = bubble.getBoundingClientRect();
+      return document.elementsFromPoint(box.x + box.width / 2, box.y + box.height / 2).includes(bubble);
+    }).length,
+  );
+  expect(takers).toBe(0);
 });
 
 async function clearLaunch(page: Page) {
