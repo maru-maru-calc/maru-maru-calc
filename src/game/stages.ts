@@ -32,42 +32,6 @@ export const STAGE_ISLANDS: StageIsland[] = [
     description: 'まとまりをわけて、わりざんをためす',
     stageSetTitles: ['まとまりをわける', 'ひくか わるか', 'くみあわせてわける'],
   },
-  {
-    id: 'mixed3',
-    title: '3つのあわ',
-    description: '3つのあわと2つのきごうをぜんぶつかう',
-    stageSetTitles: ['3つのあわ'],
-  },
-  {
-    id: 'mixed4',
-    title: '4つのあわ',
-    description: '4つのあわと3つのきごうをぜんぶつかう',
-    stageSetTitles: ['4つのあわ'],
-  },
-  {
-    id: 'mixed5',
-    title: '5つのあわ',
-    description: '5つのあわと4つのきごうをぜんぶつかう',
-    stageSetTitles: ['5つのあわ'],
-  },
-  {
-    id: 'mixed3Free',
-    title: '3つのあわ ∞',
-    description: '3つのあわを、きごうの回数制限なしでとく',
-    stageSetTitles: ['3つのあわ ∞'],
-  },
-  {
-    id: 'mixed4Free',
-    title: '4つのあわ ∞',
-    description: '4つのあわを、きごうの回数制限なしでとく',
-    stageSetTitles: ['4つのあわ ∞'],
-  },
-  {
-    id: 'mixed5Free',
-    title: '5つのあわ ∞',
-    description: '5つのあわを、きごうの回数制限なしでとく',
-    stageSetTitles: ['5つのあわ ∞'],
-  },
 ];
 
 export const STAGES: Stage[] = [
@@ -75,8 +39,6 @@ export const STAGES: Stage[] = [
   ...createSubtractionStages(),
   ...createMultiplicationStages(),
   ...createDivisionStages(),
-  ...createMixedStages(),
-  ...createFreeMixedStages(),
 ];
 
 export function getStage(index: number) {
@@ -297,125 +259,5 @@ function operationStageGroup(
     setTitle,
     bubbleCounts,
     operatorLimits,
-  }));
-}
-
-function createMixedStages(): Stage[] {
-  return [
-    ...mixedStageGroup('mixed3', [
-      [[2, 3, 4], { '×': 1, '+': 1 }, 10],
-      [[8, 2, 3], { '÷': 1, '+': 1 }, 7],
-      [[5, 4, 3], { '+': 1, '-': 1 }, 6],
-      [[3, 3, 2], { '×': 1, '-': 1 }, 7],
-      [[9, 3, 2], { '÷': 1, '×': 1 }, 6],
-      [[6, 2, 5], { '-': 1, '×': 1 }, 28],
-      [[4, 2, 2], { '×': 1, '÷': 1 }, 4],
-      [[8, 4, 2], { '+': 1, '÷': 1 }, 8],
-      [[10, 2, 6], { '÷': 1, '-': 1 }, -1],
-      [[4, 6, 2], { '+': 1, '×': 1 }, 16],
-    ]),
-    ...mixedStageGroup('mixed4', [
-      [[2, 3, 4, 5], { '×': 1, '+': 1, '-': 1 }, 5],
-      [[8, 2, 3, 4], { '÷': 1, '+': 1, '×': 1 }, 16],
-      [[10, 4, 3, 2], { '-': 1, '÷': 1, '+': 1 }, 4],
-      [[6, 3, 2, 5], { '×': 1, '÷': 1, '+': 1 }, 9],
-      [[9, 3, 4, 2], { '÷': 1, '+': 1, '-': 1 }, 5],
-      [[4, 4, 3, 2], { '+': 1, '×': 1, '÷': 1 }, 10],
-      [[7, 2, 5, 3], { '+': 1, '-': 1, '×': 1 }, 12],
-      [[12, 3, 2, 4], { '÷': 1, '×': 1, '+': 1 }, 12],
-      [[5, 5, 2, 3], { '+': 1, '÷': 1, '×': 1 }, 9],
-      [[14, 7, 3, 2], { '÷': 1, '+': 1, '×': 1 }, 8],
-    ]),
-    ...mixedStageGroup('mixed5', [
-      [[2, 3, 4, 5, 6], { '×': 1, '+': 2, '-': 1 }, 11],
-      [[12, 3, 2, 5, 4], { '÷': 1, '×': 1, '+': 1, '-': 1 }, 9],
-      [[6, 4, 2, 3, 5], { '+': 1, '÷': 1, '×': 1, '-': 1 }, 16],
-      [[9, 3, 5, 2, 4], { '÷': 1, '+': 1, '×': 1, '-': 1 }, 13],
-      [[8, 2, 6, 3, 5], { '÷': 1, '+': 1, '-': 1, '×': 1 }, 23],
-      [[5, 5, 4, 2, 3], { '+': 1, '-': 1, '÷': 1, '×': 1 }, 9],
-      [[7, 3, 2, 4, 6], { '+': 1, '×': 1, '÷': 1, '-': 1 }, -1],
-      [[10, 2, 3, 5, 4], { '÷': 1, '+': 1, '×': 1, '-': 1 }, 11],
-      [[4, 4, 2, 6, 3], { '×': 1, '÷': 1, '+': 1, '-': 1 }, 11],
-      [[15, 3, 2, 4, 7], { '÷': 1, '×': 1, '+': 1, '-': 1 }, 7],
-    ]),
-  ];
-}
-
-function mixedStageGroup(
-  islandId: 'mixed3' | 'mixed4' | 'mixed5',
-  specs: Array<[number[], Partial<NonNullable<Stage['operatorLimits']>>, number]>,
-): Stage[] {
-  const bubbleCount = Number(islandId.replace('mixed', ''));
-  return specs.map(([bubbleCounts, operatorLimits, target], index) => ({
-    id: `${islandId}-${index + 1}`,
-    title: `${target}にしよう`,
-    target,
-    allowedValues: [1],
-    islandId,
-    islandTitle: `${bubbleCount}つのあわ`,
-    setTitle: `${bubbleCount}つのあわ`,
-    bubbleCounts,
-    operatorLimits,
-  }));
-}
-
-function createFreeMixedStages(): Stage[] {
-  // Every operator may be used as often as wanted, so these are chosen to still need thought:
-  // adding and taking away alone never reaches the goal, and each island goes from several
-  // winning ways down to a few. (They used to repeat the bubbles and goals of the islands above.)
-  return [
-    ...freeMixedStageGroup('mixed3Free', [
-      [[2, 3, 4], 20],
-      [[2, 5, 7], 45],
-      [[4, 5, 8], 52],
-      [[3, 4, 9], 15],
-      [[5, 6, 12], 30],
-      [[2, 3, 7], 3],
-      [[2, 3, 8], 2],
-      [[3, 4, 6], 2],
-      [[4, 6, 8], 3],
-      [[6, 6, 9], 4],
-    ]),
-    ...freeMixedStageGroup('mixed4Free', [
-      [[4, 5, 6, 9], 55],
-      [[2, 5, 8, 9], 15],
-      [[2, 4, 6, 8], 3],
-      [[3, 4, 7, 8], 20],
-      [[3, 5, 6, 8], 37],
-      [[3, 4, 6, 9], 13],
-      [[3, 4, 6, 8], 12],
-      [[3, 6, 7, 9], 4],
-      [[4, 7, 8, 9], 24],
-      [[2, 5, 6, 7], 22],
-    ]),
-    ...freeMixedStageGroup('mixed5Free', [
-      [[2, 3, 4, 5, 6], 21],
-      [[2, 3, 4, 5, 9], 14],
-      [[2, 3, 5, 8, 9], 26],
-      [[2, 4, 5, 6, 7], 13],
-      [[2, 3, 5, 7, 9], 29],
-      [[2, 3, 5, 6, 9], 17],
-      [[2, 3, 5, 6, 7], 45],
-      [[2, 4, 5, 6, 8], 49],
-      [[3, 4, 5, 6, 7], 37],
-      [[2, 3, 6, 7, 8], 58],
-    ]),
-  ];
-}
-
-function freeMixedStageGroup(
-  islandId: 'mixed3Free' | 'mixed4Free' | 'mixed5Free',
-  specs: Array<[number[], number]>,
-): Stage[] {
-  const bubbleCount = Number(islandId.replace('mixed', '').replace('Free', ''));
-  return specs.map(([bubbleCounts, target], index) => ({
-    id: `${islandId}-${index + 1}`,
-    title: `${target}にしよう`,
-    target,
-    allowedValues: [1],
-    islandId,
-    islandTitle: `${bubbleCount}つのあわ ∞`,
-    setTitle: `${bubbleCount}つのあわ ∞`,
-    bubbleCounts,
   }));
 }

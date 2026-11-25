@@ -103,6 +103,121 @@ test('maru falling out of a bubble never cover the bubbles still waiting', async
   expect(covered).toEqual([]);
 });
 
+// The board itself. These were reported and fixed on the islands that mixed all four operators;
+// those islands are the puzzle game now, so the checks live here.
+
+test('a puzzle with free operators shows no counts, and opens all four after the first bubble', async ({ page }) => {
+  await openPuzzle(page, 1);
+  for (const operator of ['+', '-', '×', '÷']) {
+    await expect(page.getByTestId(`operator-${operator}`)).toBeDisabled();
+  }
+  await expect(page.locator('[data-testid$="-usage"]')).toHaveCount(0);
+
+  await bubble(page, PUZZLE_STAGES[0].bubbles[0]).click();
+  for (const operator of ['+', '-', '×', '÷']) {
+    await expect(page.getByTestId(`operator-${operator}`)).toBeEnabled();
+  }
+});
+
+test('a puzzle with rationed operators shows how often each is left, and spends them', async ({ page }) => {
+  // #46: five bubbles, each operator once. Its way starts "10 - 6 ÷ 2".
+  const way = PUZZLE_STAGES[45].solution.split(' ');
+  expect(PUZZLE_STAGES[45].limits).toEqual({ '+': 1, '-': 1, '×': 1, '÷': 1 });
+  await openPuzzle(page, 46);
+  for (const operator of ['+', '-', '×', '÷']) {
+    await expect(page.getByTestId(`operator-${operator}-usage`)).toHaveText('1');
+  }
+
+  await bubble(page, way[0]).click();
+  await page.getByTestId(`operator-${way[1]}`).click();
+  await bubble(page, way[2]).click();
+
+  await expect(page.getByTestId(`operator-${way[1]}`)).toBeDisabled();
+  await expect(page.getByTestId(`operator-${way[1]}-usage`)).toHaveCount(0);
+  await expect(page.getByTestId(`operator-${way[3]}-usage`)).toHaveText('1');
+});
+
+test('wrapped bubbles that settle on the basin burst even while unused bubbles remain', async ({ page }) => {
+  // #16 starts "12 ÷ 2" with two bubbles left over.
+  const way = PUZZLE_STAGES[15].solution.split(' ');
+  expect(way.slice(0, 3)).toEqual(['12', '÷', '2']);
+  await openPuzzle(page, 16);
+
+  await bubble(page, 12).click();
+  await page.getByTestId('operator-÷').click();
+  await bubble(page, 2).click();
+
+  await expect(page.getByTestId('expression-display-text')).toContainText('12 ÷ 2 = 6');
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(2);
+  await expect(page.locator('[data-testid^="bead-division-6-"]')).toHaveCount(0, { timeout: 3500 });
+});
+
+test('moves tapped while the maru are still settling all happen, in order', async ({ page }) => {
+  // #77: "8 + 10 ÷ 9 + 7 × 6 - 11". Tapped without waiting, the ÷ and the × each have to wait
+  // for the maru before them, with more taps coming in behind. A waiting move used to be
+  // replaced by the next tap and then never happened.
+  const way = PUZZLE_STAGES[76].solution.split(' ');
+  await openPuzzle(page, 77);
+
+  await bubble(page, way[0]).click();
+  for (let index = 1; index < way.length; index += 2) {
+    await page.getByTestId(`operator-${way[index]}`).click();
+    await bubble(page, way[index + 1]).click();
+  }
+
+  await expect(page.getByTestId('current-total-value')).toHaveText(String(PUZZLE_STAGES[76].goal), { timeout: 30_000 });
+  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 20_000 });
+});
+
+test('the last move can be taken back, one move at a time', async ({ page }) => {
+  // #16: "12 ÷ 2 - 4 × 9".
+  await openPuzzle(page, 16);
+  await expect(page.getByLabel('undo')).toBeDisabled();
+
+  await bubble(page, 12).click();
+  await page.getByTestId('operator-÷').click();
+  await bubble(page, 2).click();
+  await expect(page.getByTestId('current-total-value')).toHaveText('6', { timeout: 10_000 });
+  await page.getByTestId('operator--').click();
+  await bubble(page, 4).click();
+  await expect(page.getByTestId('current-total-value')).toHaveText('2', { timeout: 10_000 });
+
+  await page.getByLabel('undo').click();
+  await expect(page.getByTestId('current-total-value')).toHaveText('6');
+  await expect(page.getByTestId('expression-display-text')).toHaveText('12 ÷ 2 = 6');
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(2);
+  await expect(bubble(page, 4)).toBeVisible();
+
+  await page.getByLabel('undo').click();
+  await expect(page.getByTestId('current-total-value')).toHaveText('12');
+  await page.getByLabel('undo').click();
+  await expect(page.getByTestId('current-total-value')).toHaveText('0');
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(4);
+  await expect(page.getByLabel('undo')).toBeDisabled();
+});
+
+test('multiplication preview bubble does not auto-burst while multiply is selected', async ({ page }) => {
+  // #1: bubbles 2, 8 and 6, every operator free.
+  await openPuzzle(page, 1);
+
+  await page.getByLabel('bubble-2').click();
+  await page.getByTestId('operator-×').click();
+
+  await expect(page.getByTestId('expression-display-text')).toContainText('2 ×');
+  await expect(page.getByLabel('multiply-8')).toBeVisible();
+  await page.waitForTimeout(1800);
+  await expect(page.getByLabel('multiply-8')).toBeVisible();
+});
+
+/** Opens the numbered puzzle `number` (1 is the first), with every puzzle before it solved. */
+async function openPuzzle(page: Page, number: number) {
+  await openPuzzleGame(page, { version: 1, solved: PUZZLE_GAME_STAGES.slice(0, number - 1).map((stage) => stage.id), startVisits: 9, quickScores: [] });
+  await solveStartPuzzle(page);
+  await page.getByTestId('choose-puzzles').click();
+  await expect(page.getByTestId('stage-goal-number')).toHaveText(`#${number}`);
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(PUZZLE_STAGES[number - 1].bubbles.length);
+}
+
 async function openPuzzleGame(page: Page, saved?: object) {
   if (saved) {
     await page.addInitScript(

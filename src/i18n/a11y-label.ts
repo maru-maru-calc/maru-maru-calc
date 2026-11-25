@@ -83,7 +83,6 @@ const JAPANESE_PATTERNS: Array<[RegExp, (...groups: string[]) => string]> = [
   [/^divide-(-?\d+)$/, (count) => `÷${count}のあわ`],
   [/^bead-([a-z]+)-(-?\d+)$/, (role, count) => `${JAPANESE_BEAD_ROLES[role] ?? 'まる'} ${count}`],
   [/^sea creature ([A-Za-z]+)$/, (kind) => JAPANESE_SEA_CREATURES[kind] ?? 'うみのいきもの'],
-  [/^mixed-(\d+)(-free)?$/, (count, free) => (free ? `${count}つのあわ じゆう` : `${count}つのあわ`)],
   [/^stage (\d+): make (-?\d+)$/, (stageNumber, target) => `ステージ${stageNumber} ${target}にしよう`],
   [/^(\d+) × \? shuffled$/, (dan) => `${dan} × ? ばらばら`],
 ];

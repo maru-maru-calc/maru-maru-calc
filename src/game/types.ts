@@ -24,12 +24,6 @@ export type Stage = {
     | 'subtraction'
     | 'multiplication'
     | 'division'
-    | 'mixed3'
-    | 'mixed4'
-    | 'mixed5'
-    | 'mixed3Free'
-    | 'mixed4Free'
-    | 'mixed5Free'
     // The puzzle game's own stages; its operator limits are always given in full.
     | 'puzzle';
   islandTitle: string;
