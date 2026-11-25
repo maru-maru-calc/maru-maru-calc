@@ -5,6 +5,7 @@ import { PixelRatio, Pressable, Text, View } from 'react-native';
 
 import { SFX } from '@/audio/sfx';
 import { useBoardViewport } from '@/components/marumaru/board-viewport';
+import { useStaysPut } from '@/components/marumaru/use-stays-put';
 import { useOneShotAudio } from '@/audio/use-one-shot-audio';
 import { KukuAnswerPad } from '@/components/marumaru/answer-pad';
 import { BasinFrame, BeadLayer } from '@/components/marumaru/beads';
@@ -184,6 +185,8 @@ export function MarumaruGame({
   dentakuPractice?: DentakuPractice;
 }) {
   const { width, height } = useBoardViewport();
+  const screenRef = useRef<View>(null);
+  useStaysPut(screenRef);
   const fieldWidth = Math.max(240, width - FIELD_MARGIN * 2);
   const fieldHeight = Math.max(360, height - HEADER_HEIGHT - FOOTER_HEIGHT - OPERATOR_TABS_HEIGHT - 20);
   const [stageIndex, setStageIndex] = useState(initialStageIndex);
@@ -1995,7 +1998,7 @@ export function MarumaruGame({
   const longFormProblem = dentakuPractice?.longFormMode ? getLongFormProblem(dentakuPractice) : undefined;
 
   return (
-    <View style={styles.screen}>
+    <View ref={screenRef} style={styles.screen}>
       <View style={styles.header}>
         <View style={styles.headerTitleGroup}>
           {onBack && mode !== 'launch' ? (
