@@ -25,7 +25,7 @@ test('landing page shows the puzzle game and leads to it', async ({ page }) => {
   await page.getByTestId('landing-puzzle-button').click();
   await expect(page).toHaveURL(/\/puzzle$/);
   await expect(page.locator('[data-testid^="pending-bubble-"]').first()).toBeVisible();
-  await expect(page.getByTestId('stage-goal-number')).toHaveCount(0);
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
 });
 
 test('landing page presents the core copy and opens the app', async ({ page }) => {

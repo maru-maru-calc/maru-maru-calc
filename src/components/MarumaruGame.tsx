@@ -92,6 +92,7 @@ import {
   toSnapshots,
 } from '@/components/marumaru/field-physics';
 import { HeaderActionButton, KukuGoalTitle, LaunchLogo, StageGoalTitle } from '@/components/marumaru/header';
+import type { StageMark } from '@/components/marumaru/header';
 import {
   getFooterExpressionTokens,
   getLongFormProblem,
@@ -155,7 +156,7 @@ export function MarumaruGame({
   dentakuPractice,
   stages,
   onLastStageNext,
-  showsStageNumber = true,
+  stageMark,
   showsGoalAsMaru = true,
   onAllBubblesUsed,
   resetSignal = 0,
@@ -177,7 +178,8 @@ export function MarumaruGame({
   /** Called for "next" on the last of `stages`, instead of staying on it. */
   onLastStageNext?: () => void;
   /** Whether the header shows "#n" before the goal. */
-  showsStageNumber?: boolean;
+  /** Shown before the goal instead of the stage's own number: the start puzzle is #0, the one-minute game shows a clock. */
+  stageMark?: StageMark;
   initialStageIndex?: number;
   onBack?: () => void;
   onStageClear?: (stageId: string) => void;
@@ -2122,7 +2124,7 @@ export function MarumaruGame({
                 isWrong={kukuInputState === 'wrong'}
               />
             ) : (
-              <StageGoalTitle showsGoalParts={showsGoalAsMaru} stageNumber={showsStageNumber ? stageNumberInIsland : undefined} target={target} maxWidth={Math.max(168, fieldWidth - 132)} />
+              <StageGoalTitle showsGoalParts={showsGoalAsMaru} stageMark={stageMark ?? stageNumberInIsland} target={target} maxWidth={Math.max(168, fieldWidth - 132)} />
             )}
           </View>
         </View>
@@ -2194,7 +2196,7 @@ export function MarumaruGame({
               onPress={undoLastMove}
               style={({ pressed }) => [styles.undoButton, !canUndo && styles.undoButtonDisabled, pressed && styles.pressedButton]}
             >
-              <NavImageIcon kind="undo" size={27} />
+              <NavImageIcon kind="undo" size={29} />
             </Pressable>
           ) : null}
           {/* The whole board skips too; the button in the header is the one that says so. */}

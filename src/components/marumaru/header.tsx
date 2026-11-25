@@ -13,10 +13,13 @@ import { getFailedProgress } from '@/components/marumaru/effects';
 import { getGoalParts, getSignedPalette, getTranslucentBeadColor } from '@/components/marumaru/field-layout';
 import { styles } from '@/components/marumaru/styles';
 import type { DentakuPractice, GoalPart } from '@/components/marumaru/types';
-import { NavImageIcon } from '@/components/NavImageIcon';
+import { ClockIcon, NavImageIcon } from '@/components/NavImageIcon';
 import { getBeadKind } from '@/game/beads';
 import { useTick } from '@/game/use-tick';
 import { a11yLabel } from '@/i18n/a11y-label';
+
+// The colour of the stage number (styles.stageGameNumber).
+const STAGE_MARK_COLOR = '#0284C7';
 
 export function LaunchLogo({ variant = 'header', onPress }: { variant?: 'header' | 'tada'; onPress?: () => void }) {
   const content = (
@@ -36,14 +39,24 @@ export function LaunchLogo({ variant = 'header', onPress }: { variant?: 'header'
   );
 }
 
-export function StageGoalTitle({ stageNumber, target, maxWidth, showsGoalParts = true }: { stageNumber: number | undefined; target: number; maxWidth: number; showsGoalParts?: boolean }) {
+/**
+ * What stands before the goal: the stage's number ("#12"), or a clock in the one-minute game,
+ * where the puzzles have no numbers.
+ */
+export type StageMark = number | 'clock';
+
+export function StageGoalTitle({ stageMark, target, maxWidth, showsGoalParts = true }: { stageMark: StageMark; target: number; maxWidth: number; showsGoalParts?: boolean }) {
   return (
     <View testID="stage-goal-title" style={[styles.stageGameTitle, { maxWidth }]}>
-      {stageNumber === undefined ? null : (
-        <View style={styles.stageGameNumberSlot}>
-          <Text testID="stage-goal-number" style={styles.stageGameNumber}>#{stageNumber}</Text>
-        </View>
-      )}
+      <View style={styles.stageGameNumberSlot}>
+        {stageMark === 'clock' ? (
+          <View testID="stage-goal-clock">
+            <ClockIcon size={22} color={STAGE_MARK_COLOR} />
+          </View>
+        ) : (
+          <Text testID="stage-goal-number" style={styles.stageGameNumber}>#{stageMark}</Text>
+        )}
+      </View>
       {showsGoalParts ? <HeaderGoalParts target={target} maxWidth={Math.max(54, maxWidth - 118)} /> : null}
       <View style={styles.stageGameEqualsSlot}>
         <Text testID="stage-goal-equals" style={styles.stageGameEquals}>=</Text>

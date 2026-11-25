@@ -91,7 +91,7 @@ export function QuickGame({
     <View style={styles.screen}>
       <MarumaruGame
         stages={stages}
-        showsStageNumber={false}
+        stageMark="clock"
         showsGoalAsMaru={false}
         onBack={onBack}
         onAllBubblesUsed={handleAllBubblesUsed}
