@@ -14,6 +14,20 @@ declare global {
 // (src/i18n/a11y-label.ts). The other spec files run in the default locale and use the English names.
 test.use({ locale: 'ja-JP', viewport: { width: 390, height: 844 } });
 
+test('landing page shows the puzzle game and leads to it', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('landing-puzzle-section').scrollIntoViewIfNeeded();
+
+  await expect(page.getByTestId('mode-video-puzzle-image')).toBeVisible();
+  // The learning app's own poster is one of its own stages (the islands that mixed the operators are gone).
+  await expect(page.getByTestId('mode-video-marumaru-image')).toBeVisible();
+
+  await page.getByTestId('landing-puzzle-button').click();
+  await expect(page).toHaveURL(/\/puzzle$/);
+  await expect(page.locator('[data-testid^="pending-bubble-"]').first()).toBeVisible();
+  await expect(page.getByTestId('stage-goal-number')).toHaveCount(0);
+});
+
 test('landing page presents the core copy and opens the app', async ({ page }) => {
   await page.goto('/');
 
