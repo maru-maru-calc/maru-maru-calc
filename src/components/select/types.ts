@@ -19,8 +19,7 @@ export type DepthFishSpec = {
   speed: number;
   delay: number;
   direction: 1 | -1;
-  tint: string;
-  kind: 'fish' | 'clownfish' | 'blueTang' | 'puffer' | 'seahorse' | 'squid' | 'ray' | 'turtle' | 'tuna' | 'shark' | 'whale' | 'flatfish' | 'jelly' | 'angler';
+  kind: 'clownfish' | 'blueTang' | 'puffer' | 'seahorse' | 'squid' | 'ray' | 'turtle' | 'tuna' | 'shark' | 'whale' | 'flatfish' | 'jelly' | 'angler';
 };
 
 export type MapNodeLayout = {

@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SFX } from '@/audio/sfx';
 import { useOneShotAudio } from '@/audio/use-one-shot-audio';
 import { BrandLogo } from '@/components/BrandLogo';
+import { CreatureArt } from '@/components/creature-art';
 import { DepthBackdrop } from '@/components/select/backdrop';
 import { BubbleRoute, SoundToggleButton } from '@/components/select/map-parts';
 import { styles } from '@/components/select/styles';
@@ -44,6 +45,7 @@ export function ModeSelect({
         <DepthBackdrop width={viewportWidth} height={viewportHeight} scrollDepthStore={scrollDepthStore} onBubblePop={playBackgroundBubbleSfx} onCreaturePress={playActionSfx} />
         <SoundToggleButton />
         <ScrollView
+          testID="mode-select-scroll"
           style={styles.worldScroll}
           contentContainerStyle={styles.modeScrollContent}
           showsVerticalScrollIndicator={false}
@@ -95,32 +97,14 @@ export function ModeSelect({
   );
 }
 
+const MODE_DIVER_WIDTH = 124;
+
 function ModeDiver({ variant, style }: { variant: 'boy' | 'girl'; style: StyleProp<ViewStyle> }) {
   const isGirl = variant === 'girl';
 
   return (
-    <View pointerEvents="none" style={[styles.modeDiver, style, isGirl && styles.modeDiverGirlFlip]}>
-      <View style={styles.modeDiverTrailBubbleLarge} />
-      <View style={styles.modeDiverTrailBubbleSmall} />
-      <View style={[styles.modeDiverArm, styles.modeDiverArmFront]} />
-      <View style={[styles.modeDiverArm, styles.modeDiverArmBack]} />
-      <View style={styles.modeDiverBody}>
-        <View style={styles.modeDiverTank} />
-        <View style={styles.modeDiverSuitBand} />
-      </View>
-      <View style={[styles.modeDiverLeg, styles.modeDiverLegTop]}>
-        <View style={styles.modeDiverFin} />
-      </View>
-      <View style={[styles.modeDiverLeg, styles.modeDiverLegBottom]}>
-        <View style={styles.modeDiverFin} />
-      </View>
-      <View style={styles.modeDiverHead}>
-        {isGirl ? <View style={styles.modeDiverPonytail} /> : null}
-        <View style={styles.modeDiverHair} />
-        <View style={styles.modeDiverMask}>
-          <View style={styles.modeDiverMaskGlass} />
-        </View>
-      </View>
+    <View pointerEvents="none" testID={`mode-diver-${variant}`} style={[styles.modeDiver, style, isGirl && styles.modeDiverGirlFlip]}>
+      <CreatureArt kind={isGirl ? 'diverGirl' : 'diverBoy'} width={MODE_DIVER_WIDTH} />
     </View>
   );
 }

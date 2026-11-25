@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="92" viewBox="0 0 108 92">
+  <defs>
+    <clipPath id="b"><circle cx="48" cy="46" r="36"/></clipPath>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FBE27A"/><stop offset="1" stop-color="#F3C63F"/></linearGradient>
+  </defs>
+  <g fill="#E3AE2A">
+    <path d="M48 4l5 9h-10zM22 12l9 5-7 7zM74 12l2 12-9-7zM6 34l10 1-5 9zM88 30l-1 11-8-7z"/>
+    <path d="M82 46c8-8 16-10 22-9-3 6-3 12 0 18-6 1-14-1-22-9z"/>
+  </g>
+  <circle cx="48" cy="46" r="36" fill="url(#g)"/>
+  <g clip-path="url(#b)">
+    <ellipse cx="44" cy="74" rx="38" ry="24" fill="#FFF8E1"/>
+    <g fill="#D99A1C" opacity=".7"><circle cx="52" cy="22" r="3.5"/><circle cx="66" cy="30" r="3"/><circle cx="40" cy="16" r="2.5"/><circle cx="70" cy="44" r="2.5"/><circle cx="58" cy="36" r="2"/></g>
+    <ellipse cx="38" cy="20" rx="20" ry="6" fill="#fff" opacity=".3" transform="rotate(-18 38 20)"/>
+  </g>
+  <path d="M56 52c7-2 12 2 12 8-5 3-11 2-13-3z" fill="#E3AE2A"/>
+  <circle cx="26" cy="40" r="7" fill="#fff"/><circle cx="25" cy="40.5" r="4.5" fill="#12334A"/><circle cx="23.5" cy="39" r="1.6" fill="#fff"/>
+  <ellipse cx="14" cy="53" rx="2.6" ry="3.2" fill="#D9622B"/>
+  <ellipse cx="30" cy="54" rx="5" ry="3" fill="#F9A8D4" opacity=".7"/>
+</svg>
