@@ -2,24 +2,14 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { NavImageIcon } from '@/components/NavImageIcon';
+import { HEADER_ACTION_BUTTON_SIZE, RADIUS_LG } from '@/components/marumaru/constants';
+import { ClockIcon, NavImageIcon } from '@/components/NavImageIcon';
 import { a11yLabel } from '@/i18n/a11y-label';
 
 const INK = '#12334A';
 const ACCENT = '#0284C7';
 const WATER = '#C6E8F4';
 const FONT = 'Helvetica';
-
-/** A clock face: the sign for the one-minute game. */
-function ClockIcon({ size }: { size: number }) {
-  const stroke = Math.max(3, Math.round(size * 0.1));
-  return (
-    <View testID="clock-icon" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: stroke, borderColor: INK, alignItems: 'center' }}>
-      <View style={{ position: 'absolute', top: size * 0.16, width: stroke, height: size * 0.3, borderRadius: stroke / 2, backgroundColor: INK }} />
-      <View style={{ position: 'absolute', top: size / 2 - stroke * 1.5, left: size / 2 - stroke * 1.5, width: size * 0.26, height: stroke, borderRadius: stroke / 2, backgroundColor: INK }} />
-    </View>
-  );
-}
 
 /**
  * Shown over the board once the start puzzle is solved: on to the puzzles in order, or the
@@ -59,10 +49,10 @@ export function QuickResult({ solved, scores, rank, onAgain, onBack }: { solved:
         </View>
         <View style={styles.buttonRow}>
           <Pressable accessibilityLabel={a11yLabel('Back')} accessibilityRole="button" testID="quick-result-back" onPress={onBack} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-            <NavImageIcon kind="back" size={30} />
+            <NavImageIcon kind="back" size={29} />
           </Pressable>
           <Pressable accessibilityLabel={a11yLabel('play again')} accessibilityRole="button" testID="quick-result-again" onPress={onAgain} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-            <NavImageIcon kind="retry" size={30} />
+            <NavImageIcon kind="retry" size={29} />
           </Pressable>
         </View>
       </View>
@@ -79,7 +69,7 @@ export function PuzzleEnd({ solved, total, onBack }: { solved: number; total: nu
         <Text testID="puzzle-end-count" style={styles.endCount}>{solved} / {total}</Text>
         <View style={styles.buttonRow}>
           <Pressable accessibilityLabel={a11yLabel('Back')} accessibilityRole="button" testID="puzzle-end-back" onPress={onBack} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-            <NavImageIcon kind="back" size={30} />
+            <NavImageIcon kind="back" size={29} />
           </Pressable>
         </View>
       </View>
@@ -170,13 +160,12 @@ const styles = StyleSheet.create({
     gap: 16,
     marginTop: 16,
   },
+  // The same button as on the board.
   button: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.58)',
-    borderWidth: 3,
-    borderColor: 'rgba(186, 230, 253, 0.72)',
+    width: HEADER_ACTION_BUTTON_SIZE,
+    height: HEADER_ACTION_BUTTON_SIZE,
+    borderRadius: RADIUS_LG,
+    backgroundColor: 'rgba(255, 255, 255, 0.26)',
     alignItems: 'center',
     justifyContent: 'center',
   },

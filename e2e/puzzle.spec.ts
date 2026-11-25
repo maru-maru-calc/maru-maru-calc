@@ -9,6 +9,8 @@ const SAVE_KEY = 'marumaru-calc:puzzle-progress';
 
 test('solving the start puzzle offers the puzzles in order and the one-minute game', async ({ page }) => {
   await openPuzzleGame(page);
+  // The start puzzle is number zero: its header reads like every other puzzle's.
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
   await expect(page.getByTestId('puzzle-choice')).toHaveCount(0);
 
   await solveStartPuzzle(page);
@@ -33,6 +35,9 @@ test('in the one-minute game a solved puzzle counts and a new one follows; a wro
   await openPuzzleGame(page);
   await solveStartPuzzle(page);
   await page.getByTestId('choose-quick').click();
+  // The puzzles of the one-minute game have no numbers: a clock stands where the number would be.
+  await expect(page.getByTestId('stage-goal-clock')).toBeVisible();
+  await expect(page.getByTestId('stage-goal-number')).toHaveCount(0);
   await expect(page.getByTestId('corner-badge')).toHaveText('0');
   await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(3);
 
@@ -78,7 +83,7 @@ test('the list opens any puzzle, solved or not, and marks the solved ones', asyn
   await page.getByLabel('Back', { exact: true }).click();
   await page.getByTestId('puzzle-list-back').click();
   await expect(page.locator('[data-testid^="pending-bubble-"]').first()).toBeVisible();
-  await expect(page.getByTestId('stage-goal-number')).toHaveCount(0);
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
 });
 
 test('maru falling out of a bubble never cover the bubbles still waiting', async ({ page }) => {

@@ -90,7 +90,7 @@ function PuzzleScreens({ host }: { host: GameHost }) {
         <MarumaruGame
           key={`start-${screen.round}`}
           stages={[screen.stage]}
-          showsStageNumber={false}
+          stageMark={0}
           showsGoalAsMaru={false}
           onStageClear={() => {
             update({ ...progress, startVisits: progress.startVisits + 1 });

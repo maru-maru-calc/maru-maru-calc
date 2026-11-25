@@ -150,7 +150,7 @@ test('launch-clear and game-clear next buttons keep the same position and size',
     assertBoxMatch(launchExpressionBox, gameExpressionBox);
   });
 
-  test('retry icon uses the same image icon pipeline as back and next', async ({ page }) => {
+  test('retry icon is drawn like back and next, not typed', async ({ page }) => {
     await page.goto('/game');
 
     await clearLaunch(page);
@@ -159,7 +159,12 @@ test('launch-clear and game-clear next buttons keep the same position and size',
 
     await expect(page.getByTestId('nav-icon-back')).toBeVisible();
     await expect(page.getByTestId('nav-icon-retry')).toBeVisible();
-    await expect(page.getByTestId('nav-icon-retry')).toContainText('↻');
+    // A typed "↻" changes shape with the device's fonts; a drawn one matches the arrows everywhere.
+    await expect(page.getByTestId('nav-icon-retry')).toHaveText('');
+    const strokeColor = (testId: string) =>
+      page.getByTestId(testId).evaluate((icon) => getComputedStyle(icon.firstElementChild as Element).borderBottomColor);
+    const backColor = await page.getByTestId('nav-icon-back').evaluate((icon) => getComputedStyle(icon.firstElementChild as Element).backgroundColor);
+    expect(await strokeColor('nav-icon-retry')).toBe(backColor);
   });
 
   test('goal beads align close to the target number baseline in the header', async ({ page }) => {

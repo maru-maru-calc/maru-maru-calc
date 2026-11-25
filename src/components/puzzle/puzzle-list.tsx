@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { HEADER_ACTION_BUTTON_SIZE, RADIUS_LG } from '@/components/marumaru/constants';
 import { NavImageIcon } from '@/components/NavImageIcon';
 import { getPuzzleSections, PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
 import { a11yLabel } from '@/i18n/a11y-label';
@@ -56,7 +57,7 @@ export function PuzzleList({
     <SafeAreaView style={styles.screen}>
       <View style={styles.header}>
         <Pressable accessibilityLabel={a11yLabel('Back')} accessibilityRole="button" testID="puzzle-list-back" onPress={onBack} style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}>
-          <NavImageIcon kind="back" size={30} />
+          <NavImageIcon kind="back" size={29} />
         </Pressable>
       </View>
       <ScrollView ref={scrollRef} testID="puzzle-list" contentContainerStyle={styles.content}>
@@ -108,17 +109,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: WATER,
   },
+  // "Back" sits exactly where it does on the board (24 from the left, 37 from the top).
   header: {
-    height: 72,
+    height: HEADER_ACTION_BUTTON_SIZE,
+    marginTop: 37,
+    marginBottom: 16,
     paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
   },
+  // The same button, in the same place, as "back" on the board.
   headerButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.58)',
+    width: HEADER_ACTION_BUTTON_SIZE,
+    height: HEADER_ACTION_BUTTON_SIZE,
+    borderRadius: RADIUS_LG,
+    backgroundColor: 'rgba(255, 255, 255, 0.26)',
     alignItems: 'center',
     justifyContent: 'center',
   },
