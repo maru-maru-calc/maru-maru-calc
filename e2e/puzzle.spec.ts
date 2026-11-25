@@ -209,6 +209,30 @@ test('multiplication preview bubble does not auto-burst while multiply is select
   await expect(page.getByLabel('multiply-8')).toBeVisible();
 });
 
+test('the board cannot be left scrolled sideways by a script or by focus', async ({ page }) => {
+  // The decorative bubbles drift past the screen's edge, so the board's box holds more than it
+  // shows. Scrolling it used to shift the whole board, and it stayed shifted.
+  await openPuzzle(page, 1);
+  const before = await page.getByTestId('operator-+').boundingBox();
+
+  const scrolled = await page.evaluate(async () => {
+    const ancestors: HTMLElement[] = [];
+    for (let element = document.querySelector('[data-testid="operator-+"]')?.parentElement; element; element = element.parentElement) {
+      ancestors.push(element);
+    }
+    ancestors.forEach((element) => {
+      element.scrollLeft = 40;
+      element.scrollTop = 40;
+    });
+    document.querySelector('[data-testid^="background-bubble-"]')?.scrollIntoView({ block: 'center', inline: 'center' });
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    return ancestors.filter((element) => element.scrollLeft !== 0 || element.scrollTop !== 0).length;
+  });
+
+  expect(scrolled).toBe(0);
+  expect(await page.getByTestId('operator-+').boundingBox()).toEqual(before);
+});
+
 /** Opens the numbered puzzle `number` (1 is the first), with every puzzle before it solved. */
 async function openPuzzle(page: Page, number: number) {
   await openPuzzleGame(page, { version: 1, solved: PUZZLE_GAME_STAGES.slice(0, number - 1).map((stage) => stage.id), startVisits: 9, quickScores: [] });

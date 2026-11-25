@@ -1,19 +1,22 @@
 // Shows what is inside at a size the board can be laid out in, shrunk to fit the screen when the
 // screen is too short or too narrow (see layout/fit-board.ts). The game must be playable at any
 // screen shape, a phone held sideways included.
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { BoardViewportProvider } from '@/components/marumaru/board-viewport';
+import { useStaysPut } from '@/components/marumaru/use-stays-put';
 import { fitBoardToScreen } from '@/layout/fit-board';
 
 export function FitToScreen({ children }: { children: ReactNode }) {
   const { width, height } = useWindowDimensions();
   const viewport = useMemo(() => fitBoardToScreen(width, height), [height, width]);
+  const screenRef = useRef<View>(null);
+  useStaysPut(screenRef);
 
   return (
-    <View style={styles.screen}>
+    <View ref={screenRef} style={styles.screen}>
       {/* Laid out at its own size around the middle of the screen, then shrunk about its middle: it ends up covering the screen exactly. */}
       <View
         testID="fit-to-screen"
