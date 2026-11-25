@@ -308,16 +308,12 @@ test('moves through the depth path into the existing game', async ({ page }) => 
   await expect(page.locator('[data-testid^="depth-background-bubble-"]')).toHaveCount(6);
   await expect(page.locator('[data-testid^="depth-fish-"]')).toHaveCount(5);
   await expect(page.getByTestId('depth-shade')).toBeVisible();
-  await expect(page.getByLabel('3つのあわ', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('4つのあわ', { exact: true })).toBeVisible();
+  // One island for each operator, and nothing else: the islands that mixed them are the puzzle game now.
+  await expect(page.getByLabel('たしざん', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('ひきざん', { exact: true })).toBeVisible();
   await expect(page.getByLabel('かけざん', { exact: true })).toBeVisible();
   await expect(page.getByLabel('わりざん', { exact: true })).toBeVisible();
-  await page.getByLabel('5つのあわ', { exact: true }).scrollIntoViewIfNeeded();
-  await expect(page.getByLabel('5つのあわ', { exact: true })).toBeVisible();
-  await page.getByLabel('5つのあわ じゆう', { exact: true }).scrollIntoViewIfNeeded();
-  await expect(page.getByLabel('3つのあわ じゆう', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('4つのあわ じゆう', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('5つのあわ じゆう', { exact: true })).toBeVisible();
+  await expect(page.getByLabel(/つのあわ/)).toHaveCount(0);
   await page.screenshot({ path: 'test-results/app-worlds.png' });
 
   await page.getByLabel('たしざん', { exact: true }).click();
@@ -335,16 +331,16 @@ test('moves through the depth path into the existing game', async ({ page }) => 
   await page.screenshot({ path: 'test-results/app-game.png' });
 });
 
-test('stage routes can scroll to later mixed problems', async ({ page }) => {
+test('stage routes can scroll to the later problems of an island', async ({ page }) => {
   await page.goto('/game');
 
   await clearLaunch(page);
   await expect(page.getByTestId('world-select')).toBeVisible();
-  await page.getByLabel('3つのあわ', { exact: true }).click();
+  await page.getByLabel('たしざん', { exact: true }).click();
 
-  await expect(page.getByTestId('stage-mixed3-1')).toBeVisible();
-  await page.getByTestId('stage-mixed3-10').scrollIntoViewIfNeeded();
-  await expect(page.getByTestId('stage-mixed3-10')).toBeVisible();
+  await expect(page.getByTestId('stage-addition-10-ones')).toBeVisible();
+  await page.getByTestId('stage-addition-120-times').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('stage-addition-120-times')).toBeVisible();
 });
 
 test('going back from an uncleared next stage does not mark it complete', async ({ page }) => {

@@ -4,7 +4,7 @@ import { a11yLabel } from '@/i18n/a11y-label';
 
 describe('screen reader names', () => {
   it('leaves every name as written for non-Japanese locales', () => {
-    for (const label of ['Back', 'next stage', 'bubble-5', 'bead-normal-1', 'sea creature turtle', 'mixed-3-free', '+', 'stage 2: make 10']) {
+    for (const label of ['Back', 'next stage', 'bubble-5', 'bead-normal-1', 'sea creature turtle', '+', 'stage 2: make 10']) {
       expect(a11yLabel(label, 'en')).toBe(label);
     }
   });
@@ -25,8 +25,6 @@ describe('screen reader names', () => {
     expect(a11yLabel('divide-4', 'ja')).toBe('÷4のあわ');
     expect(a11yLabel('bead-normal-10', 'ja')).toBe('まる 10');
     expect(a11yLabel('bead-product-12', 'ja')).toBe('かけざんのこたえ 12');
-    expect(a11yLabel('mixed-3', 'ja')).toBe('3つのあわ');
-    expect(a11yLabel('mixed-3-free', 'ja')).toBe('3つのあわ じゆう');
     expect(a11yLabel('stage 2: make 10', 'ja')).toBe('ステージ2 10にしよう');
     expect(a11yLabel('skip the replay', 'ja')).toBe('とばす');
     expect(a11yLabel('undo', 'ja')).toBe('ひとつもどす');
@@ -52,7 +50,7 @@ describe('screen reader names', () => {
   });
 
   it('never makes one kind of maru or bubble name part of another', () => {
-    const names = ['bubble-3', 'multiply-3', 'divide-3', 'bead-normal-3', 'bead-multiplicand-3', 'bead-product-3', 'bead-division-3', 'decorative bubble', 'mixed-3'].map((label) => a11yLabel(label, 'ja'));
+    const names = ['bubble-3', 'multiply-3', 'divide-3', 'bead-normal-3', 'bead-multiplicand-3', 'bead-product-3', 'bead-division-3', 'decorative bubble'].map((label) => a11yLabel(label, 'ja'));
     for (const name of names) {
       expect(names.filter((other) => other.includes(name))).toEqual([name]);
     }

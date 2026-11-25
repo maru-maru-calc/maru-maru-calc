@@ -1250,9 +1250,6 @@ export const styles = StyleSheet.create({
     borderColor: '#0EA5E9',
     backgroundColor: '#FFFFFF',
   },
-  mixedWorldNode: {
-    gap: 0,
-  },
   dentakuWorldNode: {
     position: 'absolute',
     width: 80,
@@ -1314,26 +1311,6 @@ export const styles = StyleSheet.create({
   mixedCountText: {
     color: TEXT_BASE_COLOR,
     fontSize: 14,
-    fontWeight: '900',
-    fontFamily: LATIN_FONT_FAMILY,
-  },
-  freeBadge: {
-    position: 'absolute',
-    left: -4,
-    bottom: -4,
-    minWidth: 32,
-    height: 32,
-    borderRadius: RADIUS_PILL,
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    backgroundColor: '#FACC15',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  freeBadgeText: {
-    color: TEXT_BASE_COLOR,
-    fontSize: 16,
-    lineHeight: 18,
     fontWeight: '900',
     fontFamily: LATIN_FONT_FAMILY,
   },

@@ -193,12 +193,6 @@ export function WorldSelect({
                 onSelectWorld('division');
               }}
             />
-            <MixedWorldNode label="mixed-3" count={3} x={layouts[4].x} y={layouts[4].y} onPress={() => { playActionSfx(); onSelectWorld('mixed3'); }} />
-            <MixedWorldNode label="mixed-3-free" count={3} x={layouts[5].x} y={layouts[5].y} free onPress={() => { playActionSfx(); onSelectWorld('mixed3Free'); }} />
-            <MixedWorldNode label="mixed-4" count={4} x={layouts[6].x} y={layouts[6].y} onPress={() => { playActionSfx(); onSelectWorld('mixed4'); }} />
-            <MixedWorldNode label="mixed-4-free" count={4} x={layouts[7].x} y={layouts[7].y} free onPress={() => { playActionSfx(); onSelectWorld('mixed4Free'); }} />
-            <MixedWorldNode label="mixed-5" count={5} x={layouts[8].x} y={layouts[8].y} onPress={() => { playActionSfx(); onSelectWorld('mixed5'); }} />
-            <MixedWorldNode label="mixed-5-free" count={5} x={layouts[9].x} y={layouts[9].y} free onPress={() => { playActionSfx(); onSelectWorld('mixed5Free'); }} />
             <SingingMermaid isVocalEnabled={isVocalEnabled} mapWidth={mapWidth} onPress={toggleVocal} />
           </View>
         </ScrollView>
@@ -248,53 +242,6 @@ function WorldNode({
       <Text style={[styles.worldProgress, active && styles.worldProgressActive]}>
         {progress}/{total}
       </Text>
-    </Pressable>
-  );
-}
-
-function MixedWorldNode({
-  label,
-  count,
-  x,
-  y,
-  free = false,
-  onPress,
-}: {
-  label: string;
-  count: 3 | 4 | 5;
-  x: number;
-  y: number;
-  free?: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      accessibilityLabel={a11yLabel(label)}
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.bubbleNode,
-        styles.worldNode,
-        styles.mixedWorldNode,
-        {
-          left: x - 45,
-          top: y - 45,
-        },
-        pressed && styles.pressed,
-      ]}
-    >
-      <View pointerEvents="none" style={styles.nodeBubbleInnerGlow} />
-      <View pointerEvents="none" style={styles.nodeBubbleShine} />
-      <Text style={styles.mixedWorldSymbols}>+ −</Text>
-      <Text style={styles.mixedWorldSymbols}>× ÷</Text>
-      <View style={styles.mixedCountBadge}>
-        <Text style={styles.mixedCountText}>{count}</Text>
-      </View>
-      {free ? (
-        <View style={styles.freeBadge}>
-          <Text style={styles.freeBadgeText}>∞</Text>
-        </View>
-      ) : null}
     </Pressable>
   );
 }

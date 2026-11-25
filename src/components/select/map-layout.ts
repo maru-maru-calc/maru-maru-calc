@@ -2,6 +2,7 @@
 import { MAP_BOTTOM_SPACE_AFTER_LAST_NODE, MAP_NODE_RADIUS } from '@/components/select/constants';
 import type { MapNodeLayout } from '@/components/select/types';
 import { DENTAKU_WORLDS } from '@/game/dentaku';
+import { STAGE_ISLANDS } from '@/game/stages';
 
 export function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -24,7 +25,8 @@ export function getSelectionMapHeight(layouts: MapNodeLayout[]) {
 
 export function getWorldNodeLayouts(mapWidth: number): MapNodeLayout[] {
   const centerX = mapWidth / 2;
-  return Array.from({ length: 10 }, (_, index) => {
+  // One for each island: + − × ÷.
+  return Array.from({ length: STAGE_ISLANDS.length }, (_, index) => {
     const spiral = index * 0.9 - Math.PI / 2;
     const radius = Math.min(118, 24 + index * 16, mapWidth * 0.32);
     return {

@@ -48,9 +48,7 @@ export function getStageOperatorUsage(stage: Stage): OperatorUsageLimits {
       ? { '+': 'infinite', '-': 0, '×': 0, '÷': 0 }
       : stage.islandId === 'subtraction'
         ? { '+': 'infinite', '-': 'infinite', '×': 0, '÷': 0 }
-        : stage.islandId === 'mixed3Free' || stage.islandId === 'mixed4Free' || stage.islandId === 'mixed5Free'
-          ? { '+': 'infinite', '-': 'infinite', '×': 'infinite', '÷': 'infinite' }
-          : { '+': 0, '-': 0, '×': 0, '÷': 0 };
+        : { '+': 0, '-': 0, '×': 0, '÷': 0 };
   return { ...base, ...stage.operatorLimits };
 }
 

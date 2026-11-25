@@ -16,15 +16,13 @@ const winningShare = (stage: Stage) => {
 const key = (stage: Stage) => `${[...stage.bubbleCounts].sort((a, b) => a - b).join(' ')} -> ${stage.target}`;
 
 describe('stage list', () => {
-  it('has ten islands with unique stage ids', () => {
-    expect(STAGE_ISLANDS).toHaveLength(10);
+  it('has four islands, one for each operator, with unique stage ids', () => {
+    // The islands that mixed all four operators are now the puzzle game (game/puzzle-stages.ts).
+    expect(STAGE_ISLANDS.map((candidate) => candidate.id)).toEqual(['addition', 'subtraction', 'multiplication', 'division']);
     expect(new Set(STAGES.map((stage) => stage.id)).size).toBe(STAGES.length);
-    expect(STAGES).toHaveLength(160);
+    expect(STAGES).toHaveLength(100);
     for (const id of ['addition', 'subtraction', 'multiplication', 'division'] as const) {
       expect(island(id)).toHaveLength(25);
-    }
-    for (const id of ['mixed3', 'mixed4', 'mixed5', 'mixed3Free', 'mixed4Free', 'mixed5Free'] as const) {
-      expect(island(id)).toHaveLength(10);
     }
   });
 
@@ -83,53 +81,6 @@ describe('かけざん and わりざん', () => {
       }
       // The old jump was from 100% straight to 7%.
       expect(steps[1]).toBeGreaterThan(0.3);
-    }
-  });
-});
-
-describe('じゆう islands', () => {
-  const free = [...island('mixed3Free'), ...island('mixed4Free'), ...island('mixed5Free')];
-
-  it('never repeat a problem of the islands with limited operators', () => {
-    const limited = new Set([...island('mixed3'), ...island('mixed4'), ...island('mixed5')].map(key));
-
-    expect(free.filter((stage) => limited.has(key(stage))).map(key)).toEqual([]);
-    expect(new Set(free.map(key)).size).toBe(free.length);
-  });
-
-  it('cannot be solved by adding and taking away alone', () => {
-    const tooEasy = free.filter((stage) => solveStage(stage).winning.some((way) => !/[×÷]/.test(way))).map((stage) => stage.id);
-
-    expect(tooEasy).toEqual([]);
-  });
-
-  it('have a winning way that never needs more than 60 maru or goes below 1', () => {
-    for (const stage of free) {
-      const calm = solveStage(stage).winning.some((way) => {
-        const tokens = way.split(' ');
-        let total = Number(tokens[0]);
-        let ok = total >= 1 && total <= 60;
-        for (let index = 1; index < tokens.length; index += 2) {
-          const value = Number(tokens[index + 1]);
-          total = tokens[index] === '+' ? total + value : tokens[index] === '-' ? total - value : tokens[index] === '×' ? total * value : total / value;
-          ok = ok && total >= 1 && total <= 60;
-        }
-        return ok;
-      });
-      expect(calm).toBe(true);
-    }
-  });
-
-  it('never let multiplying everything grow past what the board is known to handle', () => {
-    for (const stage of free) {
-      expect(stage.bubbleCounts.reduce((product, value) => product * value, 1)).toBeLessThanOrEqual(2520);
-    }
-  });
-
-  it('go from more winning ways to fewer within the four- and five-bubble islands', () => {
-    for (const id of ['mixed4Free', 'mixed5Free'] as const) {
-      const wins = island(id).map((stage) => solveStage(stage).winning.length);
-      expect(wins).toEqual([...wins].sort((a, b) => b - a));
     }
   });
 });

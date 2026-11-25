@@ -5,9 +5,8 @@ test.use({ viewport: { width: 390, height: 844 } });
 test('pending bubbles still burst after operator selection when the tap drifts slightly', async ({ page }) => {
   await page.goto('/game');
   await openCurrentLaunch(page);
-  await page.getByLabel('mixed-5-free', { exact: true }).scrollIntoViewIfNeeded();
-  await page.getByLabel('mixed-5-free', { exact: true }).click();
-  await page.getByTestId('stage-mixed5Free-1').click();
+  await page.getByLabel('+', { exact: true }).click();
+  await page.getByTestId('stage-addition-10-ones').click();
 
   await page.getByLabel('bubble-2').click();
   await page.getByTestId('operator-+').click();

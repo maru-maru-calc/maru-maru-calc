@@ -37,94 +37,6 @@ test.describe('user-reported regressions', () => {
     await expect(page.getByTestId('stage-subtraction-4')).toBeDisabled();
   });
 
-  test('wrapped bubbles that settle on the basin burst even while unused bubbles remain', async ({ page }) => {
-    await page.goto('/game');
-
-    await clearLaunch(page);
-    await openIsland(page, 'mixed-5-free');
-    await page.getByTestId('stage-mixed5Free-1').click();
-
-    await page.getByLabel('bubble-6').click();
-    await page.getByTestId('operator-÷').click();
-    await page.getByLabel('divide-3').click();
-
-    await expect(page.getByTestId('expression-display-text')).toContainText('6 ÷ 3 = 2');
-    await expect(page.locator('[data-testid^="pending-bubble-"]')).not.toHaveCount(0);
-    await expect(page.locator('[data-testid^="bead-division-2-"]')).toHaveCount(0, { timeout: 3500 });
-  });
-
-  test('moves tapped while the maru are still settling all happen, in order', async ({ page }) => {
-    await page.goto('/game');
-
-    await clearLaunch(page);
-    await openIsland(page, 'mixed-5-free');
-    await page.getByTestId('stage-mixed5Free-1').click();
-
-    const bubble = (count: number) => page.locator(`[data-testid^="pending-bubble-${count}-"]`).first();
-    await bubble(2).click();
-    await page.getByTestId('operator-+').click();
-    await bubble(4).click();
-    await page.getByTestId('operator--').click();
-    await bubble(3).click();
-    // The take-away is still playing, so × 5 has to wait, and + 6 is tapped behind it. The + used
-    // to replace the waiting × 5, which then never happened.
-    await page.getByTestId('operator-×').click();
-    await bubble(5).click();
-    await page.getByTestId('operator-+').click();
-    await bubble(6).click();
-
-    await expect(page.getByTestId('expression-display-text')).toContainText('× 5 + 6 = 21', { timeout: 20000 });
-    await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 20000 });
-  });
-
-  test('the last move can be taken back, one move at a time', async ({ page }) => {
-    await page.goto('/game');
-
-    await clearLaunch(page);
-    await openIsland(page, 'mixed-5-free');
-    await page.getByTestId('stage-mixed5Free-1').click();
-
-    const bubble = (count: number) => page.locator(`[data-testid^="pending-bubble-${count}-"]`).first();
-    await expect(page.getByLabel('undo')).toBeDisabled();
-
-    await bubble(2).click();
-    await page.getByTestId('operator-+').click();
-    await bubble(3).click();
-    await expect(page.getByTestId('current-total-value')).toHaveText('5');
-    await page.getByTestId('operator-×').click();
-    await bubble(4).click();
-    await expect(page.getByTestId('current-total-value')).toHaveText('20', { timeout: 10000 });
-
-    await page.getByLabel('undo').click();
-    await expect(page.getByTestId('current-total-value')).toHaveText('5');
-    await expect(page.getByTestId('expression-display-text')).toHaveText('2 + 3 = 5');
-    await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(3);
-    await expect(bubble(4)).toBeVisible();
-
-    await page.getByLabel('undo').click();
-    await expect(page.getByTestId('current-total-value')).toHaveText('2');
-    await page.getByLabel('undo').click();
-    await expect(page.getByTestId('current-total-value')).toHaveText('0');
-    await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(5);
-    await expect(page.getByLabel('undo')).toBeDisabled();
-  });
-
-  test('multiplication preview bubble does not auto-burst while multiply is selected', async ({ page }) => {
-    await page.goto('/game');
-
-    await clearLaunch(page);
-    await openIsland(page, 'mixed-5-free');
-    await page.getByTestId('stage-mixed5Free-1').click();
-
-    await page.getByLabel('bubble-2').click();
-    await page.getByTestId('operator-×').click();
-
-    await expect(page.getByTestId('expression-display-text')).toContainText('2 ×');
-    await expect(page.getByLabel('multiply-3')).toBeVisible();
-    await page.waitForTimeout(1800);
-    await expect(page.getByLabel('multiply-3')).toBeVisible();
-  });
-
   test('large value bubbles release place-value beads and subtraction resolves same-place cancellation', async ({ page }) => {
     await page.goto('/game');
 
@@ -260,8 +172,8 @@ test('launch-clear and game-clear next buttons keep the same position and size',
 
     await page.getByLabel('Back', { exact: true }).click();
     await page.getByLabel('Back', { exact: true }).click();
-    await openIslandFromWorld(page, 'mixed-3');
-    await page.getByTestId('stage-mixed3-2').click();
+    await openIslandFromWorld(page, '×');
+    await page.getByTestId('stage-multiplication-1').click();
     await expectHeaderGoalOrderAndVerticalPosition(page);
   });
 });

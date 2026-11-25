@@ -47,58 +47,6 @@ test('subtraction island allows both addition and subtraction', async ({ page })
   await expect(page.getByTestId('operator-÷')).toBeDisabled();
 });
 
-test('mixed stages start from plus and expose finite usage badges', async ({ page }) => {
-  await page.goto('/game');
-
-  await openIsland(page, 'mixed-3');
-  await page.getByTestId('stage-mixed3-1').click();
-
-  await expect(page.getByTestId('operator-+')).toBeDisabled();
-  await expect(page.getByTestId('operator-+-usage')).toHaveText('1');
-  await expect(page.getByTestId('operator-×-usage')).toHaveText('1');
-
-  await tapFirstPendingBubble(page);
-  await expect(page.getByTestId('expression-display-text')).toContainText('2 +');
-  await expect(page.getByTestId('operator-+')).toBeEnabled();
-  await expect(page.getByTestId('operator-×')).toBeEnabled();
-});
-
-test('finite operator usage is spent after an operation', async ({ page }) => {
-  await page.goto('/game');
-
-  await openIsland(page, 'mixed-3');
-  await page.getByTestId('stage-mixed3-1').click();
-
-  await expect(page.getByTestId('operator-+-usage')).toHaveText('1');
-  await expect(page.getByTestId('operator-×-usage')).toHaveText('1');
-
-  await page.getByLabel('bubble-2').first().click();
-  await page.getByTestId('operator-×').click();
-  await page.getByLabel('multiply-3').first().click();
-
-  await expect(page.getByTestId('operator-×')).toBeDisabled();
-  await expect(page.getByTestId('operator-×-usage')).toHaveCount(0);
-});
-
-test('free mixed worlds allow all four operators without usage badges', async ({ page }) => {
-  await page.goto('/game');
-
-  await openIsland(page, 'mixed-3-free');
-  await page.getByTestId('stage-mixed3Free-1').click();
-
-  await expect(page.getByTestId('operator-+')).toBeDisabled();
-  await expect(page.getByTestId('operator--')).toBeDisabled();
-  await expect(page.getByTestId('operator-×')).toBeDisabled();
-  await expect(page.getByTestId('operator-÷')).toBeDisabled();
-  await expect(page.locator('[data-testid$="-usage"]')).toHaveCount(0);
-
-  await tapFirstPendingBubble(page);
-  await expect(page.getByTestId('operator-+')).toBeEnabled();
-  await expect(page.getByTestId('operator--')).toBeEnabled();
-  await expect(page.getByTestId('operator-×')).toBeEnabled();
-  await expect(page.getByTestId('operator-÷')).toBeEnabled();
-});
-
 test('multiplication world starts with multiplication only and has about twenty five stages', async ({ page }) => {
   await page.goto('/game');
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { applyMove, getStageOperatorUsage, hasLegalMove, solveStage } from '@/game/stage-rules';
 import { STAGES } from '@/game/stages';
-import type { OperatorUsageLimits } from '@/game/types';
+import type { OperatorUsageLimits, Stage } from '@/game/types';
 
 const stage = (id: string) => {
   const found = STAGES.find((candidate) => candidate.id === id);
@@ -12,6 +12,19 @@ const stage = (id: string) => {
   return found;
 };
 const usage = (overrides: Partial<OperatorUsageLimits>): OperatorUsageLimits => ({ '+': 0, '-': 0, '×': 0, '÷': 0, ...overrides });
+const EVERY_OPERATOR: OperatorUsageLimits = { '+': 'infinite', '-': 'infinite', '×': 'infinite', '÷': 'infinite' };
+/** A stage of the puzzle game's kind: its own bubbles, goal and operators. */
+const puzzle = (bubbleCounts: number[], target: number, operatorLimits: Partial<OperatorUsageLimits>): Stage => ({
+  id: `puzzle-${bubbleCounts.join('.')}-${target}`,
+  title: '',
+  target,
+  allowedValues: [1],
+  islandId: 'puzzle',
+  islandTitle: '',
+  setTitle: '',
+  bubbleCounts,
+  operatorLimits,
+});
 
 describe('a single move', () => {
   it('adds and takes away, below zero too', () => {
@@ -77,24 +90,27 @@ describe('operators a stage starts with', () => {
     expect(getStageOperatorUsage(stage('addition-10-ones'))).toEqual({ '+': 'infinite', '-': 0, '×': 0, '÷': 0 });
     expect(getStageOperatorUsage(stage('subtraction-1'))).toEqual({ '+': 'infinite', '-': 'infinite', '×': 0, '÷': 0 });
     expect(getStageOperatorUsage(stage('division-1'))).toEqual({ '+': 0, '-': 0, '×': 0, '÷': 'infinite' });
-    expect(getStageOperatorUsage(stage('mixed3-1'))).toEqual({ '+': 1, '-': 0, '×': 1, '÷': 0 });
-    expect(getStageOperatorUsage(stage('mixed3Free-1'))).toEqual({ '+': 'infinite', '-': 'infinite', '×': 'infinite', '÷': 'infinite' });
+  });
+
+  it('lets a stage set its own, on top of the island', () => {
+    expect(getStageOperatorUsage(puzzle([2, 3, 4], 10, { '+': 1, '×': 1 }))).toEqual({ '+': 1, '-': 0, '×': 1, '÷': 0 });
+    expect(getStageOperatorUsage(puzzle([2, 3, 4], 10, EVERY_OPERATOR))).toEqual(EVERY_OPERATOR);
   });
 });
 
 describe('playing a stage every possible way', () => {
   it('counts the ways of a small stage', () => {
-    const solved = solveStage(stage('mixed3-1'));
+    const solved = solveStage(puzzle([2, 3, 4], 10, { '+': 1, '×': 1 }));
 
     expect(solved.complete).toBe(12);
     expect([...solved.winning].sort()).toEqual(['2 × 3 + 4', '3 × 2 + 4']);
   });
 
   it('works left to right: 2 + 3 × 4 is 20, not 14', () => {
-    const free = solveStage({ ...stage('mixed3Free-1'), target: 20 });
+    const free = solveStage(puzzle([2, 3, 4], 20, EVERY_OPERATOR));
 
     expect(free.winning).toContain('2 + 3 × 4');
-    expect(solveStage({ ...stage('mixed3Free-1'), target: 14 }).winning).not.toContain('2 + 3 × 4');
+    expect(solveStage(puzzle([2, 3, 4], 14, EVERY_OPERATOR)).winning).not.toContain('2 + 3 × 4');
   });
 
   it('sees the dead end of dividing the wrong way round', () => {
@@ -114,8 +130,7 @@ describe('playing a stage every possible way', () => {
     expect(unsolvable).toEqual([]);
   });
 
-  it('the stage that could not be solved now can', () => {
-    expect([...solveStage(stage('mixed4-9')).winning].sort()).toEqual(['5 × 5 + 2 ÷ 3', '5 ÷ 5 + 2 × 3']);
-    expect(solveStage(stage('mixed4Free-9')).winning.length).toBeGreaterThan(0);
+  it('finds both ways of a stage that uses each operator once', () => {
+    expect([...solveStage(puzzle([5, 5, 2, 3], 9, { '+': 1, '×': 1, '÷': 1 })).winning].sort()).toEqual(['5 × 5 + 2 ÷ 3', '5 ÷ 5 + 2 × 3']);
   });
 });

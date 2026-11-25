@@ -103,6 +103,9 @@ async function clearLaunch(page) {
   await page.getByTestId('mode-select').waitFor({ state: 'visible', timeout: 6000 });
 }
 
+// NOTE: the island this records on (five bubbles, every operator free) has moved out of the
+// learning app into the puzzle game. Before recording again, choose a stage of one of the four
+// islands that are left and rewrite the taps below for its bubbles.
 async function recordMarumaruMode(browser) {
   const { context, page, rawPath, outputPath } = await newRecordingPage(browser, 'mode-marumaru.webm');
   await clearLaunch(page);
