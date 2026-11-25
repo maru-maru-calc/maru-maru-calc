@@ -1,13 +1,14 @@
 {
   "name": "marumaru-calculator",
   "version": "1.0.0",
-  "main": "expo-router/entry",
+  "main": "./entry.js",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
     "export:web": "expo export --platform web --output-dir dist && node scripts/patch-web-metadata.js && node scripts/add-route-pages.js && node scripts/add-service-worker.js",
+    "export:youtube": "MARUMARU_TARGET=youtube expo export --platform web --output-dir dist-youtube-raw && node scripts/build-youtube.js",
     "e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"

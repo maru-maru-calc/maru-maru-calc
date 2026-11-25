@@ -86,7 +86,17 @@ const JAPANESE_PATTERNS: Array<[RegExp, (...groups: string[]) => string]> = [
   [/^(\d+) × \? shuffled$/, (dan) => `${dan} × ? ばらばら`],
 ];
 
+let hostLocale: A11yLocale | undefined;
+
+/** For a host that tells the game the player's language itself (YouTube does): use that, not the browser's. */
+export function setA11yLocale(locale: A11yLocale) {
+  hostLocale = locale;
+}
+
 export function getA11yLocale(): A11yLocale {
+  if (hostLocale) {
+    return hostLocale;
+  }
   // Native builds have no browser language; the app itself is Japanese.
   const language = typeof navigator !== 'undefined' && typeof navigator.language === 'string' ? navigator.language : 'ja';
   return language.toLowerCase().startsWith('ja') ? 'ja' : 'en';

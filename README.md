@@ -61,6 +61,20 @@ Web版は1ページ構成(SPA)なので、`npm run export:web` の最後に `ind
 
 SNSやSlackで共有された時の表示用に、タイトル、description、OGP/Twitter Card、favicon、apple-touch-iconを設定しています。
 
+## YouTube 向けビルド(パズルだけ)
+
+大人用パズル(`/puzzle`)だけを、YouTube のゲーム(Playables)に載せられる形で書き出せます。
+
+```sh
+npm run export:youtube
+```
+
+`dist-youtube/` にできるのがアップロード用の一式です(`dist-youtube-raw/` は途中の出力)。
+
+- 入口は `src/youtube/entry.tsx` です。ルーターも学習アプリも入りません。どちらのアプリを作るかは `metro.config.js` が決めます
+- セーブ・一時停止・音のオン/オフは YouTube の SDK に従います(`src/youtube/youtube-host.ts`)。ブラウザの保存領域は使いません
+- `scripts/build-youtube.js` が、YouTube の決まり(SDK を最初に読む、パスは相対、ファイル名に使える文字、容量)を確かめ、破っていれば失敗します
+
 ## ライセンス
 
 現時点ではライセンス未定です。無断での再配布や商用利用はしないでください。

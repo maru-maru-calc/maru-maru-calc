@@ -41,3 +41,7 @@ test-results/
 # generated native folders
 /ios
 /android
+
+# The puzzle game as built for YouTube (npm run export:youtube)
+dist-youtube/
+dist-youtube-raw/

@@ -4,7 +4,7 @@ import type { AudioPlayer } from 'expo-audio';
 import { Asset } from 'expo-asset';
 import { Platform } from 'react-native';
 
-import { isSoundMuted } from './sound-settings';
+import { isSoundMuted } from './sound-muted-state';
 import { createWebAudioPool } from './web-audio-pool';
 import type { WebAudioPool } from './web-audio-pool';
 
@@ -23,6 +23,11 @@ function getWebAudioPool() {
 
   webAudioPool ??= createWebAudioPool((uri) => new Audio(uri), undefined, SFX_FADE_OUT_MS);
   return webAudioPool;
+}
+
+/** Web only: cuts off every sound effect that is playing (the host has put the game on hold, or switched sound off). */
+export function stopAllWebAudio() {
+  webAudioPool?.stopAll();
 }
 
 function fadeOutAudioPlayer(player: AudioPlayer, startingVolume: number, release: boolean) {
