@@ -56,6 +56,7 @@ function getVideoUris(source: VideoSource): VideoUris {
 const modeMarumaruPosterSource = require('../../assets/landing/mode-marumaru-poster.png');
 const modeDentakuPosterSource = require('../../assets/landing/mode-dentaku-poster.png');
 const modeLongFormPosterSource = require('../../assets/landing/mode-long-form-poster.png');
+const modePuzzlePosterSource = require('../../assets/landing/mode-puzzle-poster.png');
 
 type LandingLocale = 'ja' | 'en' | 'zh-hans' | 'zh-hant' | 'ko' | 'de';
 
@@ -102,6 +103,12 @@ const landingCopy = {
     calculationModeLongFormName: '筆算モード',
     calculationModeLongFormLabel: '順番にとく',
     calculationModeLongFormBody: '一の位、十の位のように、筆算の順番を見ながら答えてみよう。最後に"まる"の動きでたしかめられるよ。',
+    puzzleTitle: 'おとなにはパズル',
+    puzzleLead: '同じ"まる"と"あわ"で、おとな向けのパズルもつくりました。',
+    puzzleName: 'パズル',
+    puzzleLabel: '100問 + 1分チャレンジ',
+    puzzleBody: '"あわ"を全部つかって、ぴったりの数をつくろう。答えは1通りだけ。ことばはひとつも出てきません。',
+    puzzleButton: 'パズルであそぶ',
     finalTitle: 'さがしてごらん',
     finalSegments: [
       { text: '魚は何種類いるかな？' },
@@ -151,6 +158,12 @@ const landingCopy = {
     calculationModeLongFormName: 'Written arithmetic mode',
     calculationModeLongFormLabel: 'Step through it',
     calculationModeLongFormBody: 'Work through ones, tens, partial products, and division steps in order, then check the result with maru.',
+    puzzleTitle: 'A puzzle for grown-ups',
+    puzzleLead: 'The same maru and bubbles, made into a puzzle for adults.',
+    puzzleName: 'Puzzle',
+    puzzleLabel: '100 puzzles + a one-minute challenge',
+    puzzleBody: 'Use every bubble to hit the number exactly. Each puzzle has only one solution, and there is not a single word in it.',
+    puzzleButton: 'Play the puzzle',
     finalTitle: 'Look around',
     finalSegments: [
       { text: 'How many kinds of fish can you find?' },
@@ -200,6 +213,12 @@ const landingCopy = {
     calculationModeLongFormName: '竖式模式',
     calculationModeLongFormLabel: '按步骤解',
     calculationModeLongFormBody: '按个位、十位、部分积和除法步骤的顺序来回答，最后用圆点的动作确认。',
+    puzzleTitle: '给大人的谜题',
+    puzzleLead: '用同样的圆点和泡泡，做成了给大人玩的谜题。',
+    puzzleName: '谜题',
+    puzzleLabel: '100 道题 + 1 分钟挑战',
+    puzzleBody: '用上所有的泡泡，正好凑出目标数字。每道题只有一种解法，而且全程没有一个字。',
+    puzzleButton: '玩谜题',
     finalTitle: '找找看',
     finalSegments: [
       { text: '你能找到几种鱼？' },
@@ -249,6 +268,12 @@ const landingCopy = {
     calculationModeLongFormName: '直式模式',
     calculationModeLongFormLabel: '按步驟解',
     calculationModeLongFormBody: '按照個位、十位、部分積和除法步驟回答，最後用圓點的動作確認。',
+    puzzleTitle: '給大人的謎題',
+    puzzleLead: '用同樣的圓點和泡泡，做成了給大人玩的謎題。',
+    puzzleName: '謎題',
+    puzzleLabel: '100 題 + 1 分鐘挑戰',
+    puzzleBody: '用上所有的泡泡，剛好湊出目標數字。每一題只有一種解法，而且全程沒有一個字。',
+    puzzleButton: '玩謎題',
     finalTitle: '找找看',
     finalSegments: [
       { text: '你能找到幾種魚？' },
@@ -298,6 +323,12 @@ const landingCopy = {
     calculationModeLongFormName: '세로셈 모드',
     calculationModeLongFormLabel: '차례대로 풀기',
     calculationModeLongFormBody: '일의 자리, 십의 자리, 부분곱, 나눗셈 단계를 순서대로 풀고 원의 움직임으로 확인해요.',
+    puzzleTitle: '어른을 위한 퍼즐',
+    puzzleLead: '같은 원과 거품으로 어른을 위한 퍼즐도 만들었어요.',
+    puzzleName: '퍼즐',
+    puzzleLabel: '100문제 + 1분 챌린지',
+    puzzleBody: '거품을 모두 써서 딱 맞는 수를 만들어요. 답은 한 가지뿐이고, 글자는 하나도 나오지 않아요.',
+    puzzleButton: '퍼즐 하기',
     finalTitle: '찾아봐요',
     finalSegments: [
       { text: '물고기는 몇 종류가 있을까요?' },
@@ -347,6 +378,12 @@ const landingCopy = {
     calculationModeLongFormName: 'Schriftlich-Modus',
     calculationModeLongFormLabel: 'Schrittweise lösen',
     calculationModeLongFormBody: 'Löse Einer, Zehner, Teilprodukte und Divisionsschritte der Reihe nach und prüfe das Ergebnis mit maru.',
+    puzzleTitle: 'Ein Rätsel für Erwachsene',
+    puzzleLead: 'Dieselben maru und Blasen, als Rätsel für Erwachsene.',
+    puzzleName: 'Rätsel',
+    puzzleLabel: '100 Rätsel + 1-Minuten-Challenge',
+    puzzleBody: 'Nutze alle Blasen, um die Zahl genau zu treffen. Jedes Rätsel hat nur eine Lösung – ganz ohne Worte.',
+    puzzleButton: 'Rätsel spielen',
     finalTitle: 'Schau dich um',
     finalSegments: [
       { text: 'Wie viele Fischarten findest du?' },
@@ -558,6 +595,8 @@ export default function LandingPage() {
         </View>
       </View>
 
+      <PuzzleSection copy={copy} compact={isCompact} onPlay={() => router.push('/puzzle')} />
+
       <View style={[styles.finalSection, styles.decoratedSection]}>
         <LandingSectionAmbient variant="final" />
         <View style={[styles.finalContent, isCompact && styles.finalContentCompact]}>
@@ -748,6 +787,42 @@ function CalculationModeSection({ copy, compact }: { copy: typeof landingCopy[La
             testID="mode-video-long-form"
           />
         </View>
+      </View>
+    </View>
+  );
+}
+
+/** The way to the puzzle game: the same board as a puzzle for adults, with an entrance of its own. */
+function PuzzleSection({ copy, compact, onPlay }: { copy: typeof landingCopy[LandingLocale]; compact: boolean; onPlay: () => void }) {
+  const posterUri = Asset.fromModule(modePuzzlePosterSource).uri;
+
+  return (
+    <View style={[styles.calculationModeSection, styles.decoratedSection]} testID="landing-puzzle-section">
+      <View pointerEvents="none" style={styles.calculationModeAmbient}>
+        {/* Kept inside the section at any width, so nothing sticks out past the edge. */}
+        <FloatingBubble size={64} left="6%" top="64%" opacity={0.16} />
+        <FloatingBubble size={88} left="66%" top="6%" opacity={0.12} />
+      </View>
+      <View style={[styles.calculationModeContent, compact && styles.calculationModeContentCompact]}>
+        <View style={[styles.calculationModeCopy, compact && styles.calculationModeCopyCompact]}>
+          <Text {...getHeadingProps(2)} style={[styles.sectionTitle, styles.calculationModeTitle, compact && styles.calculationModeTitleCompact]}>
+            {copy.puzzleTitle}
+          </Text>
+          <Text style={styles.calculationModeLead}>{copy.puzzleLead}</Text>
+        </View>
+        <View style={styles.calculationModeRows}>
+          <ModeFlowRow
+            compact={compact}
+            description={copy.puzzleBody}
+            expression={copy.puzzleLabel}
+            imageUri={posterUri}
+            label={copy.puzzleName}
+            testID="mode-video-puzzle"
+          />
+        </View>
+        <Pressable accessibilityRole="button" onPress={onPlay} style={[styles.primaryButton, styles.puzzleButton]} testID="landing-puzzle-button">
+          <Text style={styles.primaryButtonText}>{copy.puzzleButton}</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -1387,6 +1462,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 8 },
+  },
+  puzzleButton: {
+    alignSelf: 'center',
   },
   primaryButtonText: {
     color: TEXT_BASE_COLOR,
