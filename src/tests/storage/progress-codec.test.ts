@@ -55,6 +55,15 @@ describe('stored progress', () => {
     });
   });
 
+  it('turns five cleared one-question stages of the calculator mode into today\'s stage of five questions', () => {
+    const oldStages = ['dentaku-addition-1', 'dentaku-addition-2', 'dentaku-addition-3', 'dentaku-addition-4', 'dentaku-addition-5', 'dentaku-addition-6'];
+    const parsed = parseStoredProgress(JSON.stringify({ version: 1, dentaku: oldStages, hasSeenIntro: true }));
+
+    expect(parsed.dentaku).toEqual([...oldStages, 'dentaku-addition-set-1']);
+    // Saved and read again, nothing more is added.
+    expect(parseStoredProgress(serializeProgress(parsed)).dentaku).toEqual(parsed.dentaku);
+  });
+
   it('keeps only real times-table facts among the remembered misses', () => {
     const raw = JSON.stringify({ kukuWeak: ['7x8', '7x8', '12x3', 'addition-1', 56, null, '9x9'] });
 
