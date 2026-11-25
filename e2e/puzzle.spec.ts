@@ -58,6 +58,29 @@ test('in the one-minute game a solved puzzle counts and a new one follows; a wro
   expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '{}').quickScores ?? [], SAVE_KEY)).toEqual([]);
 });
 
+test('the list opens any puzzle, solved or not, and marks the solved ones', async ({ page }) => {
+  await openPuzzleGame(page, { version: 1, solved: PUZZLE_GAME_STAGES.slice(0, 3).map((stage) => stage.id), startVisits: 9, quickScores: [] });
+  await solveStartPuzzle(page);
+  await page.getByTestId('choose-puzzles').click();
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#4');
+
+  // Back from a puzzle is the list of all of them.
+  await page.getByLabel('Back', { exact: true }).click();
+  await expect(page.locator('[data-testid^="pick-puzzle-"]')).toHaveCount(100);
+  await expect(page.getByTestId('pick-puzzle-3')).toHaveAttribute('aria-label', 'puzzle 3, solved');
+  await expect(page.getByTestId('pick-puzzle-4')).toHaveAttribute('aria-label', 'puzzle 4');
+
+  // A puzzle far ahead can be opened without solving the ones before it.
+  await page.getByTestId('pick-puzzle-60').click();
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#60');
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(5);
+
+  await page.getByLabel('Back', { exact: true }).click();
+  await page.getByTestId('puzzle-list-back').click();
+  await expect(page.locator('[data-testid^="pending-bubble-"]').first()).toBeVisible();
+  await expect(page.getByTestId('stage-goal-number')).toHaveCount(0);
+});
+
 test('maru falling out of a bubble never cover the bubbles still waiting', async ({ page }) => {
   // Six bubbles in two rows: the maru of the upper row fall past the lower one.
   const number = 77;

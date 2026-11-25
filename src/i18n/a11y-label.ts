@@ -76,6 +76,8 @@ const JAPANESE_BEAD_ROLES: Record<string, string> = {
 // Names that carry a number or a kind. None of the Japanese forms is contained in another,
 // so a control can still be found by part of its name.
 const JAPANESE_PATTERNS: Array<[RegExp, (...groups: string[]) => string]> = [
+  [/^puzzle (\d+)$/, (number) => `${number}ばん`],
+  [/^puzzle (\d+), solved$/, (number) => `${number}ばん とけた`],
   [/^bubble-(-?\d+)$/, (count) => `あわ ${count}`],
   [/^multiply-(-?\d+)$/, (count) => `×${count}のあわ`],
   [/^divide-(-?\d+)$/, (count) => `÷${count}のあわ`],
