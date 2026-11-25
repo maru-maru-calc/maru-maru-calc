@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 import { useBgmControl } from '@/audio/bgm-control';
+import { CreatureArt } from '@/components/creature-art';
 import { styles } from '@/components/select/styles';
 import type { MapNodeLayout } from '@/components/select/types';
 import { a11yLabel } from '@/i18n/a11y-label';
@@ -117,6 +118,8 @@ export function BubbleRoute({ from, to }: { from: MapNodeLayout; to: MapNodeLayo
   );
 }
 
+const MERMAID_WIDTH = 176;
+
 export function SingingMermaid({
   isVocalEnabled,
   mapWidth,
@@ -155,21 +158,7 @@ export function SingingMermaid({
           </Text>
         </>
       ) : null}
-      <View style={styles.mermaidRockBack} />
-      <View style={styles.mermaidRockLeft} />
-      <View style={styles.mermaidRockRight} />
-      <View style={styles.mermaidTailFin} />
-      <View style={styles.mermaidTail} />
-      <View style={styles.mermaidBody} />
-      <View style={styles.mermaidArmBack} />
-      <View style={styles.mermaidArmFront} />
-      <View style={styles.mermaidHairBack} />
-      <View style={styles.mermaidLongHair} />
-      <View style={styles.mermaidHead} />
-      <View style={styles.mermaidHairFront} />
-      <View style={styles.mermaidEye} />
-      <View style={styles.mermaidMouth} />
-      <View style={styles.mermaidHairShine} />
+      <CreatureArt kind={isVocalEnabled ? 'mermaidSinging' : 'mermaid'} width={MERMAID_WIDTH} style={styles.mermaidArt} />
     </Pressable>
   );
 }

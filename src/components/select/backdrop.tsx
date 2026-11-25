@@ -1,7 +1,13 @@
 // The sea behind the select screens: rising bubbles, sea creatures by depth, and the water getting darker.
-import { memo, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+//
+// It is two layers with the buttons of the screen between them. The creatures' pictures are in the
+// back layer, so they swim behind the buttons and never cover a number. What can be pressed (the
+// bubbles, and a see-through target over each creature) is in the front layer, where a finger reaches it.
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { CreatureArt, getCreatureHeight } from '@/components/creature-art';
+import { useStaysPut } from '@/components/marumaru/use-stays-put';
 import { DEPTH_BUBBLE_TICK_MS, DEPTH_CREATURE_REACTION_MS } from '@/components/select/constants';
 import { clamp } from '@/components/select/map-layout';
 import { styles } from '@/components/select/styles';
@@ -32,6 +38,12 @@ export function DepthBackdrop({
   const bubbles = useMemo(() => (prefersReducedMotion ? [] : getDepthBubbleSpecs(width)), [prefersReducedMotion, width]);
   const fish = useMemo(() => (prefersReducedMotion ? [] : getDepthFishSpecs()), [prefersReducedMotion]);
   const shadeOpacity = Math.min(0.44, Math.max(0, scrollDepth / 1500) * 0.44);
+  // Both layers hold bubbles and creatures that are past the edge of the screen. If either were
+  // scrolled to bring one into view, the pictures and their press targets would no longer line up.
+  const behindRef = useRef<View>(null);
+  const frontRef = useRef<View>(null);
+  useStaysPut(behindRef);
+  useStaysPut(frontRef);
 
   useEffect(() => {
     if (prefersReducedMotion) {
@@ -42,89 +54,88 @@ export function DepthBackdrop({
     return () => clearInterval(interval);
   }, [prefersReducedMotion]);
 
-  return (
-    <View pointerEvents="box-none" style={styles.depthBackdrop}>
-      <View pointerEvents="none" style={[styles.softPatch, styles.softPatchLeft]} />
-      <View pointerEvents="none" style={[styles.softPatch, styles.softPatchBottom]} />
-      {bubbles.map((bubble) => {
-        const startAt = bubbleStarts[bubble.id] ?? 0;
-        const elapsedSeconds = Math.max(0, (tick - startAt - bubble.delay) / 1000);
-        const travel = height + bubble.size * 5;
-        const cycle = (elapsedSeconds * bubble.speed + scrollDepth * 0.58) % travel;
-        const y = height + bubble.size - cycle;
-        const drift = Math.sin(elapsedSeconds * 0.58 + bubble.delay * 0.001) * bubble.drift;
-        const x = bubble.xRatio * width + drift - bubble.size / 2;
-        const opacity = elapsedSeconds < 0.24 ? elapsedSeconds / 0.24 : 1;
+  const creatures = fish.flatMap((spec) => {
+    const placement = getDepthCreaturePlacement(spec, width, height, tick, scrollDepth, creatureStarts[spec.id]);
+    return placement ? [{ spec, placement }] : [];
+  });
 
-        return (
+  return (
+    <>
+      <View ref={behindRef} pointerEvents="none" style={styles.depthBackdropBehind}>
+        {creatures.map(({ spec, placement }) => (
+          <View key={spec.id} testID={`depth-creature-art-${spec.id}`} style={[styles.depthFish, placement.box, { opacity: placement.opacity }]}>
+            <CreatureArt kind={spec.kind} width={spec.size} />
+          </View>
+        ))}
+      </View>
+      <View ref={frontRef} pointerEvents="box-none" style={styles.depthBackdrop}>
+        <View pointerEvents="none" style={[styles.softPatch, styles.softPatchLeft]} />
+        <View pointerEvents="none" style={[styles.softPatch, styles.softPatchBottom]} />
+        {bubbles.map((bubble) => {
+          const startAt = bubbleStarts[bubble.id] ?? 0;
+          const elapsedSeconds = Math.max(0, (tick - startAt - bubble.delay) / 1000);
+          const travel = height + bubble.size * 5;
+          const cycle = (elapsedSeconds * bubble.speed + scrollDepth * 0.58) % travel;
+          const y = height + bubble.size - cycle;
+          const drift = Math.sin(elapsedSeconds * 0.58 + bubble.delay * 0.001) * bubble.drift;
+          const x = bubble.xRatio * width + drift - bubble.size / 2;
+          const opacity = elapsedSeconds < 0.24 ? elapsedSeconds / 0.24 : 1;
+
+          return (
+            <Pressable
+              key={bubble.id}
+              accessibilityLabel={a11yLabel('decorative bubble')}
+              accessibilityRole="button"
+              focusable={false}
+              tabIndex={-1}
+              testID={`depth-background-bubble-${bubble.id}`}
+              onPress={() => {
+                onBubblePop?.();
+                setBubbleStarts((current) => ({ ...current, [bubble.id]: Date.now() }));
+              }}
+              style={[
+                styles.depthBackgroundBubble,
+                {
+                  left: x,
+                  top: y,
+                  width: bubble.size,
+                  height: bubble.size,
+                  borderRadius: bubble.size / 2,
+                  opacity: opacity * 0.74,
+                },
+              ]}
+            />
+          );
+        })}
+        {creatures.map(({ spec, placement }) => (
           <Pressable
-            key={bubble.id}
-            accessibilityLabel={a11yLabel('decorative bubble')}
+            key={spec.id}
+            accessibilityLabel={a11yLabel(`sea creature ${spec.kind}`)}
             accessibilityRole="button"
             focusable={false}
             tabIndex={-1}
-            testID={`depth-background-bubble-${bubble.id}`}
-            onPress={() => {
-              onBubblePop?.();
-              setBubbleStarts((current) => ({ ...current, [bubble.id]: Date.now() }));
-            }}
-            style={[
-              styles.depthBackgroundBubble,
-              {
-                left: x,
-                top: y,
-                width: bubble.size,
-                height: bubble.size,
-                borderRadius: bubble.size / 2,
-                opacity: opacity * 0.74,
-              },
-            ]}
-          />
-        );
-      })}
-      {fish.map((spec) => {
-        const depthDistance = Math.abs(scrollDepth - spec.depth);
-        if (depthDistance > 620 && spec.depth !== 0) {
-          return null;
-        }
-        return (
-          <DepthCreature
-            key={spec.id}
-            spec={spec}
-            width={width}
-            height={height}
-            tick={tick}
-            scrollDepth={scrollDepth}
-            reactedAt={creatureStarts[spec.id]}
+            hitSlop={18}
             onPress={() => {
               onCreaturePress?.();
               setCreatureStarts((current) => ({ ...current, [spec.id]: Date.now() }));
             }}
+            testID={`depth-fish-${spec.id}`}
+            style={[styles.depthFish, placement.box]}
           />
-        );
-      })}
-      <View pointerEvents="none" testID="depth-shade" style={[styles.depthShade, { opacity: shadeOpacity }]} />
-    </View>
+        ))}
+        <View pointerEvents="none" testID="depth-shade" style={[styles.depthShade, { opacity: shadeOpacity }]} />
+      </View>
+    </>
   );
 }
 
-function DepthCreature({
-  spec,
-  width,
-  height,
-  tick,
-  scrollDepth,
-  reactedAt,
-  onPress,
-}: {
-  spec: DepthFishSpec;
-  width: number;
-  height: number;
-  tick: number;
-  scrollDepth: number;
-  reactedAt?: number;
-  onPress: () => void;
-}) {
+/** Where a creature is at this moment, or nothing while it is too far above or below to be seen. */
+function getDepthCreaturePlacement(spec: DepthFishSpec, width: number, height: number, tick: number, scrollDepth: number, reactedAt?: number) {
+  const depthDistance = Math.abs(scrollDepth - spec.depth);
+  if (depthDistance > 620 && spec.depth !== 0) {
+    return null;
+  }
+
   const elapsedSeconds = Math.max(0, (tick - spec.delay) / 1000);
   const travelX = width + spec.size * 5;
   const travelY = height + spec.size * 4;
@@ -132,184 +143,28 @@ function DepthCreature({
   const cycleY = (elapsedSeconds * (spec.speed * 0.42) + scrollDepth * 0.48) % travelY;
   const x = spec.direction > 0 ? cycleX - spec.size * 2 : width - cycleX + spec.size;
   const y = height + spec.size - cycleY + Math.sin(elapsedSeconds * 0.7 + spec.depth * 0.01) * 10;
-  const depthDistance = Math.abs(scrollDepth - spec.depth);
   const depthOpacity = Math.max(0, 1 - depthDistance / 520);
-  const baseOpacity = spec.depth === 0 ? 0.26 : 0.36;
-  const isAngler = spec.kind === 'angler';
-  const isJelly = spec.kind === 'jelly';
-  const isWhale = spec.kind === 'whale';
-  const isFlatfish = spec.kind === 'flatfish';
-  const isTall = spec.kind === 'seahorse' || spec.kind === 'squid' || spec.kind === 'turtle';
-  const creatureHeight = isJelly ? spec.size * 0.9 : isWhale ? spec.size * 0.54 : isFlatfish ? spec.size * 0.62 : isTall ? spec.size * 0.86 : spec.size * 0.42;
+  const baseOpacity = spec.depth === 0 ? 0.3 : 0.38;
   const reaction = getDepthCreatureReaction(spec, tick, reactedAt);
 
-  return (
-    <Pressable
-      accessibilityLabel={a11yLabel(`sea creature ${spec.kind}`)}
-      accessibilityRole="button"
-      focusable={false}
-      tabIndex={-1}
-      hitSlop={18}
-      onPress={onPress}
-      testID={`depth-fish-${spec.id}`}
-      style={[
-        styles.depthFish,
-        reaction.isReacting && styles.depthFishReacting,
-        {
-          left: x,
-          top: y,
-          width: spec.size,
-          height: creatureHeight,
-          opacity: Math.min(isAngler ? 0.9 : 0.76, baseOpacity + depthOpacity * 0.56),
-          transform: [
-            { translateX: reaction.translateX },
-            { translateY: reaction.translateY },
-            { scaleX: (spec.direction > 0 ? -1 : 1) * reaction.flipScale },
-            { scale: reaction.scale },
-            { rotate: reaction.rotate },
-          ],
-        },
-      ]}
-    >
-      <DepthCreatureArt spec={spec} />
-    </Pressable>
-  );
+  return {
+    opacity: Math.min(spec.kind === 'angler' ? 0.96 : 0.9, baseOpacity + depthOpacity * 0.6),
+    // The picture and its press target share this, so the target stays on the creature while it darts away.
+    box: {
+      left: x,
+      top: y,
+      width: spec.size,
+      height: getCreatureHeight(spec.kind, spec.size),
+      transform: [
+        { translateX: reaction.translateX },
+        { translateY: reaction.translateY },
+        { scaleX: (spec.direction > 0 ? -1 : 1) * reaction.flipScale },
+        { scale: reaction.scale },
+        { rotate: reaction.rotate },
+      ],
+    },
+  };
 }
-
-/** The drawing of one sea creature. It only depends on which creature it is, so it is not redrawn as the creature swims. */
-const DepthCreatureArt = memo(function DepthCreatureArt({ spec }: { spec: DepthFishSpec }) {
-  const isAngler = spec.kind === 'angler';
-  const isJelly = spec.kind === 'jelly';
-
-  return (
-    <>
-      {isAngler ? <View style={[styles.anglerGlow, { width: spec.size * 1.45, height: spec.size * 1.45, borderRadius: spec.size, right: -spec.size * 0.9, top: -spec.size * 0.52 }]} /> : null}
-      {isJelly ? (
-        <>
-          <View style={[styles.jellyBell, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
-          <View style={[styles.jellyTentacle, { left: '30%', height: spec.size * 0.44, backgroundColor: spec.tint }]} />
-          <View style={[styles.jellyTentacle, { left: '50%', height: spec.size * 0.54, backgroundColor: spec.tint }]} />
-          <View style={[styles.jellyTentacle, { left: '70%', height: spec.size * 0.4, backgroundColor: spec.tint }]} />
-        </>
-      ) : spec.kind === 'shark' ? (
-        <>
-          <View style={[styles.sharkBody, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
-          <View style={styles.creatureEye} />
-          <View style={[styles.sharkNose, { borderLeftColor: spec.tint, borderTopWidth: spec.size * 0.11, borderBottomWidth: spec.size * 0.11, borderLeftWidth: spec.size * 0.18 }]} />
-          <View style={[styles.sharkTail, { borderTopWidth: spec.size * 0.18, borderBottomWidth: spec.size * 0.18, borderRightWidth: spec.size * 0.22, borderRightColor: spec.tint }]} />
-          <View style={[styles.sharkFin, { borderLeftWidth: spec.size * 0.16, borderRightWidth: spec.size * 0.16, borderBottomWidth: spec.size * 0.28, borderBottomColor: spec.tint }]} />
-          <View style={[styles.sharkGill, { backgroundColor: 'rgba(224, 247, 255, 0.48)' }]} />
-        </>
-      ) : spec.kind === 'whale' ? (
-        <>
-          <View style={[styles.whaleBody, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
-          <View style={styles.whaleBelly} />
-          <View style={[styles.whaleTailTop, { borderTopWidth: spec.size * 0.16, borderBottomWidth: spec.size * 0.08, borderRightWidth: spec.size * 0.24, borderRightColor: spec.tint }]} />
-          <View style={[styles.whaleTailBottom, { borderTopWidth: spec.size * 0.08, borderBottomWidth: spec.size * 0.16, borderRightWidth: spec.size * 0.24, borderRightColor: spec.tint }]} />
-          <View style={styles.whaleEye} />
-        </>
-      ) : spec.kind === 'flatfish' ? (
-        <>
-          <View style={[styles.flatfishBody, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
-          <View style={[styles.flatfishTail, { borderTopWidth: spec.size * 0.14, borderBottomWidth: spec.size * 0.14, borderRightWidth: spec.size * 0.18, borderRightColor: spec.tint }]} />
-          <View style={styles.flatfishEyeOne} />
-          <View style={styles.flatfishEyeTwo} />
-          <View style={styles.flatfishSpotOne} />
-          <View style={styles.flatfishSpotTwo} />
-        </>
-      ) : spec.kind === 'clownfish' ? (
-        <>
-          <View style={styles.clownfishBody} />
-          <View style={[styles.clownfishStripe, { left: '20%' }]} />
-          <View style={[styles.clownfishStripe, { left: '49%' }]} />
-          <View style={styles.clownfishTail} />
-          <View style={styles.clownfishFin} />
-          <View style={styles.creatureEye} />
-        </>
-      ) : spec.kind === 'blueTang' ? (
-        <>
-          <View style={styles.blueTangBody} />
-          <View style={styles.blueTangBlackMark} />
-          <View style={styles.blueTangTail} />
-          <View style={styles.blueTangFin} />
-          <View style={styles.creatureEye} />
-        </>
-      ) : spec.kind === 'puffer' ? (
-        <>
-          <View style={styles.pufferBody} />
-          <View style={styles.pufferMouth} />
-          <View style={styles.pufferTail} />
-          <View style={styles.pufferSpotOne} />
-          <View style={styles.pufferSpotTwo} />
-          <View style={styles.creatureEye} />
-        </>
-      ) : spec.kind === 'seahorse' ? (
-        <>
-          <View style={styles.seahorseBody} />
-          <View style={styles.seahorseHead} />
-          <View style={styles.seahorseSnout} />
-          <View style={styles.seahorseTail} />
-          <View style={styles.seahorseFin} />
-          <View style={styles.seahorseEye} />
-        </>
-      ) : spec.kind === 'squid' ? (
-        <>
-          <View style={styles.squidHead} />
-          <View style={styles.squidFinLeft} />
-          <View style={styles.squidFinRight} />
-          <View style={[styles.squidTentacle, { left: '27%' }]} />
-          <View style={[styles.squidTentacle, { left: '43%' }]} />
-          <View style={[styles.squidTentacle, { left: '59%' }]} />
-          <View style={styles.squidEyeLeft} />
-          <View style={styles.squidEyeRight} />
-        </>
-      ) : spec.kind === 'ray' ? (
-        <>
-          <View style={styles.rayBody} />
-          <View style={styles.rayWingLeft} />
-          <View style={styles.rayWingRight} />
-          <View style={styles.rayTail} />
-          <View style={styles.rayEyeLeft} />
-          <View style={styles.rayEyeRight} />
-        </>
-      ) : spec.kind === 'turtle' ? (
-        <>
-          <View style={styles.turtleShell} />
-          <View style={styles.turtleShellPattern} />
-          <View style={styles.turtleHead} />
-          <View style={styles.turtleFlipperFront} />
-          <View style={styles.turtleFlipperBack} />
-          <View style={styles.creatureEye} />
-        </>
-      ) : spec.kind === 'tuna' ? (
-        <>
-          <View style={[styles.tunaBody, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
-          <View style={styles.tunaLine} />
-          <View style={[styles.tunaTail, { borderTopWidth: spec.size * 0.18, borderBottomWidth: spec.size * 0.18, borderRightWidth: spec.size * 0.24, borderRightColor: spec.tint }]} />
-          <View style={[styles.tunaFin, { borderLeftWidth: spec.size * 0.12, borderRightWidth: spec.size * 0.12, borderBottomWidth: spec.size * 0.18, borderBottomColor: spec.tint }]} />
-          <View style={styles.creatureEye} />
-        </>
-      ) : (
-        <>
-          <View style={[styles.depthFishBody, { backgroundColor: spec.tint, borderRadius: spec.size }]} />
-          <View
-            style={[
-              styles.depthFishTail,
-              {
-                borderTopWidth: spec.size * 0.17,
-                borderBottomWidth: spec.size * 0.17,
-                borderRightWidth: spec.size * 0.24,
-                borderRightColor: spec.tint,
-                right: -spec.size * 0.08,
-              },
-            ]}
-          />
-          {isAngler ? <View style={[styles.anglerLight, { right: -spec.size * 0.46, top: -spec.size * 0.06 }]} /> : null}
-        </>
-      )}
-    </>
-  );
-});
 
 function getDepthCreatureReaction(spec: DepthFishSpec, tick: number, reactedAt?: number) {
   if (!reactedAt) {
@@ -328,7 +183,7 @@ function getDepthCreatureReaction(spec: DepthFishSpec, tick: number, reactedAt?:
   const fadeBack = 1 - progress;
   const fleeDirection = spec.direction > 0 ? 1 : -1;
   const isPuff = spec.kind === 'puffer' || spec.kind === 'whale';
-  const isDart = spec.kind === 'shark' || spec.kind === 'tuna' || spec.kind === 'clownfish' || spec.kind === 'blueTang' || spec.kind === 'fish';
+  const isDart = spec.kind === 'shark' || spec.kind === 'tuna' || spec.kind === 'clownfish' || spec.kind === 'blueTang';
   const isBob = spec.kind === 'seahorse' || spec.kind === 'squid' || spec.kind === 'jelly';
   const isDive = spec.kind === 'ray' || spec.kind === 'flatfish' || spec.kind === 'turtle' || spec.kind === 'angler';
 
@@ -389,18 +244,18 @@ function getDepthBubbleSpecs(width: number): DepthBubbleSpec[] {
 
 function getDepthFishSpecs(): DepthFishSpec[] {
   return [
-    { id: 'shallow-clownfish', depth: 0, yRatio: 0.2, size: 42, speed: 8, delay: 0, direction: 1, tint: 'rgba(251, 146, 60, 0.58)', kind: 'clownfish' },
-    { id: 'shallow-blue-tang', depth: 160, yRatio: 0.38, size: 46, speed: 7, delay: 1800, direction: -1, tint: 'rgba(96, 165, 250, 0.56)', kind: 'blueTang' },
-    { id: 'shallow-puffer', depth: 300, yRatio: 0.24, size: 42, speed: 5, delay: 3200, direction: 1, tint: 'rgba(250, 204, 21, 0.56)', kind: 'puffer' },
-    { id: 'shallow-turtle', depth: 430, yRatio: 0.43, size: 50, speed: 4, delay: 4700, direction: -1, tint: 'rgba(74, 222, 128, 0.5)', kind: 'turtle' },
-    { id: 'middle-tuna', depth: 560, yRatio: 0.18, size: 50, speed: 10, delay: 3600, direction: 1, tint: 'rgba(56, 189, 248, 0.5)', kind: 'tuna' },
-    { id: 'middle-flatfish', depth: 700, yRatio: 0.4, size: 42, speed: 5, delay: 2200, direction: -1, tint: 'rgba(94, 234, 212, 0.45)', kind: 'flatfish' },
-    { id: 'middle-squid', depth: 840, yRatio: 0.5, size: 44, speed: 5, delay: 6200, direction: 1, tint: 'rgba(244, 114, 182, 0.48)', kind: 'squid' },
-    { id: 'middle-shark', depth: 980, yRatio: 0.25, size: 62, speed: 7, delay: 1200, direction: -1, tint: 'rgba(125, 211, 252, 0.5)', kind: 'shark' },
-    { id: 'deep-ray', depth: 1120, yRatio: 0.44, size: 60, speed: 4, delay: 7600, direction: 1, tint: 'rgba(196, 181, 253, 0.42)', kind: 'ray' },
-    { id: 'deep-seahorse', depth: 1260, yRatio: 0.24, size: 42, speed: 3, delay: 6900, direction: -1, tint: 'rgba(253, 186, 116, 0.52)', kind: 'seahorse' },
-    { id: 'deep-jelly', depth: 1400, yRatio: 0.5, size: 46, speed: 5, delay: 3400, direction: 1, tint: 'rgba(103, 232, 249, 0.42)', kind: 'jelly' },
-    { id: 'deep-whale', depth: 1540, yRatio: 0.28, size: 82, speed: 3, delay: 5200, direction: 1, tint: 'rgba(125, 211, 252, 0.44)', kind: 'whale' },
-    { id: 'deep-angler', depth: 1680, yRatio: 0.34, size: 54, speed: 4, delay: 3100, direction: -1, tint: 'rgba(94, 234, 212, 0.46)', kind: 'angler' },
+    { id: 'shallow-clownfish', depth: 0, yRatio: 0.2, size: 46, speed: 8, delay: 0, direction: 1, kind: 'clownfish' },
+    { id: 'shallow-blue-tang', depth: 160, yRatio: 0.38, size: 48, speed: 7, delay: 1800, direction: -1, kind: 'blueTang' },
+    { id: 'shallow-puffer', depth: 300, yRatio: 0.24, size: 44, speed: 5, delay: 3200, direction: 1, kind: 'puffer' },
+    { id: 'shallow-turtle', depth: 430, yRatio: 0.43, size: 56, speed: 4, delay: 4700, direction: -1, kind: 'turtle' },
+    { id: 'middle-tuna', depth: 560, yRatio: 0.18, size: 60, speed: 10, delay: 3600, direction: 1, kind: 'tuna' },
+    { id: 'middle-flatfish', depth: 700, yRatio: 0.4, size: 50, speed: 5, delay: 2200, direction: -1, kind: 'flatfish' },
+    { id: 'middle-squid', depth: 840, yRatio: 0.5, size: 36, speed: 5, delay: 6200, direction: 1, kind: 'squid' },
+    { id: 'middle-shark', depth: 980, yRatio: 0.25, size: 76, speed: 7, delay: 1200, direction: -1, kind: 'shark' },
+    { id: 'deep-ray', depth: 1120, yRatio: 0.44, size: 70, speed: 4, delay: 7600, direction: 1, kind: 'ray' },
+    { id: 'deep-seahorse', depth: 1260, yRatio: 0.24, size: 34, speed: 3, delay: 6900, direction: -1, kind: 'seahorse' },
+    { id: 'deep-jelly', depth: 1400, yRatio: 0.5, size: 40, speed: 5, delay: 3400, direction: 1, kind: 'jelly' },
+    { id: 'deep-whale', depth: 1540, yRatio: 0.28, size: 96, speed: 3, delay: 5200, direction: 1, kind: 'whale' },
+    { id: 'deep-angler', depth: 1680, yRatio: 0.34, size: 60, speed: 4, delay: 3100, direction: -1, kind: 'angler' },
   ];
 }

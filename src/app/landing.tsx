@@ -6,6 +6,7 @@ import type { TextStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandLogo } from '@/components/BrandLogo';
+import { CreatureArt } from '@/components/creature-art';
 import { a11yLabel } from '@/i18n/a11y-label';
 import { DESKTOP_MIN_WIDTH, shouldUsePhoneFrame } from '@/layout/phone-frame';
 import { usePrefersReducedMotion } from '@/layout/reduced-motion';
@@ -23,6 +24,7 @@ const RADIUS_XL = 24;
 const RADIUS_PILL = 999;
 const COPYRIGHT_TEXT = '© 2026 nozomitaguchi';
 const LANDING_DESKTOP_MIN_WIDTH = 1100;
+const LANDING_FISH_WIDTH = 56;
 const BASE_PATH = __DEV__ ? '' : process.env.EXPO_BASE_URL ?? '';
 // Each video comes as MP4 (H.264), which every browser plays and which is far smaller for this
 // flat artwork, with the original WebM kept as a fallback.
@@ -496,7 +498,7 @@ export default function LandingPage() {
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.pageContent} testID="landing-page">
       <View style={[styles.hero, isCompact ? styles.heroCompact : { minHeight: heroHeight }]}>
-        <HeroWaterScene />
+        <HeroWaterScene compact={isCompact} />
         <SafeAreaView style={styles.heroSafe}>
           <View style={styles.heroTopBar}>
             <Pressable accessibilityLabel={a11yLabel('maru maru calc logo')} accessibilityRole="link" onPress={() => router.push('/')} style={({ pressed }) => pressed && styles.pressedLogo}>
@@ -598,7 +600,7 @@ export default function LandingPage() {
       <PuzzleSection copy={copy} compact={isCompact} onPlay={() => router.push('/puzzle')} />
 
       <View style={[styles.finalSection, styles.decoratedSection]}>
-        <LandingSectionAmbient variant="final" />
+        <LandingSectionAmbient variant="final" compact={isCompact} />
         <View style={[styles.finalContent, isCompact && styles.finalContentCompact]}>
           {isCompact ? (
             <>
@@ -626,7 +628,7 @@ export default function LandingPage() {
   );
 }
 
-function HeroWaterScene() {
+function HeroWaterScene({ compact }: { compact: boolean }) {
   return (
     <View pointerEvents="none" style={styles.heroScene}>
       <FloatingBubble size={124} left="6%" top="18%" opacity={0.34} />
@@ -637,7 +639,8 @@ function HeroWaterScene() {
       <FloatingBubble size={26} left="40%" top="16%" opacity={0.32} />
       <FloatingBubble size={58} left="30%" top="84%" opacity={0.24} />
       <FloatingBubble size={140} left="92%" top="68%" opacity={0.14} />
-      <LandingBlueTang style={{ position: 'absolute', right: '10%', bottom: '18%', opacity: 0.56, transform: [{ scaleX: -1 }, { rotate: '-8deg' }] }} />
+      {/* On a narrow screen the lower right is the caption and the buttons, so the fish swims beside the logo instead. */}
+      <LandingBlueTang style={[{ position: 'absolute', opacity: 0.56, transform: [{ scaleX: -1 }, { rotate: '-8deg' }] }, compact ? { right: '7%', top: 18 } : { right: '10%', bottom: '18%' }]} />
       <LandingClownfish style={{ position: 'absolute', left: '9%', bottom: '26%', opacity: 0.58, transform: [{ rotate: '7deg' }] }} />
       <View style={styles.softWaterPatchLeft} />
       <View style={styles.softWaterPatchRight} />
@@ -881,12 +884,7 @@ function ModePoster({ uri, label, testID, compact }: { uri: string; label: strin
 function FeaturePenguinChick({ style }: { style: StyleProp<ViewStyle> }) {
   return (
     <View pointerEvents="none" style={[styles.featurePenguinChick, style]}>
-      <View style={styles.featurePenguinChickBody} />
-      <View style={styles.featurePenguinChickBelly} />
-      <View style={styles.featurePenguinChickFlipper} />
-      <View style={styles.featurePenguinChickEye} />
-      <View style={[styles.featurePenguinFoot, styles.featurePenguinFootFront]} />
-      <View style={[styles.featurePenguinFoot, styles.featurePenguinFootBack]} />
+      <CreatureArt kind="penguinChick" width={55} />
     </View>
   );
 }
@@ -894,15 +892,7 @@ function FeaturePenguinChick({ style }: { style: StyleProp<ViewStyle> }) {
 function FeaturePenguinParent({ style }: { style: StyleProp<ViewStyle> }) {
   return (
     <View pointerEvents="none" style={[styles.featurePenguinParent, style]}>
-      <View style={styles.featurePenguinParentBody} />
-      <View style={styles.featurePenguinParentBelly} />
-      <View style={styles.featurePenguinParentFace} />
-      <View style={styles.featurePenguinParentGoldPatch} />
-      <View style={styles.featurePenguinParentFlipper} />
-      <View style={styles.featurePenguinParentBeak} />
-      <View style={styles.featurePenguinParentEye} />
-      <View style={[styles.featurePenguinFoot, styles.featurePenguinParentFootFront]} />
-      <View style={[styles.featurePenguinFoot, styles.featurePenguinParentFootBack]} />
+      <CreatureArt kind="penguinParent" width={64} />
     </View>
   );
 }
@@ -1125,7 +1115,7 @@ function AutoPlayVideo({
   createElement('source', { key: 'webm', src: uris.webm, type: 'video/webm' }));
 }
 
-function LandingSectionAmbient({ variant }: { variant: 'features' | 'flow' | 'final' }) {
+function LandingSectionAmbient({ variant, compact = false }: { variant: 'features' | 'flow' | 'final'; compact?: boolean }) {
   if (variant === 'features') {
     return (
       <View pointerEvents="none" testID="landing-features-ambient" style={styles.sectionAmbient}>
@@ -1159,8 +1149,9 @@ function LandingSectionAmbient({ variant }: { variant: 'features' | 'flow' | 'fi
       <FloatingBubble size={44} left="54%" top="80%" opacity={0.22} />
       <FloatingBubble size={34} left="14%" top="76%" opacity={0.28} />
       <FloatingBubble size={156} left="92%" top="56%" opacity={0.1} />
-      <LandingPuffer style={styles.ambientPufferFinal} />
-      <LandingBlueTang style={{ position: 'absolute', right: '10%', bottom: '14%', opacity: 0.48, transform: [{ rotate: '5deg' }] }} />
+      <LandingPuffer style={[styles.ambientPufferFinal, compact && styles.ambientPufferFinalCompact]} />
+      {/* Kept clear of the buttons, which fill the lower right on a narrow screen. */}
+      <LandingBlueTang style={[{ position: 'absolute', opacity: 0.48, transform: [{ rotate: '5deg' }] }, compact ? { left: '9%', bottom: '4%' } : { right: '10%', bottom: '14%' }]} />
     </View>
   );
 }
@@ -1183,12 +1174,7 @@ function UnderwaterPlayScene({ accessibilityLabel }: { accessibilityLabel: strin
 function LandingClownfish({ style }: { style: StyleProp<ViewStyle> }) {
   return (
     <View pointerEvents="none" style={[styles.landingFish, style]}>
-      <View style={styles.landingClownfishBody} />
-      <View style={[styles.landingClownfishStripe, { left: '20%' }]} />
-      <View style={[styles.landingClownfishStripe, { left: '49%' }]} />
-      <View style={styles.landingClownfishTail} />
-      <View style={styles.landingClownfishFin} />
-      <View style={styles.landingCreatureEye} />
+      <CreatureArt kind="clownfish" width={LANDING_FISH_WIDTH} />
     </View>
   );
 }
@@ -1196,11 +1182,7 @@ function LandingClownfish({ style }: { style: StyleProp<ViewStyle> }) {
 function LandingBlueTang({ style }: { style: StyleProp<ViewStyle> }) {
   return (
     <View pointerEvents="none" style={[styles.landingFish, style]}>
-      <View style={styles.landingBlueTangBody} />
-      <View style={styles.landingBlueTangMark} />
-      <View style={styles.landingBlueTangTail} />
-      <View style={styles.landingBlueTangFin} />
-      <View style={styles.landingCreatureEye} />
+      <CreatureArt kind="blueTang" width={LANDING_FISH_WIDTH} />
     </View>
   );
 }
@@ -1208,12 +1190,7 @@ function LandingBlueTang({ style }: { style: StyleProp<ViewStyle> }) {
 function LandingPuffer({ style }: { style: StyleProp<ViewStyle> }) {
   return (
     <View pointerEvents="none" style={[styles.landingPuffer, style]}>
-      <View style={styles.landingPufferBody} />
-      <View style={styles.landingPufferTail} />
-      <View style={styles.landingPufferMouth} />
-      <View style={styles.landingPufferSpotOne} />
-      <View style={styles.landingPufferSpotTwo} />
-      <View style={styles.landingPufferEye} />
+      <CreatureArt kind="puffer" width={44} />
     </View>
   );
 }
@@ -1229,21 +1206,7 @@ function LandingMermaid() {
       <Text pointerEvents="none" style={[styles.mermaidMusicNote, styles.mermaidMusicNoteOne]}>♪</Text>
       <Text pointerEvents="none" style={[styles.mermaidMusicNote, styles.mermaidMusicNoteTwo]}>♫</Text>
       <Text pointerEvents="none" style={[styles.mermaidMusicNote, styles.mermaidMusicNoteThree]}>♪</Text>
-      <View style={[styles.mermaidRockBack, styles.mermaidRockBackActive]} />
-      <View style={[styles.mermaidRockLeft, styles.mermaidRockLeftActive]} />
-      <View style={[styles.mermaidRockRight, styles.mermaidRockRightActive]} />
-      <View style={[styles.mermaidTailFin, styles.mermaidTailFinActive]} />
-      <View style={[styles.mermaidTail, styles.mermaidTailActive]} />
-      <View style={[styles.mermaidBody, styles.mermaidBodyActive]} />
-      <View style={[styles.mermaidArmBack, styles.mermaidSkinActive]} />
-      <View style={[styles.mermaidArmFront, styles.mermaidSkinActive]} />
-      <View style={[styles.mermaidHairBack, styles.mermaidHairActive]} />
-      <View style={[styles.mermaidLongHair, styles.mermaidLongHairActive]} />
-      <View style={[styles.mermaidHead, styles.mermaidHeadActive]} />
-      <View style={[styles.mermaidHairFront, styles.mermaidHairFrontActive]} />
-      <View style={styles.mermaidEye} />
-      <View style={[styles.mermaidMouth, styles.mermaidMouthActive]} />
-      <View style={[styles.mermaidHairShine, styles.mermaidHairShineActive]} />
+      <CreatureArt kind="mermaidSinging" width={176} style={styles.sceneMermaidArt} />
     </View>
   );
 }
@@ -1797,44 +1760,6 @@ const styles = StyleSheet.create({
     bottom: 18,
     transform: [{ rotate: '-7deg' }],
   },
-  featurePenguinChickBody: {
-    position: 'absolute',
-    left: 9,
-    top: 8,
-    width: 36,
-    height: 48,
-    borderRadius: 22,
-    backgroundColor: 'rgba(115, 129, 139, 0.5)',
-  },
-  featurePenguinChickBelly: {
-    position: 'absolute',
-    left: 17,
-    top: 22,
-    width: 22,
-    height: 28,
-    borderRadius: 15,
-    backgroundColor: 'rgba(239, 244, 246, 0.45)',
-  },
-  featurePenguinChickFlipper: {
-    position: 'absolute',
-    left: 8,
-    top: 28,
-    width: 10,
-    height: 22,
-    borderRadius: 8,
-    backgroundColor: 'rgba(92, 107, 119, 0.34)',
-    transform: [{ rotate: '18deg' }],
-  },
-  featurePenguinChickEye: {
-    position: 'absolute',
-    right: 18,
-    top: 19,
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: TEXT_BASE_COLOR,
-    opacity: 0.56,
-  },
   featurePenguinParent: {
     position: 'absolute',
     width: 66,
@@ -1850,102 +1775,6 @@ const styles = StyleSheet.create({
     right: 12,
     bottom: 10,
     transform: [{ scale: 0.58 }, { rotate: '-7deg' }],
-  },
-  featurePenguinParentBody: {
-    position: 'absolute',
-    left: 16,
-    top: 6,
-    width: 38,
-    height: 72,
-    borderRadius: 24,
-    backgroundColor: 'rgba(18, 51, 74, 0.58)',
-  },
-  featurePenguinParentBelly: {
-    position: 'absolute',
-    left: 24,
-    top: 28,
-    width: 24,
-    height: 44,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.74)',
-  },
-  featurePenguinParentFace: {
-    position: 'absolute',
-    left: 27,
-    top: 12,
-    width: 20,
-    height: 20,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
-  },
-  featurePenguinParentGoldPatch: {
-    position: 'absolute',
-    left: 38,
-    top: 18,
-    width: 14,
-    height: 18,
-    borderRadius: 10,
-    backgroundColor: 'rgba(250, 204, 21, 0.48)',
-    transform: [{ rotate: '-20deg' }],
-  },
-  featurePenguinParentFlipper: {
-    position: 'absolute',
-    left: 10,
-    top: 34,
-    width: 13,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: 'rgba(18, 51, 74, 0.42)',
-    transform: [{ rotate: '10deg' }],
-  },
-  featurePenguinParentBeak: {
-    position: 'absolute',
-    right: 8,
-    top: 20,
-    width: 0,
-    height: 0,
-    borderTopWidth: 4,
-    borderBottomWidth: 4,
-    borderLeftWidth: 11,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderLeftColor: 'rgba(203, 161, 33, 0.58)',
-  },
-  featurePenguinParentEye: {
-    position: 'absolute',
-    right: 18,
-    top: 16,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: TEXT_BASE_COLOR,
-    opacity: 0.62,
-  },
-  featurePenguinFoot: {
-    position: 'absolute',
-    bottom: 2,
-    width: 10,
-    height: 4,
-    borderRadius: 4,
-    backgroundColor: 'rgba(203, 161, 33, 0.44)',
-  },
-  featurePenguinFootFront: {
-    left: 20,
-    transform: [{ rotate: '-8deg' }],
-  },
-  featurePenguinFootBack: {
-    left: 34,
-    transform: [{ rotate: '8deg' }],
-  },
-  featurePenguinParentFootFront: {
-    left: 26,
-    bottom: 0,
-    width: 12,
-  },
-  featurePenguinParentFootBack: {
-    left: 40,
-    bottom: 0,
-    width: 12,
   },
   flowSection: {
     backgroundColor: 'rgba(224, 247, 255, 0.64)',
@@ -2296,8 +2125,8 @@ const styles = StyleSheet.create({
   },
   landingFish: {
     position: 'absolute',
-    width: 56,
-    height: 24,
+    width: LANDING_FISH_WIDTH,
+    height: 36,
     opacity: 0.9,
   },
   sceneClownfish: {
@@ -2305,9 +2134,10 @@ const styles = StyleSheet.create({
     bottom: 72,
     transform: [{ scaleX: -1 }],
   },
+  // Above the mermaid's notes, not on them.
   sceneClownfishSmall: {
-    right: 54,
-    top: 92,
+    right: 150,
+    top: 34,
     opacity: 0.72,
   },
   ambientClownfishFeatures: {
@@ -2328,170 +2158,13 @@ const styles = StyleSheet.create({
     opacity: 0.32,
     transform: [{ scale: 1.12 }],
   },
-  landingCreatureEye: {
-    position: 'absolute',
-    left: '17%',
-    top: '31%',
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.82)',
-  },
-  landingClownfishBody: {
-    position: 'absolute',
-    left: '4%',
-    top: '15%',
-    width: '72%',
-    height: '70%',
-    borderRadius: RADIUS_PILL,
-    backgroundColor: 'rgba(251, 146, 60, 0.56)',
-    borderWidth: 1,
-    borderColor: 'rgba(251, 191, 36, 0.38)',
-    transform: [{ scaleY: 0.78 }],
-  },
-  landingClownfishStripe: {
-    position: 'absolute',
-    top: '16%',
-    width: '12%',
-    height: '68%',
-    borderRadius: RADIUS_PILL,
-    backgroundColor: 'rgba(255, 255, 255, 0.62)',
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: 'rgba(15, 23, 42, 0.18)',
-  },
-  landingClownfishTail: {
-    position: 'absolute',
-    right: '1%',
-    top: '20%',
-    width: 0,
-    height: 0,
-    borderTopWidth: 8,
-    borderBottomWidth: 8,
-    borderRightWidth: 13,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderRightColor: 'rgba(251, 146, 60, 0.56)',
-  },
-  landingClownfishFin: {
-    position: 'absolute',
-    left: '42%',
-    bottom: '-2%',
-    width: 10,
-    height: 7,
-    borderRadius: 8,
-    backgroundColor: 'rgba(253, 186, 116, 0.5)',
-    transform: [{ rotate: '-18deg' }],
-  },
-  landingBlueTangBody: {
-    position: 'absolute',
-    left: '5%',
-    top: '12%',
-    width: '72%',
-    height: '74%',
-    borderRadius: RADIUS_PILL,
-    backgroundColor: 'rgba(96, 165, 250, 0.56)',
-    borderWidth: 1,
-    borderColor: 'rgba(191, 219, 254, 0.42)',
-    transform: [{ scaleY: 0.74 }],
-  },
-  landingBlueTangMark: {
-    position: 'absolute',
-    left: '20%',
-    top: '22%',
-    width: '40%',
-    height: '32%',
-    borderRadius: RADIUS_PILL,
-    backgroundColor: 'rgba(7, 89, 133, 0.36)',
-    transform: [{ rotate: '-10deg' }],
-  },
-  landingBlueTangTail: {
-    position: 'absolute',
-    right: '0%',
-    top: '20%',
-    width: 0,
-    height: 0,
-    borderTopWidth: 8,
-    borderBottomWidth: 8,
-    borderRightWidth: 14,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderRightColor: 'rgba(250, 204, 21, 0.56)',
-  },
-  landingBlueTangFin: {
-    position: 'absolute',
-    left: '42%',
-    bottom: '-1%',
-    width: 11,
-    height: 7,
-    borderRadius: 8,
-    backgroundColor: 'rgba(147, 197, 253, 0.5)',
-    transform: [{ rotate: '-16deg' }],
+  ambientPufferFinalCompact: {
+    bottom: 22,
   },
   landingPuffer: {
     position: 'absolute',
     width: 44,
-    height: 36,
-  },
-  landingPufferBody: {
-    position: 'absolute',
-    left: 3,
-    top: 2,
-    width: 34,
-    height: 30,
-    borderRadius: 17,
-    backgroundColor: 'rgba(250, 204, 21, 0.52)',
-    borderWidth: 1,
-    borderColor: 'rgba(254, 240, 138, 0.44)',
-  },
-  landingPufferTail: {
-    position: 'absolute',
-    right: 0,
-    top: 11,
-    width: 0,
-    height: 0,
-    borderTopWidth: 7,
-    borderBottomWidth: 7,
-    borderRightWidth: 11,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderRightColor: 'rgba(250, 204, 21, 0.48)',
-  },
-  landingPufferMouth: {
-    position: 'absolute',
-    left: 1,
-    top: 17,
-    width: 7,
-    height: 4,
-    borderRadius: 4,
-    backgroundColor: 'rgba(7, 89, 133, 0.22)',
-  },
-  landingPufferSpotOne: {
-    position: 'absolute',
-    left: 16,
-    top: 9,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.54)',
-  },
-  landingPufferSpotTwo: {
-    position: 'absolute',
-    left: 25,
-    top: 18,
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.44)',
-  },
-  landingPufferEye: {
-    position: 'absolute',
-    left: 11,
-    top: 11,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(7, 89, 133, 0.48)',
+    height: 38,
   },
   sceneMermaid: {
     position: 'absolute',
@@ -2499,11 +2172,11 @@ const styles = StyleSheet.create({
     bottom: 24,
     width: 176,
     height: 138,
-    opacity: 1,
-    shadowColor: '#FDE68A',
-    shadowOpacity: 0.22,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 0 },
+  },
+  sceneMermaidArt: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
   },
   mermaidSongBubbleOne: {
     position: 'absolute',
@@ -2607,209 +2280,5 @@ const styles = StyleSheet.create({
     color: TEXT_ACCENT_COLOR,
     opacity: 0.9,
     transform: [{ rotate: '-18deg' }],
-  },
-  mermaidRockBack: {
-    position: 'absolute',
-    left: 18,
-    bottom: 2,
-    width: 138,
-    height: 38,
-    borderRadius: 24,
-    backgroundColor: 'rgba(56, 189, 248, 0.22)',
-    borderWidth: 2,
-    borderColor: 'rgba(224, 247, 255, 0.28)',
-  },
-  mermaidRockBackActive: {
-    backgroundColor: 'rgba(56, 189, 248, 0.3)',
-    borderColor: 'rgba(224, 247, 255, 0.4)',
-  },
-  mermaidRockLeft: {
-    position: 'absolute',
-    left: 8,
-    bottom: 4,
-    width: 76,
-    height: 34,
-    borderRadius: 22,
-    backgroundColor: 'rgba(14, 165, 233, 0.24)',
-    transform: [{ rotate: '-7deg' }],
-  },
-  mermaidRockLeftActive: {
-    backgroundColor: 'rgba(14, 165, 233, 0.32)',
-  },
-  mermaidRockRight: {
-    position: 'absolute',
-    right: 8,
-    bottom: 0,
-    width: 78,
-    height: 42,
-    borderRadius: 26,
-    backgroundColor: 'rgba(6, 182, 212, 0.2)',
-    transform: [{ rotate: '8deg' }],
-  },
-  mermaidRockRightActive: {
-    backgroundColor: 'rgba(6, 182, 212, 0.3)',
-  },
-  mermaidTail: {
-    position: 'absolute',
-    left: 70,
-    bottom: 35,
-    width: 58,
-    height: 24,
-    borderRadius: 20,
-    backgroundColor: 'rgba(45, 212, 191, 0.68)',
-    borderWidth: 2,
-    borderColor: 'rgba(153, 246, 228, 0.72)',
-    transform: [{ rotate: '15deg' }, { scaleY: 0.72 }],
-  },
-  mermaidTailActive: {
-    backgroundColor: 'rgba(45, 212, 191, 0.68)',
-    borderColor: 'rgba(153, 246, 228, 0.72)',
-  },
-  mermaidTailFin: {
-    position: 'absolute',
-    right: 23,
-    bottom: 42,
-    width: 0,
-    height: 0,
-    borderTopWidth: 13,
-    borderBottomWidth: 13,
-    borderLeftWidth: 24,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderLeftColor: 'rgba(45, 212, 191, 0.66)',
-    transform: [{ rotate: '14deg' }],
-  },
-  mermaidTailFinActive: {
-    borderLeftColor: 'rgba(45, 212, 191, 0.66)',
-  },
-  mermaidBody: {
-    position: 'absolute',
-    left: 67,
-    bottom: 58,
-    width: 30,
-    height: 38,
-    borderRadius: 16,
-    backgroundColor: 'rgba(244, 114, 182, 0.58)',
-    borderWidth: 2,
-    borderColor: 'rgba(251, 207, 232, 0.62)',
-    transform: [{ rotate: '-5deg' }],
-  },
-  mermaidBodyActive: {
-    backgroundColor: 'rgba(244, 114, 182, 0.58)',
-    borderColor: 'rgba(251, 207, 232, 0.62)',
-  },
-  mermaidArmBack: {
-    position: 'absolute',
-    left: 54,
-    bottom: 58,
-    width: 28,
-    height: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(253, 224, 197, 0.72)',
-    transform: [{ rotate: '22deg' }],
-  },
-  mermaidArmFront: {
-    position: 'absolute',
-    left: 88,
-    bottom: 61,
-    width: 31,
-    height: 8,
-    borderRadius: 8,
-    backgroundColor: 'rgba(253, 224, 197, 0.72)',
-    transform: [{ rotate: '-18deg' }],
-  },
-  mermaidSkinActive: {
-    backgroundColor: 'rgba(253, 224, 197, 0.72)',
-  },
-  mermaidHairBack: {
-    position: 'absolute',
-    left: 54,
-    bottom: 80,
-    width: 52,
-    height: 47,
-    borderRadius: 28,
-    backgroundColor: 'rgba(250, 204, 21, 0.76)',
-    transform: [{ rotate: '-8deg' }],
-  },
-  mermaidHairActive: {
-    backgroundColor: 'rgba(250, 204, 21, 0.76)',
-  },
-  mermaidLongHair: {
-    position: 'absolute',
-    left: 52,
-    bottom: 61,
-    width: 29,
-    height: 60,
-    borderRadius: 22,
-    backgroundColor: 'rgba(234, 179, 8, 0.66)',
-    transform: [{ rotate: '10deg' }],
-  },
-  mermaidLongHairActive: {
-    backgroundColor: 'rgba(234, 179, 8, 0.66)',
-  },
-  mermaidHead: {
-    position: 'absolute',
-    left: 68,
-    bottom: 87,
-    width: 31,
-    height: 31,
-    borderRadius: 16,
-    backgroundColor: 'rgba(253, 224, 197, 0.8)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.62)',
-  },
-  mermaidHeadActive: {
-    backgroundColor: 'rgba(253, 224, 197, 0.8)',
-    borderColor: 'rgba(255, 255, 255, 0.62)',
-  },
-  mermaidHairFront: {
-    position: 'absolute',
-    left: 56,
-    bottom: 89,
-    width: 34,
-    height: 26,
-    borderRadius: 18,
-    backgroundColor: 'rgba(253, 224, 71, 0.82)',
-    transform: [{ rotate: '-20deg' }],
-  },
-  mermaidHairFrontActive: {
-    backgroundColor: 'rgba(253, 224, 71, 0.82)',
-  },
-  mermaidHairShine: {
-    position: 'absolute',
-    left: 62,
-    bottom: 105,
-    width: 14,
-    height: 6,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-    transform: [{ rotate: '-22deg' }],
-  },
-  mermaidHairShineActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  mermaidEye: {
-    position: 'absolute',
-    left: 91,
-    bottom: 103,
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(7, 89, 133, 0.52)',
-  },
-  mermaidMouth: {
-    position: 'absolute',
-    left: 94,
-    bottom: 95,
-    width: 10,
-    height: 6,
-    borderRadius: 6,
-    borderBottomWidth: 2,
-    borderBottomColor: 'rgba(236, 72, 153, 0.76)',
-  },
-  mermaidMouthActive: {
-    width: 10,
-    height: 6,
-    borderBottomColor: 'rgba(236, 72, 153, 0.76)',
   },
 });

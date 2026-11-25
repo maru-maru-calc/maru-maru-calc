@@ -5,6 +5,7 @@ import type { StyleProp, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BrandLogo } from '@/components/BrandLogo';
+import { CreatureArt } from '@/components/creature-art';
 import { a11yLabel } from '@/i18n/a11y-label';
 import { getPhoneFrameLayout, shouldUsePhoneFrame } from '@/layout/phone-frame';
 
@@ -120,12 +121,7 @@ function FloatingBubble({ size, left, top, opacity }: { size: number; left: `${n
 function PlayClownfish({ style, testID }: { style: StyleProp<ViewStyle>; testID: string }) {
   return (
     <View style={[styles.playFish, styles.playClownfish, style]} testID={testID}>
-      <View style={[styles.playFishTail, styles.playClownfishTail]} />
-      <View style={[styles.playFishBody, styles.playClownfishBody]}>
-        <View style={[styles.clownfishBand, styles.clownfishBandLeft]} />
-        <View style={[styles.clownfishBand, styles.clownfishBandRight]} />
-        <View style={styles.playFishEye} />
-      </View>
+      <CreatureArt kind="clownfish" width={86} />
     </View>
   );
 }
@@ -133,21 +129,15 @@ function PlayClownfish({ style, testID }: { style: StyleProp<ViewStyle>; testID:
 function PlayBlueTang({ style, testID }: { style: StyleProp<ViewStyle>; testID: string }) {
   return (
     <View style={[styles.playFish, styles.playBlueTang, style]} testID={testID}>
-      <View style={[styles.playFishTail, styles.playBlueTangTail]} />
-      <View style={[styles.playFishBody, styles.playBlueTangBody]}>
-        <View style={styles.blueTangStripe} />
-        <View style={styles.playFishEye} />
-      </View>
+      <CreatureArt kind="blueTang" width={96} />
     </View>
   );
 }
 
 function PlayPuffer({ style, testID }: { style: StyleProp<ViewStyle>; testID: string }) {
   return (
-    <View style={[styles.playPuffer, style]} testID={testID}>
-      <View style={styles.playPufferMouth} />
-      <View style={styles.playFishEye} />
-      <View style={styles.playPufferFin} />
+    <View style={[styles.playFish, styles.playPuffer, style]} testID={testID}>
+      <CreatureArt kind="puffer" width={60} />
     </View>
   );
 }
@@ -177,117 +167,16 @@ const styles = StyleSheet.create({
   },
   playFish: {
     position: 'absolute',
-    width: 86,
-    height: 48,
-  },
-  playFishBody: {
-    position: 'absolute',
-    left: 15,
-    top: 7,
-    width: 58,
-    height: 34,
-    borderRadius: 999,
-    borderWidth: 3,
-    overflow: 'hidden',
-  },
-  playFishTail: {
-    position: 'absolute',
-    right: 0,
-    top: 12,
-    width: 0,
-    height: 0,
-    borderTopWidth: 12,
-    borderBottomWidth: 12,
-    borderLeftWidth: 20,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-  },
-  playFishEye: {
-    position: 'absolute',
-    left: 14,
-    top: 9,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: TEXT_BASE_COLOR,
   },
   playClownfish: {
     opacity: 0.78,
   },
-  playClownfishBody: {
-    borderColor: 'rgba(219, 123, 31, 0.62)',
-    backgroundColor: 'rgba(251, 146, 60, 0.78)',
-  },
-  playClownfishTail: {
-    borderLeftColor: 'rgba(251, 146, 60, 0.72)',
-  },
-  clownfishBand: {
-    position: 'absolute',
-    top: -3,
-    width: 8,
-    height: 42,
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
-  },
-  clownfishBandLeft: {
-    left: 22,
-  },
-  clownfishBandRight: {
-    left: 40,
-  },
   playBlueTang: {
-    width: 96,
     opacity: 0.7,
     transform: [{ scaleX: -1 }, { rotate: '-6deg' }],
   },
-  playBlueTangBody: {
-    width: 66,
-    borderColor: 'rgba(2, 132, 199, 0.5)',
-    backgroundColor: 'rgba(56, 189, 248, 0.58)',
-  },
-  playBlueTangTail: {
-    borderLeftColor: 'rgba(250, 204, 21, 0.74)',
-  },
-  blueTangStripe: {
-    position: 'absolute',
-    left: 25,
-    top: -5,
-    width: 12,
-    height: 46,
-    borderRadius: 999,
-    backgroundColor: 'rgba(18, 51, 74, 0.28)',
-    transform: [{ rotate: '18deg' }],
-  },
   playPuffer: {
-    position: 'absolute',
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    borderWidth: 3,
-    borderColor: 'rgba(218, 165, 32, 0.48)',
-    backgroundColor: 'rgba(253, 224, 71, 0.38)',
     opacity: 0.74,
-  },
-  playPufferMouth: {
-    position: 'absolute',
-    left: 4,
-    top: 24,
-    width: 8,
-    height: 5,
-    borderRadius: 999,
-    backgroundColor: 'rgba(18, 51, 74, 0.32)',
-  },
-  playPufferFin: {
-    position: 'absolute',
-    right: -9,
-    top: 20,
-    width: 0,
-    height: 0,
-    borderTopWidth: 8,
-    borderBottomWidth: 8,
-    borderLeftWidth: 14,
-    borderTopColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderLeftColor: 'rgba(253, 224, 71, 0.5)',
   },
   backgroundClownfish: {
     left: '11%',

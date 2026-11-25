@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="108" viewBox="0 0 140 108">
+  <defs>
+    <radialGradient id="glow"><stop offset="0" stop-color="#FFF7B0" stop-opacity=".95"/><stop offset=".45" stop-color="#FDE68A" stop-opacity=".45"/><stop offset="1" stop-color="#FDE68A" stop-opacity="0"/></radialGradient>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4F8F9B"/><stop offset="1" stop-color="#2F6470"/></linearGradient>
+    <clipPath id="b"><path d="M24 66c0-24 20-42 46-42s44 18 44 40-18 38-44 38S24 88 24 66z"/></clipPath>
+  </defs>
+  <circle cx="22" cy="22" r="22" fill="url(#glow)"/>
+  <path d="M60 28C56 10 40 6 26 18" fill="none" stroke="#2F6470" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="22" cy="22" r="6.5" fill="#FFF7B0"/><circle cx="20" cy="20" r="2.2" fill="#fff"/>
+  <path d="M108 64c8-10 18-14 28-14-4 8-4 22 0 30-10 0-20-6-28-16z" fill="#3D7783"/>
+  <path d="M70 26c6-8 18-10 26-4-4 2-6 6-6 10z" fill="#3D7783"/>
+  <path d="M24 66c0-24 20-42 46-42s44 18 44 40-18 38-44 38S24 88 24 66z" fill="url(#g)"/>
+  <g clip-path="url(#b)"><ellipse cx="66" cy="34" rx="26" ry="5" fill="#fff" opacity=".2" transform="rotate(-8 66 34)"/></g>
+  <path d="M24 64c8 4 22 6 34 4-2 14-12 22-26 22-6-6-9-16-8-26z" fill="#1F4650"/>
+  <g fill="#fff"><path d="M30 66.5l3 7 3-6.3zM39 68l3 7 3-6.5zM48 68.5l3 6.5 3-6.8zM32 88l3-7 3 6.6zM41 89.5l3-6.5 2 5.5z"/></g>
+  <path d="M78 70c8-2 15 2 16 9-6 4-14 2-17-4z" fill="#3D7783"/>
+  <circle cx="54" cy="48" r="8" fill="#fff"/><circle cx="52.5" cy="48.5" r="5" fill="#12334A"/><circle cx="50.8" cy="46.8" r="1.7" fill="#fff"/>
+  <ellipse cx="66" cy="60" rx="4.5" ry="2.6" fill="#F9A8D4" opacity=".55"/>
+</svg>

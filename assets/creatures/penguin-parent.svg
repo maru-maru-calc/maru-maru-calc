@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="108" viewBox="0 0 80 108">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FBBF24"/><stop offset="1" stop-color="#FDE68A" stop-opacity="0"/></linearGradient>
+    <clipPath id="belly"><path d="M40 30c14 0 22 16 22 38 0 20-8 32-22 32S18 88 18 68c0-22 8-38 22-38z"/></clipPath>
+  </defs>
+  <ellipse cx="29" cy="102" rx="10" ry="4" fill="#5B6B7A"/><ellipse cx="51" cy="102" rx="10" ry="4" fill="#5B6B7A"/>
+  <path d="M12 46c-7 12-9 28-5 42 6-6 10-18 11-30z" fill="#1F2B3A"/>
+  <path d="M68 46c7 12 9 28 5 42-6-6-10-18-11-30z" fill="#1F2B3A"/>
+  <path d="M40 4c16 0 24 12 24 26 0 6 6 22 6 40 0 22-12 34-30 34S10 92 10 70c0-18 6-34 6-40C16 16 24 4 40 4z" fill="#2C3A4A"/>
+  <path d="M40 30c14 0 22 16 22 38 0 20-8 32-22 32S18 88 18 68c0-22 8-38 22-38z" fill="#FAFCFD"/>
+  <g clip-path="url(#belly)"><rect x="14" y="28" width="52" height="30" fill="url(#gold)" opacity=".8"/></g>
+  <path d="M19 33c0-5 4-9 10-9 0 7-4 11-10 9zM61 33c0-5-4-9-10-9 0 7 4 11 10 9z" fill="#FBBF24"/>
+  <path d="M34.5 25.5c3-1.5 8-1.5 11 0L40 34z" fill="#60748A"/><path d="M36.5 28.5c2.5 1 4.5 1 7 0" fill="none" stroke="#F9A56B" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="30" cy="20" r="3.2" fill="#fff"/><circle cx="30" cy="20" r="1.9" fill="#12334A"/>
+  <circle cx="50" cy="20" r="3.2" fill="#fff"/><circle cx="50" cy="20" r="1.9" fill="#12334A"/>
+  <path d="M28 9c4-3 12-4 20-1" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".2"/>
+</svg>
