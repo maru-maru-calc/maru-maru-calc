@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MarumaruGame } from '@/components/MarumaruGame';
 import { FitToScreen } from '@/components/puzzle/fit-to-screen';
 import { PuzzleChoice, PuzzleEnd, puzzleScreenStyle, QuickResult } from '@/components/puzzle/parts';
+import { PuzzleList } from '@/components/puzzle/puzzle-list';
 import { QuickGame } from '@/components/puzzle/quick-game';
 import { createPuzzleGameStage, getPuzzleProgress, pickStartPuzzle, PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
 import type { Stage } from '@/game/types';
@@ -21,6 +22,7 @@ import type { PuzzleProgress } from '@/storage/puzzle-progress-codec';
 type Screen =
   | { name: 'start'; stage: Stage; round: number; isSolved: boolean }
   | { name: 'play'; firstIndex: number; round: number }
+  | { name: 'list' }
   | { name: 'quick'; round: number }
   | { name: 'quickResult'; solved: number; rank: number | undefined }
   | { name: 'end' };
@@ -110,9 +112,20 @@ function PuzzleScreens({ host }: { host: GameHost }) {
         stages={PUZZLE_GAME_STAGES}
         showsGoalAsMaru={false}
         initialStageIndex={screen.firstIndex}
-        onBack={showStart}
+        onBack={() => setScreen({ name: 'list' })}
         onStageClear={(stageId) => update(addSolvedPuzzle(progress, stageId))}
         onLastStageNext={() => setScreen({ name: 'end' })}
+      />
+    );
+  }
+
+  if (screen.name === 'list') {
+    return (
+      <PuzzleList
+        solvedIds={progress.solved}
+        nextPuzzle={getPuzzleProgress(progress.solved).next}
+        onPick={(number) => setScreen({ name: 'play', firstIndex: number - 1, round: Date.now() })}
+        onBack={showStart}
       />
     );
   }

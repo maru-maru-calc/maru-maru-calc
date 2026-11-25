@@ -56,6 +56,28 @@ export function getPuzzleProgress(solvedIds: readonly string[]): { solved: numbe
   };
 }
 
+export type PuzzleSection = {
+  /** How many bubbles the puzzles of this section have. */
+  bubbleCount: number;
+  /** Their numbers (1 is the first puzzle), in order. */
+  numbers: number[];
+};
+
+/** The numbered puzzles as the list shows them: in order, a section for each number of bubbles. */
+export function getPuzzleSections(stages: Stage[] = PUZZLE_GAME_STAGES): PuzzleSection[] {
+  const sections: PuzzleSection[] = [];
+  stages.forEach((stage, index) => {
+    const bubbleCount = stage.bubbleCounts.length;
+    const last = sections[sections.length - 1];
+    if (last && last.bubbleCount === bubbleCount) {
+      last.numbers.push(index + 1);
+    } else {
+      sections.push({ bubbleCount, numbers: [index + 1] });
+    }
+  });
+  return sections;
+}
+
 const QUICK_OPERATORS: OperatorSymbol[] = ['+', '-', '×', '÷'];
 
 /**

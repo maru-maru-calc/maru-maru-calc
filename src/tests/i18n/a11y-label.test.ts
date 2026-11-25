@@ -40,6 +40,12 @@ describe('screen reader names', () => {
     expect(a11yLabel('sea creature kraken', 'ja')).toBe('うみのいきもの');
   });
 
+  it('names the cells of the puzzle list by number, and says which are solved', () => {
+    expect(a11yLabel('puzzle 12', 'ja')).toBe('12ばん');
+    expect(a11yLabel('puzzle 12, solved', 'ja')).toBe('12ばん とけた');
+    expect(a11yLabel('puzzle 12, solved', 'en')).toBe('puzzle 12, solved');
+  });
+
   it('falls back to the name as written when there is no Japanese for it', () => {
     expect(a11yLabel('1 × ?', 'ja')).toBe('1 × ?');
     expect(a11yLabel('くり上がり', 'ja')).toBe('くり上がり');

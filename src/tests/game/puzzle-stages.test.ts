@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createPuzzleGameStage, createQuickPuzzle, getPuzzleId, getPuzzleProgress, pickStartPuzzle, PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
+import { createPuzzleGameStage, createQuickPuzzle, getPuzzleId, getPuzzleProgress, getPuzzleSections, pickStartPuzzle, PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
 import { PUZZLE_START_GROUPS, PUZZLE_STAGES, PuzzleStage } from '@/game/puzzle-stages';
 import { solveStage } from '@/game/stage-rules';
 
@@ -188,5 +188,17 @@ describe('the puzzles of the one-minute game', () => {
       expect(getPuzzleId(next)).not.toBe(getPuzzleId(last));
       last = next;
     }
+  });
+});
+
+describe('the list of the numbered puzzles', () => {
+  it('has a section for each number of bubbles, with every puzzle once and in order', () => {
+    const sections = getPuzzleSections();
+
+    expect(sections.map((section) => [section.bubbleCount, section.numbers.length])).toEqual([[3, 15], [4, 30], [5, 30], [6, 25]]);
+    expect(sections.flatMap((section) => section.numbers)).toEqual(PUZZLE_GAME_STAGES.map((_, index) => index + 1));
+    sections.forEach((section) => {
+      section.numbers.forEach((number) => expect(PUZZLE_GAME_STAGES[number - 1].bubbleCounts).toHaveLength(section.bubbleCount));
+    });
   });
 });
