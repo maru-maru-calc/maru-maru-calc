@@ -13,7 +13,16 @@ const GET_READY_MS = 1000;
 const AFTER_LAST_BUBBLE_MS = 220;
 const TICK_MS = 100;
 
-export function QuickGame({ onFinish, onBack }: { onFinish: (solved: number) => void; onBack: () => void }) {
+export function QuickGame({
+  onFinish,
+  onBack,
+  onPauseChange,
+}: {
+  onFinish: (solved: number) => void;
+  onBack: () => void;
+  /** Tells the clock when the game is put on hold (the tab is hidden, or the platform says pause). */
+  onPauseChange: (listener: (isPaused: boolean) => void) => () => void;
+}) {
   const [puzzle, setPuzzle] = useState(() => createQuickPuzzle());
   const [solved, setSolved] = useState(0);
   const [resetSignal, setResetSignal] = useState(0);
@@ -26,9 +35,27 @@ export function QuickGame({ onFinish, onBack }: { onFinish: (solved: number) => 
   onFinishRef.current = onFinish;
 
   useEffect(() => {
-    const endsAt = Date.now() + GET_READY_MS + QUICK_GAME_MS;
+    // Time counts only while the game is not on hold: the clock adds up the stretches between
+    // ticks, and a stretch spent on hold is left out.
+    let spent = 0;
+    let countedUpTo = Date.now();
+    let isOnHold = false;
+    const stopListening = onPauseChange((isPaused) => {
+      const now = Date.now();
+      if (isPaused && !isOnHold) {
+        spent += now - countedUpTo;
+      }
+      isOnHold = isPaused;
+      countedUpTo = now;
+    });
     const interval = setInterval(() => {
-      const left = Math.max(0, Math.min(QUICK_GAME_MS, endsAt - Date.now()));
+      if (isOnHold) {
+        return;
+      }
+      const now = Date.now();
+      spent += now - countedUpTo;
+      countedUpTo = now;
+      const left = Math.max(0, Math.min(QUICK_GAME_MS, GET_READY_MS + QUICK_GAME_MS - spent));
       setTimeLeft(left);
       if (left <= 0 && !isOverRef.current) {
         isOverRef.current = true;
@@ -36,7 +63,12 @@ export function QuickGame({ onFinish, onBack }: { onFinish: (solved: number) => 
         onFinishRef.current(solvedRef.current);
       }
     }, TICK_MS);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      stopListening();
+    };
+    // The clock runs once for the life of this screen; the host's way of telling about pauses does not change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleAllBubblesUsed = (isGoal: boolean) => {

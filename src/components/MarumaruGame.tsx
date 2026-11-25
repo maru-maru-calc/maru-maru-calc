@@ -1,9 +1,10 @@
 import * as Matter from 'matter-js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { PixelRatio, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { PixelRatio, Pressable, Text, View } from 'react-native';
 
 import { SFX } from '@/audio/sfx';
+import { useBoardViewport } from '@/components/marumaru/board-viewport';
 import { useOneShotAudio } from '@/audio/use-one-shot-audio';
 import { KukuAnswerPad } from '@/components/marumaru/answer-pad';
 import { BasinFrame, BeadLayer } from '@/components/marumaru/beads';
@@ -182,7 +183,7 @@ export function MarumaruGame({
   onLogoPress?: () => void;
   dentakuPractice?: DentakuPractice;
 }) {
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useBoardViewport();
   const fieldWidth = Math.max(240, width - FIELD_MARGIN * 2);
   const fieldHeight = Math.max(360, height - HEADER_HEIGHT - FOOTER_HEIGHT - OPERATOR_TABS_HEIGHT - 20);
   const [stageIndex, setStageIndex] = useState(initialStageIndex);

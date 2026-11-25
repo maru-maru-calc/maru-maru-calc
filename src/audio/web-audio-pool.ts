@@ -19,6 +19,8 @@ export type WebAudioPool = {
   play: (uri: string, owner: unknown, volume: number) => void;
   /** Fades the sound out and stops it, but only if `owner` was the last one to play it. */
   fadeOut: (uri: string, owner: unknown) => void;
+  /** Stops every sound at once, whoever played it. */
+  stopAll: () => void;
   /** How many sounds are loaded. */
   size: () => number;
 };
@@ -98,6 +100,14 @@ export function createWebAudioPool(
           entry.owner = undefined;
         }
       }, fadeOutMs / FADE_STEPS);
+    },
+    stopAll() {
+      entries.forEach((entry) => {
+        cancelFade(entry);
+        entry.audio.pause();
+        entry.audio.currentTime = 0;
+        entry.owner = undefined;
+      });
     },
     size: () => entries.size,
   };
