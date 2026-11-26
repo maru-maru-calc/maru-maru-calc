@@ -335,32 +335,60 @@ test('a wide window with room to spare shows the board bigger, and a dragged mar
 
   await page.locator('[data-testid^="pending-bubble-"]').first().click();
   await page.waitForTimeout(2500);
-  // Press on the topmost maru of the pile: there is free water above it. Maru take a press from
-  // well outside their rim, so the one that is taken hold of may be its neighbour: that one is watched.
-  const [pressX, pressY, startX, startY] = await page.evaluate(() => {
+  // The topmost maru of the pile: there is free water above it.
+  const [startX, startY] = await page.evaluate(() => {
     const top = Array.from(document.querySelectorAll('[data-testid^="bead-"]'))
-      .map((element) => element.getBoundingClientRect())
-      .sort((left, right) => left.y - right.y)[0];
-    const x = top.x + top.width / 2;
-    const y = top.y + top.height / 2;
-    const taken = document.elementFromPoint(x, y)?.closest('[data-testid^="bead-"]') as HTMLElement;
-    taken.setAttribute('data-held', '1');
-    const box = taken.getBoundingClientRect();
-    return [x, y, box.x + box.width / 2, box.y + box.height / 2];
+      .map((element) => [element, element.getBoundingClientRect()] as const)
+      .sort((left, right) => left[1].y - right[1].y)[0];
+    top[0].setAttribute('data-held', '1');
+    return [top[1].x + top[1].width / 2, top[1].y + top[1].height / 2];
   });
-  await page.mouse.move(pressX, pressY);
+  await page.mouse.move(startX, startY);
   await page.mouse.down();
-  await page.mouse.move(pressX + 15, pressY - 45, { steps: 6 });
-  await page.mouse.move(pressX + 30, pressY - 90, { steps: 6 });
+  await page.mouse.move(startX + 15, startY - 45, { steps: 6 });
+  await page.mouse.move(startX + 30, startY - 90, { steps: 6 });
   await page.waitForTimeout(250);
   const held = await page.evaluate(() => {
     const box = (document.querySelector('[data-held]') as HTMLElement).getBoundingClientRect();
     return [box.x + box.width / 2, box.y + box.height / 2];
   });
   await page.mouse.up();
-  // It moved as far as the pointer did.
   expect(Math.abs(held[0] - (startX + 30))).toBeLessThan(5);
   expect(Math.abs(held[1] - (startY - 90))).toBeLessThan(5);
+});
+
+test('a press on a maru takes hold of that maru, not of a neighbour whose ring lies over it', async ({ page }) => {
+  // Nine loose maru in a pile. Each can be pressed from well outside its rim (a ring 88 across
+  // around a maru 28 across), so every maru lies inside the rings of its neighbours. A press on
+  // the middle of one used to take hold of whichever neighbour was drawn last.
+  const number = PUZZLE_STAGES.findIndex((stage) => stage.bubbles.includes(9)) + 1;
+  expect(number).toBeGreaterThan(0);
+  await openPuzzle(page, number);
+  await bubble(page, 9).click();
+  await page.waitForTimeout(2500);
+
+  const ids = await page.locator('[data-testid^="bead-"]').evaluateAll((elements) => elements.map((element) => element.getAttribute('data-testid') as string));
+  expect(ids).toHaveLength(9);
+  const middleOf = async (id: string) => {
+    const box = (await page.getByTestId(id).boundingBox()) as { x: number; y: number; width: number; height: number };
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+
+  for (const id of ids) {
+    const before = await middleOf(id);
+    await page.mouse.move(before.x, before.y);
+    await page.mouse.down();
+    await page.mouse.move(before.x, before.y - 30, { steps: 5 });
+    await page.mouse.move(before.x, before.y - 60, { steps: 5 });
+    await page.waitForTimeout(200);
+    const held = await middleOf(id);
+    await page.mouse.up();
+    // The maru that was pressed is the one that went up with the pointer.
+    expect(Math.abs(held.x - before.x), id).toBeLessThan(5);
+    expect(Math.abs(held.y - (before.y - 60)), id).toBeLessThan(5);
+    // Let it fall back and the pile settle before the next one.
+    await page.waitForTimeout(1200);
+  }
 });
 
 test('held sideways, the list is ten to a row with "back" beside it', async ({ page }) => {
