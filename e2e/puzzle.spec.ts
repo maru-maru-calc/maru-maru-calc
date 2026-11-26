@@ -603,17 +603,23 @@ test('a puzzle can be sent as a picture, and the address that goes with it opens
 });
 
 test('an address that asks for a puzzle there is not opens the start, as any visit does', async ({ page }) => {
-  for (const query of ['?p=0', '?p=101', '?p=abc', '?q=46']) {
-    await page.goto(`/puzzle${query}`);
-    await expect(page.getByTestId('stage-goal-number'), query).toHaveText('#0');
-  }
+  await page.goto('/puzzle?p=0');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
+  await page.goto('/puzzle?p=101');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
+  await page.goto('/puzzle?p=abc');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
+  await page.goto('/puzzle?q=46');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
+
   // And one there is, with other things in the address around it.
   await page.goto('/puzzle?from=somewhere&p=100');
   await expect(page.getByTestId('stage-goal-number')).toHaveText('#100');
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(PUZZLE_STAGES[99].bubbles.length);
   // A "#" after it too: the router rewrites such an address while the page comes up.
   await page.goto('/puzzle?p=46&x=1#somewhere');
   await expect(page.getByTestId('stage-goal-number')).toHaveText('#46');
-  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(PUZZLE_STAGES[99].bubbles.length);
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(PUZZLE_STAGES[45].bubbles.length);
 });
 
 /** How much bigger or smaller than it is laid out the board is shown. */
