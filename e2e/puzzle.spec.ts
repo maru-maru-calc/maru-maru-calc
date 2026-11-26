@@ -818,6 +818,56 @@ test('solved, a puzzle can be shown to someone: the corner button then sends tha
   await expect(page.getByTestId('choose-make')).toBeVisible();
 });
 
+test('on a phone the share button goes straight to the phone\'s own share, with no sheet of the game\'s in between', async ({ browser }) => {
+  // A device worked by touch that can pass a picture on: its share sheet takes the picture, the
+  // message and the address together, and every place a player might post to is in it.
+  const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    const shared: Array<{ name: string; text: string | undefined }> = [];
+    Object.assign(window, { sharedByTest: shared });
+    Object.defineProperty(Navigator.prototype, 'canShare', { configurable: true, value: (data?: ShareData) => (data?.files?.length ?? 0) > 0 });
+    Object.defineProperty(Navigator.prototype, 'share', {
+      configurable: true,
+      value: (data: ShareData) => {
+        shared.push({ name: (data.files?.[0] as File).name, text: data.text });
+        return Promise.resolve();
+      },
+    });
+  });
+  const readShared = () => page.evaluate(() => (window as unknown as { sharedByTest: Array<{ name: string; text: string | undefined }> }).sharedByTest);
+  await page.goto('/p/46');
+  const site = new URL(page.url()).href.replace(/p\/46$/, '');
+  const line = `#46  ${PUZZLE_STAGES[45].bubbles.join(' · ')} → ${PUZZLE_STAGES[45].goal}`;
+
+  await page.getByTestId('share-puzzle').tap();
+  await expect.poll(readShared).toEqual([{ name: 'maru-puzzle-46.png', text: `${line} ?  #MaruMaruCalc\n${site}p/46` }]);
+  await expect(page.getByTestId('share-panel')).toHaveCount(0);
+
+  // Solved, the same: one press, and the phone's share has the picture that says so.
+  await tapWay(page, PUZZLE_STAGES[45].solution.split(' '), 300);
+  await expect(page.getByTestId('share-solved')).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId('share-solved').tap();
+  await expect.poll(readShared).toHaveLength(2);
+  expect((await readShared())[1]).toEqual({ name: 'maru-solved-46.png', text: `${line} ✓  #MaruMaruCalc\n${site}p/46` });
+  await expect(page.getByTestId('share-panel')).toHaveCount(0);
+  await context.close();
+
+  // A phone whose browser cannot pass a picture on has no such share to go to: there the game shows its own ways of sending.
+  const without = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+  const other = await without.newPage();
+  await other.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'share', { configurable: true, value: undefined });
+    Object.defineProperty(Navigator.prototype, 'canShare', { configurable: true, value: undefined });
+  });
+  await other.goto('/p/46');
+  await other.getByTestId('share-puzzle').tap();
+  await expect(other.getByTestId('share-panel')).toBeVisible();
+  await expect(other.getByTestId('share-x')).toBeVisible();
+  await expect(other.getByTestId('share-device')).toHaveCount(0);
+  await without.close();
+});
+
 test('an address that asks for a puzzle there is not opens the start, as any visit does', async ({ page }) => {
   await page.goto('/puzzle?p=0');
   await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
