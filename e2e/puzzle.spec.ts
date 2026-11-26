@@ -1,5 +1,6 @@
 import { expect, Page, test } from '@playwright/test';
 
+import { countWays } from '../src/game/made-puzzle';
 import { PUZZLE_GAME_STAGES } from '../src/game/puzzle-game';
 import { PUZZLE_STAGES, PUZZLE_START_GROUPS } from '../src/game/puzzle-stages';
 
@@ -620,6 +621,194 @@ test('an address that asks for a puzzle there is not opens the start, as any vis
   await page.goto('/puzzle?p=46&x=1#somewhere');
   await expect(page.getByTestId('stage-goal-number')).toHaveText('#46');
   await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(PUZZLE_STAGES[45].bubbles.length);
+});
+
+test('a player can make a puzzle: the bubbles, a goal from working them out, the number of ways, and an address that opens it', async ({ page }) => {
+  await page.addInitScript(() => {
+    const shared: Array<{ name: string; text: string | undefined; file: File }> = [];
+    Object.assign(window, { sharedByTest: shared });
+    Object.defineProperty(Navigator.prototype, 'canShare', { configurable: true, value: (data?: ShareData) => (data?.files?.length ?? 0) > 0 });
+    Object.defineProperty(Navigator.prototype, 'share', {
+      configurable: true,
+      value: (data: ShareData) => {
+        const file = data.files?.[0] as File;
+        shared.push({ name: file.name, text: data.text, file });
+        return Promise.resolve();
+      },
+    });
+  });
+  await openPuzzleGame(page);
+  await solveStartPuzzle(page);
+  // The third choice: a pencil.
+  await page.getByTestId('choose-make').click();
+
+  // Step one: the bubbles. Three to begin with; arrows change a number, the row below adds and takes away.
+  const numbers = () => page.locator('[data-testid^="maker-bubble-"]').allTextContents();
+  expect(await numbers()).toEqual(['2', '3', '4']);
+  await page.getByTestId('maker-more-0').click();
+  await page.getByTestId('maker-more-0').click();
+  await page.getByTestId('maker-less-2').click();
+  expect(await numbers()).toEqual(['4', '3', '3']);
+  await page.getByTestId('maker-add').click();
+  expect(await numbers()).toEqual(['4', '3', '3', '3']);
+  for (let count = 4; count < 6; count += 1) {
+    await page.getByTestId('maker-add').click();
+  }
+  // Six bubbles at most, two at least, numbers from 1 to 12.
+  await expect(page.getByTestId('maker-add')).toBeDisabled();
+  for (let count = 6; count > 2; count -= 1) {
+    await page.getByTestId('maker-remove').click();
+  }
+  await expect(page.getByTestId('maker-remove')).toBeDisabled();
+  expect(await numbers()).toEqual(['4', '3']);
+  for (let number = 3; number > 1; number -= 1) {
+    await page.getByTestId('maker-less-1').click();
+  }
+  await expect(page.getByTestId('maker-less-1')).toBeDisabled();
+  for (let number = 4; number < 12; number += 1) {
+    await page.getByTestId('maker-more-0').click();
+  }
+  await expect(page.getByTestId('maker-more-0')).toBeDisabled();
+  expect(await numbers()).toEqual(['12', '1']);
+  // Nothing on this screen is a word: the only text is the numbers.
+  expect((await page.getByTestId('maker-bubbles').innerText()).replace(/\s/g, '')).toBe('121');
+
+  // Set 2, 3, 4 and go on to the board.
+  for (let number = 12; number > 2; number -= 1) {
+    await page.getByTestId('maker-less-0').click();
+  }
+  await page.getByTestId('maker-more-1').click();
+  await page.getByTestId('maker-more-1').click();
+  await page.getByTestId('maker-add').click();
+  await page.getByTestId('maker-more-2').click();
+  expect(await numbers()).toEqual(['2', '3', '4']);
+  await page.getByTestId('maker-next').click();
+
+  // Step two: the board, with a pencil for a number and "?" for a goal.
+  await expect(page.getByTestId('stage-goal-pencil')).toBeVisible();
+  await expect(page.getByTestId('stage-goal-target')).toHaveText('?');
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(3);
+  await expect(page.getByTestId('share-puzzle')).toHaveCount(0);
+  await tapWay(page, ['3', '×', '4', '+', '2'], 300);
+
+  // Step three: the puzzle as it will be sent. 14 can be reached in two ways (3 × 4 + 2, and 3 + 4 × 2).
+  await expect(page.getByTestId('made-puzzle')).toBeVisible();
+  expect(countWays({ bubbles: [2, 3, 4], goal: 14 })).toBe(2);
+  await expect(page.getByTestId('made-puzzle-ways-count')).toHaveText('2');
+  await expect(page.getByTestId('made-puzzle-picture')).toBeVisible();
+  await page.getByTestId('made-puzzle-share').click();
+  const shared = await page.evaluate(async () => {
+    const all = (window as unknown as { sharedByTest: Array<{ name: string; text: string | undefined; file: File }> }).sharedByTest;
+    const picture = await createImageBitmap(all[0].file);
+    return { count: all.length, name: all[0].name, type: all[0].file.type, text: all[0].text, width: picture.width, height: picture.height };
+  });
+  const here = new URL(page.url());
+  expect(shared).toEqual({ count: 1, name: 'maru-made-2.3.4-14.png', type: 'image/png', text: `${here.origin}${here.pathname}?m=2.3.4-14`, width: 1200, height: 630 });
+
+  // Worked out again another way, it is another puzzle: 2 + 3 + 4 = 9.
+  await page.getByTestId('made-puzzle-again').click();
+  await expect(page.getByTestId('stage-goal-target')).toHaveText('?');
+  await tapWay(page, ['2', '+', '3', '+', '4'], 300);
+  await expect(page.getByTestId('made-puzzle-ways-count')).toHaveText(String(countWays({ bubbles: [2, 3, 4], goal: 9 })));
+
+  // The maker can play it as anyone would, and come back.
+  await page.getByTestId('made-puzzle-play').click();
+  await expect(page.getByTestId('stage-goal-pencil')).toBeVisible();
+  await expect(page.getByTestId('stage-goal-target')).toHaveText('9');
+  await page.getByLabel('Back', { exact: true }).click();
+  await expect(page.getByTestId('made-puzzle')).toBeVisible();
+  // "Back" from there leads to the bubbles, as they were.
+  await page.getByTestId('made-puzzle-back').click();
+  expect(await numbers()).toEqual(['2', '3', '4']);
+});
+
+test('the address of a made puzzle opens it for anyone; solved, it is not one of the hundred', async ({ page }) => {
+  await page.goto('/puzzle?m=2.3.4-14');
+  await expect(page.getByTestId('stage-goal-pencil')).toBeVisible();
+  await expect(page.getByTestId('stage-goal-number')).toHaveCount(0);
+  await expect(page.getByTestId('stage-goal-target')).toHaveText('14');
+  expect((await readBoard(page)).bubbles).toEqual([2, 3, 4]);
+  // Every operator is free: none shows a count.
+  await expect(page.locator('[data-testid$="-usage"]')).toHaveCount(0);
+  // It can be sent on.
+  await expect(page.getByTestId('share-puzzle')).toBeVisible();
+
+  await tapWay(page, ['3', '+', '4', '×', '2'], 300);
+  // Solved: the same three choices as after the start puzzle, the pencil among them.
+  await expect(page.getByTestId('puzzle-choice')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('choose-make')).toBeVisible();
+  await expect(page.getByTestId('choose-puzzles-number')).toHaveText('#1');
+  expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '{}').solved ?? [], SAVE_KEY)).toEqual([]);
+});
+
+test('an address with a made puzzle that cannot be played opens the start', async ({ page }) => {
+  // Nothing reaches 5 from 6 and 2.
+  await page.goto('/puzzle?m=6.2-5');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
+  // Too many bubbles, a number too big, a goal too big.
+  await page.goto('/puzzle?m=2.3.4.5.6.7.8-35');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
+  await page.goto('/puzzle?m=13.2-15');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
+  await page.goto('/puzzle?m=2.3-5000');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
+});
+
+test('while a puzzle is made, an amount that cannot be a goal starts the board over', async ({ page }) => {
+  await openPuzzleGame(page);
+  await solveStartPuzzle(page);
+  await page.getByTestId('choose-make').click();
+  await page.getByTestId('maker-remove').click();
+  await page.getByTestId('maker-next').click();
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(2);
+
+  // 2 - 3 = -1: below what a goal may be.
+  await tapWay(page, ['2', '-', '3'], 300);
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(2, { timeout: 5000 });
+  await expect(page.getByTestId('made-puzzle')).toHaveCount(0);
+  await expect(page.getByTestId('stage-goal-target')).toHaveText('?');
+
+  // 2 × 3 = 6 is one.
+  await tapWay(page, ['2', '×', '3'], 300);
+  await expect(page.getByTestId('made-puzzle')).toBeVisible();
+  await expect(page.getByTestId('made-puzzle-ways-count')).toHaveText('1');
+});
+
+test('held sideways, the screens for making a puzzle fit', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await openPuzzleGame(page);
+  await solveStartPuzzle(page);
+  // Three choices over the bowl, beside the panel.
+  const panel = await page.getByTestId('board-side-panel').boundingBox();
+  for (const testId of ['choose-puzzles', 'choose-quick', 'choose-make']) {
+    const choice = await page.getByTestId(testId).boundingBox();
+    expect(choice?.x, testId).toBeGreaterThan((panel?.x ?? 0) + (panel?.width ?? 0));
+    expect((choice?.x ?? 0) + (choice?.width ?? 0), testId).toBeLessThanOrEqual(844);
+  }
+  await page.getByTestId('choose-make').click();
+  for (let count = 3; count < 6; count += 1) {
+    await page.getByTestId('maker-add').click();
+  }
+  const onScreen = async (testIds: string[]) => {
+    for (const testId of testIds) {
+      const part = await page.getByTestId(testId).boundingBox();
+      expect(part, testId).not.toBeNull();
+      expect(part?.x, testId).toBeGreaterThanOrEqual(0);
+      expect(part?.y, testId).toBeGreaterThanOrEqual(0);
+      expect((part?.x ?? 0) + (part?.width ?? 0), testId).toBeLessThanOrEqual(844);
+      expect((part?.y ?? 0) + (part?.height ?? 0), testId).toBeLessThanOrEqual(390);
+    }
+  };
+  await onScreen(['maker-back', 'maker-next', 'maker-more-0', 'maker-less-5', 'maker-bubble-5', 'maker-add', 'maker-remove']);
+
+  for (let count = 6; count > 2; count -= 1) {
+    await page.getByTestId('maker-remove').click();
+  }
+  await page.getByTestId('maker-next').click();
+  await tapWay(page, ['2', '+', '3'], 300);
+  await expect(page.getByTestId('made-puzzle-picture')).toBeVisible();
+  await expect(page.getByTestId('made-puzzle-share')).toBeVisible();
+  await onScreen(['made-puzzle-picture', 'made-puzzle-ways', 'made-puzzle-back', 'made-puzzle-again', 'made-puzzle-play', 'made-puzzle-share']);
 });
 
 /** How much bigger or smaller than it is laid out the board is shown. */

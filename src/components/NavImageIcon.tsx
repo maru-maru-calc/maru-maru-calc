@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-type NavImageIconKind = 'back' | 'next' | 'retry' | 'share' | 'skip' | 'undo';
+type NavImageIconKind = 'back' | 'next' | 'play' | 'retry' | 'share' | 'skip' | 'undo';
 
 const TEXT_BASE_COLOR = '#12334A';
 
@@ -19,6 +19,9 @@ export function NavImageIcon({ kind, size }: { kind: NavImageIconKind; size: num
   if (kind === 'share') {
     return <ShareIcon size={size} />;
   }
+  if (kind === 'play') {
+    return <PlayIcon size={size} />;
+  }
 
   return <ArrowIcon direction={kind === 'back' ? -1 : 1} size={size} />;
 }
@@ -30,6 +33,50 @@ export function ClockIcon({ size, color = TEXT_BASE_COLOR }: { size: number; col
     <View testID="clock-icon" style={{ width: size, height: size, borderRadius: size / 2, borderWidth: stroke, borderColor: color, alignItems: 'center' }}>
       <View style={{ position: 'absolute', top: size * 0.16, width: stroke, height: size * 0.3, borderRadius: stroke / 2, backgroundColor: color }} />
       <View style={{ position: 'absolute', top: size / 2 - stroke * 1.5, left: size / 2 - stroke * 1.5, width: size * 0.26, height: stroke, borderRadius: stroke / 2, backgroundColor: color }} />
+    </View>
+  );
+}
+
+/** A pencil, point down to the left: the sign of a puzzle somebody made. */
+export function PencilIcon({ size, color = TEXT_BASE_COLOR }: { size: number; color?: string }) {
+  const width = Math.max(5, Math.round(size * 0.3));
+  const body = Math.round(size * 0.62);
+  const tip = Math.round(width * 0.9);
+
+  return (
+    <View testID="pencil-icon" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      {/* Drawn upright (eraser end up, point down), then leaned over. */}
+      <View style={{ alignItems: 'center', transform: [{ rotate: '45deg' }] }}>
+        <View style={{ width, height: Math.round(width * 0.5), borderTopLeftRadius: width * 0.3, borderTopRightRadius: width * 0.3, backgroundColor: color, marginBottom: Math.max(1, Math.round(size * 0.06)) }} />
+        <View style={{ width, height: body, backgroundColor: color }} />
+        <View style={{ width: 0, height: 0, borderLeftWidth: width / 2, borderRightWidth: width / 2, borderTopWidth: tip, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: color }} />
+      </View>
+    </View>
+  );
+}
+
+/** An arrowhead pointing up or down: "one more", "one less". */
+export function ChevronIcon({ direction, size }: { direction: 'up' | 'down'; size: number }) {
+  const stroke = Math.max(4, Math.round(size * 0.16));
+  const head = Math.round(size * 0.5);
+
+  return (
+    <View pointerEvents="none" testID={`nav-icon-${direction}`} style={{ width: size, height: size }}>
+      <View
+        style={[
+          styles.arrowHead,
+          {
+            width: head,
+            height: head,
+            borderLeftWidth: stroke,
+            borderTopWidth: stroke,
+            borderRadius: Math.max(1, Math.round(stroke * 0.38)),
+            left: (size - head) / 2,
+            top: direction === 'up' ? size * 0.36 : size * 0.14,
+            transform: [{ rotate: direction === 'up' ? '45deg' : '225deg' }],
+          },
+        ]}
+      />
     </View>
   );
 }
@@ -164,6 +211,30 @@ function ArrowIcon({ direction, size }: { direction: -1 | 1; size: number }) {
             transform: [{ rotate: direction < 0 ? '-45deg' : '135deg' }],
           },
         ]}
+      />
+    </View>
+  );
+}
+
+/** A triangle pointing right: "play". */
+function PlayIcon({ size }: { size: number }) {
+  const height = Math.round(size * 0.72);
+  const width = Math.round(size * 0.6);
+
+  return (
+    <View pointerEvents="none" testID="nav-icon-play" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          width: 0,
+          height: 0,
+          marginLeft: Math.round(size * 0.1),
+          borderTopWidth: height / 2,
+          borderBottomWidth: height / 2,
+          borderLeftWidth: width,
+          borderTopColor: 'transparent',
+          borderBottomColor: 'transparent',
+          borderLeftColor: TEXT_BASE_COLOR,
+        }}
       />
     </View>
   );

@@ -11,7 +11,10 @@ import { MarumaruGame } from '@/components/MarumaruGame';
 import { FitToScreen } from '@/components/puzzle/fit-to-screen';
 import { PuzzleChoice, PuzzleEnd, puzzleScreenStyle, QuickResult, ShareButton } from '@/components/puzzle/parts';
 import { PuzzleList } from '@/components/puzzle/puzzle-list';
+import { FIRST_BUBBLES, MadePuzzleResult, MakingBoard, PuzzleMaker } from '@/components/puzzle/puzzle-maker';
 import { QuickGame } from '@/components/puzzle/quick-game';
+import { createMadePuzzleStage } from '@/game/made-puzzle';
+import type { MadePuzzle } from '@/game/made-puzzle';
 import { createPuzzleGameStage, getPuzzleProgress, pickStartPuzzle, PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
 import type { Stage } from '@/game/types';
 import type { GameHost } from '@/platform/game-host';
@@ -25,6 +28,12 @@ type Screen =
   | { name: 'list' }
   | { name: 'quick'; round: number }
   | { name: 'quickResult'; solved: number; rank: number | undefined }
+  // Making a puzzle: the bubbles, the board that finds the goal, the finished puzzle.
+  | { name: 'make'; bubbles: number[] }
+  | { name: 'makeBoard'; bubbles: number[]; round: number }
+  | { name: 'made'; puzzle: MadePuzzle }
+  // A made puzzle being played: one that came by its address, or the maker's own (for whom "back" leads to the finished puzzle).
+  | { name: 'playMade'; puzzle: MadePuzzle; round: number; isSolved: boolean; isOwn: boolean }
   | { name: 'end' };
 
 export function PuzzleGame({ host }: { host: GameHost }) {
@@ -49,7 +58,9 @@ function PuzzleScreens({ host }: { host: GameHost }) {
         setScreen(
           requested === undefined
             ? { name: 'start', stage: createPuzzleGameStage(pickStartPuzzle(loaded.startVisits), 1), round: 0, isSolved: false }
-            : { name: 'play', firstIndex: requested - 1, round: 0 },
+            : 'made' in requested
+              ? { name: 'playMade', puzzle: requested.made, round: 0, isSolved: false, isOwn: false }
+              : { name: 'play', firstIndex: requested.number - 1, round: 0 },
         );
       }
     });
@@ -89,6 +100,9 @@ function PuzzleScreens({ host }: { host: GameHost }) {
   const showQuick = () => {
     setScreen({ name: 'quick', round: Date.now() });
   };
+  // A made puzzle exists only in the address it is sent with: where nothing can be sent, none can be made.
+  const { preparePuzzleShare } = host;
+  const showMaker = preparePuzzleShare ? () => setScreen({ name: 'make', bubbles: FIRST_BUBBLES }) : undefined;
 
   if (screen.name === 'start') {
     return (
@@ -105,14 +119,13 @@ function PuzzleScreens({ host }: { host: GameHost }) {
           onLastStageNext={showPuzzles}
         />
         {screen.isSolved ? (
-          <PuzzleChoice nextPuzzle={getPuzzleProgress(progress.solved).next} best={progress.quickScores[0]} onPuzzles={showPuzzles} onQuick={showQuick} />
+          <PuzzleChoice nextPuzzle={getPuzzleProgress(progress.solved).next} best={progress.quickScores[0]} onPuzzles={showPuzzles} onQuick={showQuick} onMake={showMaker} />
         ) : null}
       </View>
     );
   }
 
   if (screen.name === 'play') {
-    const { preparePuzzleShare } = host;
     return (
       <MarumaruGame
         key={`play-${screen.round}`}
@@ -124,7 +137,7 @@ function PuzzleScreens({ host }: { host: GameHost }) {
         onLastStageNext={() => setScreen({ name: 'end' })}
         cornerSlot={
           preparePuzzleShare
-            ? (stage, number) => <ShareButton label="share this puzzle" testID="share-puzzle" shareKey={stage.id} prepare={() => preparePuzzleShare(number, stage)} />
+            ? (stage, number) => <ShareButton label="share this puzzle" testID="share-puzzle" shareKey={stage.id} prepare={() => preparePuzzleShare({ number }, stage)} />
             : undefined
         }
       />
@@ -157,6 +170,68 @@ function PuzzleScreens({ host }: { host: GameHost }) {
           setScreen({ name: 'quickResult', solved, rank: added.rank });
         }}
       />
+    );
+  }
+
+  if (screen.name === 'make') {
+    return (
+      <PuzzleMaker
+        bubbles={screen.bubbles}
+        onChange={(bubbles) => setScreen({ name: 'make', bubbles })}
+        onBack={showStart}
+        onNext={() => setScreen({ name: 'makeBoard', bubbles: screen.bubbles, round: Date.now() })}
+      />
+    );
+  }
+
+  if (screen.name === 'makeBoard') {
+    return (
+      <MakingBoard
+        key={`make-${screen.round}`}
+        bubbles={screen.bubbles}
+        onBack={() => setScreen({ name: 'make', bubbles: screen.bubbles })}
+        onMade={(puzzle) => setScreen({ name: 'made', puzzle })}
+      />
+    );
+  }
+
+  if (screen.name === 'made' && preparePuzzleShare) {
+    const { puzzle } = screen;
+    return (
+      <MadePuzzleResult
+        puzzle={puzzle}
+        prepareShare={preparePuzzleShare}
+        onBack={() => setScreen({ name: 'make', bubbles: puzzle.bubbles })}
+        onAgain={() => setScreen({ name: 'makeBoard', bubbles: puzzle.bubbles, round: Date.now() })}
+        onPlay={() => setScreen({ name: 'playMade', puzzle, round: Date.now(), isSolved: false, isOwn: true })}
+      />
+    );
+  }
+
+  if (screen.name === 'playMade') {
+    const { puzzle } = screen;
+    return (
+      <View style={puzzleScreenStyle}>
+        <MarumaruGame
+          key={`made-${screen.round}`}
+          stages={[createMadePuzzleStage(puzzle)]}
+          stageMark="pencil"
+          showsGoalAsMaru={false}
+          // The maker goes back to the finished puzzle; someone who came by its address, to the start.
+          onBack={screen.isOwn ? () => setScreen({ name: 'made', puzzle }) : showStart}
+          onStageClear={() => setScreen({ ...screen, isSolved: true })}
+          onLastStageNext={showStart}
+          cornerSlot={
+            preparePuzzleShare
+              ? (stage) => <ShareButton label="share this puzzle" testID="share-puzzle" shareKey={stage.id} prepare={() => preparePuzzleShare({ made: puzzle }, stage)} />
+              : undefined
+          }
+        />
+        {/* Solved: on to the numbered puzzles, the one-minute game, or a puzzle of one's own to send back. */}
+        {screen.isSolved ? (
+          <PuzzleChoice nextPuzzle={getPuzzleProgress(progress.solved).next} best={progress.quickScores[0]} onPuzzles={showPuzzles} onQuick={showQuick} onMake={showMaker} />
+        ) : null}
+      </View>
     );
   }
 

@@ -3,16 +3,20 @@
 import { getPuzzleCard, getPuzzleCardFileName, getPuzzleQuery, PUZZLE_CARD_PANEL } from '@/components/puzzle/puzzle-card';
 import type { PuzzleCard, PuzzleCardBubble, PuzzleCardOperator } from '@/components/puzzle/puzzle-card';
 import { getBeadKind } from '@/game/beads';
+import { getMadePuzzleQuery, writeMadePuzzle } from '@/game/made-puzzle';
 import type { Stage } from '@/game/types';
-import type { PictureShare } from '@/platform/game-host';
+import type { PictureShare, SharedPuzzle } from '@/platform/game-host';
 import { CARD_FONT, CARD_INK, drawAddress, drawBowl, drawWater, preparePictureShare } from '@/platform/share-picture';
 
 const ACCENT = '#0284C7';
 const OPERATOR_BLUE = '#38BDF8';
 
-export function preparePuzzleShare(number: number, stage: Stage): Promise<PictureShare | undefined> {
-  return preparePictureShare(getPuzzleCardFileName(number), getPuzzleQuery(number), (context, shownAddress) => {
-    const card = getPuzzleCard(number, stage);
+export function preparePuzzleShare(puzzle: SharedPuzzle, stage: Stage): Promise<PictureShare | undefined> {
+  const isMade = 'made' in puzzle;
+  const fileName = isMade ? `maru-made-${writeMadePuzzle(puzzle.made)}.png` : getPuzzleCardFileName(puzzle.number);
+  const query = isMade ? getMadePuzzleQuery(puzzle.made) : getPuzzleQuery(puzzle.number);
+  return preparePictureShare(fileName, query, (context, shownAddress) => {
+    const card = getPuzzleCard(isMade ? 'pencil' : puzzle.number, stage);
     // Only the small bubbles drift here: the big ones would lie over the puzzle's own.
     drawWater(context, [
       [30, 78, 34],
@@ -25,15 +29,17 @@ export function preparePuzzleShare(number: number, stage: Stage): Promise<Pictur
     card.bubbles.forEach((bubble) => drawBubbleCount(context, bubble));
     drawTitle(context, card);
     card.operators.forEach((operator) => drawOperator(context, operator));
-    // A little smaller than on the result's picture: it has to end before the bowl begins.
-    drawAddress(context, shownAddress, 'left', 24);
+    // A little smaller than on the result's picture, and never wider than this: it has to end
+    // before the bowl begins, and the address of a made puzzle of six bubbles is long.
+    drawAddress(context, shownAddress, 'left', 24, 690);
   });
 }
 
-/** "#46 = 28", as the board's header has it: the number small and blue, the goal big. */
+/** "#46 = 28", as the board's header has it: the number small and blue, the goal big. A made puzzle has a pencil for a number. */
 function drawTitle(context: CanvasRenderingContext2D, card: PuzzleCard) {
-  const parts = [
-    { text: `#${card.number}`, font: `900 56px ${CARD_FONT}`, color: ACCENT },
+  const PENCIL = 58;
+  const parts: Array<{ pencil: number } | { text: string; font: string; color: string }> = [
+    card.mark === 'pencil' ? { pencil: PENCIL } : { text: `#${card.mark}`, font: `900 56px ${CARD_FONT}`, color: ACCENT },
     { text: '=', font: `900 62px ${CARD_FONT}`, color: CARD_INK },
     { text: String(card.goal), font: `900 96px ${CARD_FONT}`, color: CARD_INK },
   ];
@@ -41,16 +47,47 @@ function drawTitle(context: CanvasRenderingContext2D, card: PuzzleCard) {
   context.textBaseline = 'alphabetic';
   context.textAlign = 'left';
   const widths = parts.map((part) => {
+    if ('pencil' in part) {
+      return part.pencil;
+    }
     context.font = part.font;
     return context.measureText(part.text).width;
   });
   let x = (PUZZLE_CARD_PANEL.left + PUZZLE_CARD_PANEL.right) / 2 - (widths.reduce((sum, width) => sum + width, 0) + gap * (parts.length - 1)) / 2;
   parts.forEach((part, index) => {
-    context.font = part.font;
-    context.fillStyle = part.color;
-    context.fillText(part.text, x, PUZZLE_CARD_PANEL.titleBaseline);
+    if ('pencil' in part) {
+      drawPencil(context, x + part.pencil / 2, PUZZLE_CARD_PANEL.titleBaseline - part.pencil * 0.42, part.pencil);
+    } else {
+      context.font = part.font;
+      context.fillStyle = part.color;
+      context.fillText(part.text, x, PUZZLE_CARD_PANEL.titleBaseline);
+    }
     x += widths[index] + gap;
   });
+}
+
+/** The same pencil as the header's: point down to the left. */
+function drawPencil(context: CanvasRenderingContext2D, centerX: number, centerY: number, size: number) {
+  const width = size * 0.3;
+  const body = size * 0.62;
+  const tip = width * 0.9;
+  const cap = width * 0.5;
+  const space = size * 0.06;
+  const top = -(cap + space + body + tip) / 2;
+  context.save();
+  context.translate(centerX, centerY);
+  context.rotate(Math.PI / 4);
+  context.fillStyle = ACCENT;
+  roundedRect(context, -width / 2, top, width, cap, width * 0.25);
+  context.fill();
+  context.fillRect(-width / 2, top + cap + space, width, body);
+  context.beginPath();
+  context.moveTo(-width / 2, top + cap + space + body);
+  context.lineTo(width / 2, top + cap + space + body);
+  context.lineTo(0, top + cap + space + body + tip);
+  context.closePath();
+  context.fill();
+  context.restore();
 }
 
 /** An operator's button, with how often it may be used in the corner; one that may not be used at all is pale. */

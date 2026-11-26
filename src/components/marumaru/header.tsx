@@ -13,7 +13,7 @@ import { getFailedProgress } from '@/components/marumaru/effects';
 import { getGoalParts, getSignedPalette, getTranslucentBeadColor } from '@/components/marumaru/field-layout';
 import { styles } from '@/components/marumaru/styles';
 import type { DentakuPractice, GoalPart } from '@/components/marumaru/types';
-import { ClockIcon, NavImageIcon } from '@/components/NavImageIcon';
+import { ClockIcon, NavImageIcon, PencilIcon } from '@/components/NavImageIcon';
 import { getBeadKind } from '@/game/beads';
 import { useTick } from '@/game/use-tick';
 import { a11yLabel } from '@/i18n/a11y-label';
@@ -40,18 +40,35 @@ export function LaunchLogo({ variant = 'header', onPress }: { variant?: 'header'
 }
 
 /**
- * What stands before the goal: the stage's number ("#12"), or a clock in the one-minute game,
- * where the puzzles have no numbers.
+ * What stands before the goal: the stage's number ("#12"), a clock in the one-minute game, where
+ * the puzzles have no numbers, or a pencil on a puzzle a player made.
  */
-export type StageMark = number | 'clock';
+export type StageMark = number | 'clock' | 'pencil';
 
-export function StageGoalTitle({ stageMark, target, maxWidth, showsGoalParts = true }: { stageMark: StageMark; target: number; maxWidth: number; showsGoalParts?: boolean }) {
+export function StageGoalTitle({
+  stageMark,
+  target,
+  goalText,
+  maxWidth,
+  showsGoalParts = true,
+}: {
+  stageMark: StageMark;
+  target: number;
+  /** Shown instead of the goal ("?" while a puzzle is being made and has none yet). */
+  goalText?: string;
+  maxWidth: number;
+  showsGoalParts?: boolean;
+}) {
   return (
     <View testID="stage-goal-title" style={[styles.stageGameTitle, { maxWidth }]}>
       <View style={styles.stageGameNumberSlot}>
         {stageMark === 'clock' ? (
           <View testID="stage-goal-clock">
             <ClockIcon size={22} color={STAGE_MARK_COLOR} />
+          </View>
+        ) : stageMark === 'pencil' ? (
+          <View testID="stage-goal-pencil">
+            <PencilIcon size={24} color={STAGE_MARK_COLOR} />
           </View>
         ) : (
           <Text testID="stage-goal-number" style={styles.stageGameNumber}>#{stageMark}</Text>
@@ -62,7 +79,7 @@ export function StageGoalTitle({ stageMark, target, maxWidth, showsGoalParts = t
         <Text testID="stage-goal-equals" style={styles.stageGameEquals}>=</Text>
       </View>
       <View style={styles.stageGameTargetSlot}>
-        <Text testID="stage-goal-target" style={styles.stageGameTarget}>{target}</Text>
+        <Text testID="stage-goal-target" style={styles.stageGameTarget}>{goalText ?? target}</Text>
       </View>
     </View>
   );
