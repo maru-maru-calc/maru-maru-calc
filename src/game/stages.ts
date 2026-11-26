@@ -50,29 +50,22 @@ export function getStageIndexById(stageId: string) {
 }
 
 function createAdditionStages(): Stage[] {
+  // Every stage here is "pop them all and it comes out right": there is nothing to choose, so a
+  // stage is worth having only for what is new in it. One or two stages for each step:
+  // two small numbers, many small numbers, three numbers, making ten, past ten, ten and more,
+  // two tens, then tens and hundreds. (There were 25, most of them a step repeated.)
+  //
+  // The ids are the ones these stages always had, so that cleared stages stay cleared.
   const specs: Array<[string, string, number[], number, PlaceValue[]?]> = [
     ['addition-10-ones', 'ちいさなあわせ', [2, 3], 5],
     ['addition-10-twos', 'ちいさなあわせ', [2, 2, 2, 2, 2], 10],
     ['addition-10-five-five', 'ちいさなあわせ', [5, 3], 8],
     ['addition-10-six-four', 'ちいさなあわせ', [4, 2, 3], 9],
-    ['addition-10-four-six', 'ちいさなあわせ', [6, 1, 5], 12],
-    ['addition-10-seven-three', 'ちいさなあわせ', [7, 4], 11],
-    ['addition-10-three-seven', 'ちいさなあわせ', [3, 4, 5], 12],
     ['addition-10-eight-two', '10とそのまわり', [8, 2], 10],
-    ['addition-10-two-eight', '10とそのまわり', [2, 7, 4], 13],
-    ['addition-10-nine-one', '10とそのまわり', [9, 1, 5], 15],
-    ['addition-10-one-nine', '10とそのまわり', [1, 9, 8], 18],
     ['addition-10-three-two-five', '10とそのまわり', [3, 2, 5], 10],
-    ['addition-10-two-three-five', '10とそのまわり', [2, 3, 6], 11],
-    ['addition-10-four-one-five', '10とそのまわり', [4, 1, 7], 12],
-    ['addition-10-one-four-five', '10とそのまわり', [1, 4, 9], 14],
-    ['addition-10-six-two-two', '10とそのまわり', [6, 2, 2, 5], 15],
-    ['addition-10-two-two-six', '10とそのまわり', [2, 2, 6, 8], 18],
-    ['addition-10-seven-one-two', '10とそのまわり', [7, 1, 2, 6], 16],
-    ['addition-10-one-two-seven', '10とそのまわり', [1, 2, 7, 10], 20],
-    ['addition-10-four-three-two-one', '10とそのまわり', [4, 3, 2, 1], 10],
+    ['addition-10-seven-three', '10とそのまわり', [7, 4], 11],
+    ['addition-10-nine-one', '10とそのまわり', [9, 1, 5], 15],
     ['addition-20-pairs', '10とそのまわり', [6, 4, 7, 3], 20],
-    ['addition-20-fives', '10とそのまわり', [5, 5, 4, 6], 20],
     ['addition-50-times', 'おおきなかずのひろば', [20, 15, 10, 5], 50, [1, 10]],
     ['addition-100-times', 'おおきなかずのひろば', [40, 30, 20, 10], 100, [1, 10]],
     ['addition-120-times', 'おおきなかずのひろば', [100, 10, 5, 5], 120, [1, 10, 100]],

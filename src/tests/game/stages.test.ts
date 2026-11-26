@@ -20,8 +20,9 @@ describe('stage list', () => {
     // The islands that mixed all four operators are now the puzzle game (game/puzzle-stages.ts).
     expect(STAGE_ISLANDS.map((candidate) => candidate.id)).toEqual(['addition', 'subtraction', 'multiplication', 'division']);
     expect(new Set(STAGES.map((stage) => stage.id)).size).toBe(STAGES.length);
-    expect(STAGES).toHaveLength(100);
-    for (const id of ['addition', 'subtraction', 'multiplication', 'division'] as const) {
+    expect(STAGES).toHaveLength(87);
+    expect(island('addition')).toHaveLength(12);
+    for (const id of ['subtraction', 'multiplication', 'division'] as const) {
       expect(island(id)).toHaveLength(25);
     }
   });
@@ -31,6 +32,55 @@ describe('stage list', () => {
       const titles = STAGE_ISLANDS.find((candidate) => candidate.id === stage.islandId)?.stageSetTitles ?? [];
       expect(titles).toContain(stage.setTitle);
     }
+  });
+});
+
+describe('たしざん', () => {
+  const stages = island('addition');
+
+  it('is popping every bubble, with only + to use', () => {
+    for (const stage of stages) {
+      expect(usableOperators(stage)).toBe('+');
+      expect(stage.bubbleCounts.reduce((sum, value) => sum + value, 0)).toBe(stage.target);
+      expect(winningShare(stage)).toBe(1);
+    }
+  });
+
+  it('is short, because nothing in it has to be chosen', () => {
+    expect(stages).toHaveLength(12);
+    expect(new Set(stages.map(key)).size).toBe(stages.length);
+    // Up to twenty, no two stages in a row ask for the same number of bubbles.
+    const small = stages.filter((stage) => stage.target <= 20);
+    for (let index = 1; index < small.length; index += 1) {
+      expect(small[index].bubbleCounts.length).not.toBe(small[index - 1].bubbleCounts.length);
+    }
+  });
+
+  it('goes from two small numbers to tens and hundreds', () => {
+    expect(stages[0]).toMatchObject({ id: 'addition-10-ones', bubbleCounts: [2, 3], target: 5 });
+    expect(stages.map((stage) => stage.target)).toEqual([5, 10, 8, 9, 10, 10, 11, 15, 20, 50, 100, 120]);
+    // Ten is made three ways before the numbers get big.
+    expect(stages.filter((stage) => stage.target === 10).map((stage) => stage.bubbleCounts.length)).toEqual([5, 2, 3]);
+    expect(stages.findIndex((stage) => stage.target > 10)).toBe(6);
+    expect(stages.slice(-3).every((stage) => stage.bubbleCounts.some((value) => value >= 10))).toBe(true);
+    expect(stages[stages.length - 1].bubbleCounts).toContain(100);
+  });
+
+  it('keeps the ids the stages always had, so that cleared ones stay cleared', () => {
+    expect(stages.map((stage) => stage.id)).toEqual([
+      'addition-10-ones',
+      'addition-10-twos',
+      'addition-10-five-five',
+      'addition-10-six-four',
+      'addition-10-eight-two',
+      'addition-10-three-two-five',
+      'addition-10-seven-three',
+      'addition-10-nine-one',
+      'addition-20-pairs',
+      'addition-50-times',
+      'addition-100-times',
+      'addition-120-times',
+    ]);
   });
 });
 
