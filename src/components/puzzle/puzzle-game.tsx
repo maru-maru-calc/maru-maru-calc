@@ -102,7 +102,7 @@ function PuzzleScreens({ host }: { host: GameHost }) {
     setScreen({ name: 'quick', round: Date.now() });
   };
   // A made puzzle exists only in the address it is sent with: where nothing can be sent, none can be made.
-  const { preparePuzzleShare, making, ShareButton } = host;
+  const { preparePuzzleShare, prepareSolvedShare, making, ShareButton } = host;
   const showMaker = preparePuzzleShare && making ? () => setScreen({ name: 'make', bubbles: making.firstBubbles }) : undefined;
 
   if (screen.name === 'start') {
@@ -138,7 +138,13 @@ function PuzzleScreens({ host }: { host: GameHost }) {
         onLastStageNext={() => setScreen({ name: 'end' })}
         cornerSlot={
           preparePuzzleShare && ShareButton
-            ? (stage, number) => <ShareButton label="share this puzzle" testID="share-puzzle" shareKey={stage.id} prepare={() => preparePuzzleShare({ number }, stage)} />
+            ? (stage, number, isSolved) =>
+                // Unsolved, the puzzle is sent to be solved; solved, what is sent says so.
+                isSolved && prepareSolvedShare ? (
+                  <ShareButton label="share that it is solved" testID="share-solved" shareKey={`${stage.id}:solved`} isSolved prepare={() => prepareSolvedShare({ number }, stage)} />
+                ) : (
+                  <ShareButton label="share this puzzle" testID="share-puzzle" shareKey={stage.id} prepare={() => preparePuzzleShare({ number }, stage)} />
+                )
             : undefined
         }
       />
@@ -226,7 +232,12 @@ function PuzzleScreens({ host }: { host: GameHost }) {
           onLastStageNext={showStart}
           cornerSlot={
             preparePuzzleShare && ShareButton
-              ? (stage) => <ShareButton label="share this puzzle" testID="share-puzzle" shareKey={stage.id} prepare={() => preparePuzzleShare({ made: puzzle }, stage)} />
+              ? (stage, _number, isSolved) =>
+                  isSolved && prepareSolvedShare ? (
+                    <ShareButton label="share that it is solved" testID="share-solved" shareKey={`${stage.id}:solved`} isSolved prepare={() => prepareSolvedShare({ made: puzzle }, stage)} />
+                  ) : (
+                    <ShareButton label="share this puzzle" testID="share-puzzle" shareKey={stage.id} prepare={() => preparePuzzleShare({ made: puzzle }, stage)} />
+                  )
               : undefined
           }
         />

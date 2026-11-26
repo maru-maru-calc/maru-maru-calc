@@ -36,15 +36,19 @@ export function preparePuzzleShare(puzzle: SharedPuzzle, stage: Stage): Promise<
   });
 }
 
+/** Where a picture's title stands: its middle, the line its figures stand on, and how many times as big as on the puzzle's picture. */
+export type TitlePlace = { centerX: number; baseline: number; scale: number };
+
 /** "#46 = 28", as the board's header has it: the number small and blue, the goal big. A made puzzle has a pencil for a number. */
-function drawTitle(context: CanvasRenderingContext2D, card: PuzzleCard) {
-  const PENCIL = 92;
+export function drawTitle(context: CanvasRenderingContext2D, card: Pick<PuzzleCard, 'mark' | 'goal'>, place: TitlePlace = { centerX: PUZZLE_CARD_PANEL.centerX, baseline: PUZZLE_CARD_PANEL.titleBaseline, scale: 1 }) {
+  const size = place.scale;
+  const PENCIL = 92 * size;
   const parts: Array<{ pencil: number } | { text: string; font: string; color: string }> = [
-    card.mark === 'pencil' ? { pencil: PENCIL } : { text: `#${card.mark}`, font: `900 88px ${CARD_FONT}`, color: ACCENT },
-    { text: '=', font: `900 96px ${CARD_FONT}`, color: CARD_INK },
-    { text: String(card.goal), font: `900 150px ${CARD_FONT}`, color: CARD_INK },
+    card.mark === 'pencil' ? { pencil: PENCIL } : { text: `#${card.mark}`, font: `900 ${Math.round(88 * size)}px ${CARD_FONT}`, color: ACCENT },
+    { text: '=', font: `900 ${Math.round(96 * size)}px ${CARD_FONT}`, color: CARD_INK },
+    { text: String(card.goal), font: `900 ${Math.round(150 * size)}px ${CARD_FONT}`, color: CARD_INK },
   ];
-  const gap = 34;
+  const gap = 34 * size;
   context.textBaseline = 'alphabetic';
   context.textAlign = 'left';
   const widths = parts.map((part) => {
@@ -54,14 +58,14 @@ function drawTitle(context: CanvasRenderingContext2D, card: PuzzleCard) {
     context.font = part.font;
     return context.measureText(part.text).width;
   });
-  let x = PUZZLE_CARD_PANEL.centerX - (widths.reduce((sum, width) => sum + width, 0) + gap * (parts.length - 1)) / 2;
+  let x = place.centerX - (widths.reduce((sum, width) => sum + width, 0) + gap * (parts.length - 1)) / 2;
   parts.forEach((part, index) => {
     if ('pencil' in part) {
-      drawPencil(context, x + part.pencil / 2, PUZZLE_CARD_PANEL.titleBaseline - part.pencil * 0.42, part.pencil);
+      drawPencil(context, x + part.pencil / 2, place.baseline - part.pencil * 0.42, part.pencil);
     } else {
       context.font = part.font;
       context.fillStyle = part.color;
-      context.fillText(part.text, x, PUZZLE_CARD_PANEL.titleBaseline);
+      context.fillText(part.text, x, place.baseline);
     }
     x += widths[index] + gap;
   });

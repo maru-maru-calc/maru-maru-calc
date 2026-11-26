@@ -51,12 +51,14 @@ export async function preparePictureShare(
   }
   const file = new File([blob], fileName, { type: 'image/png' });
   const previewUrl = URL.createObjectURL(blob);
+  const canShareFile = canShare(file);
 
   return {
     lead,
     previewUrl,
     release: () => URL.revokeObjectURL(previewUrl),
-    shareWithDevice: canShare(file)
+    sharesStraightAway: canShareFile && isWorkedByTouch(),
+    shareWithDevice: canShareFile
       ? () => {
           // Closing the share sheet without choosing is not a failure. Anything else: the file, at least.
           const saveUnlessClosed = (error: unknown) => {
@@ -151,6 +153,15 @@ async function copyText(text: string): Promise<boolean> {
     } catch {
       return false;
     }
+  }
+}
+
+/** Whether the device is worked with a finger first (a phone, a tablet), and not with a mouse. */
+function isWorkedByTouch() {
+  try {
+    return typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+  } catch {
+    return false;
   }
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getAmountMaru,
   getResultCardBowlCircle,
   getResultCardFileName,
   getResultCardMaru,
@@ -65,5 +66,46 @@ describe('the picture of a one-minute result', () => {
     expect(getResultCardFileName(12)).toBe('maru-1min-12.png');
     expect(getResultCardFileName(0)).toBe('maru-1min-0.png');
     expect(getResultCardFileName(Number.NaN)).toBe('maru-1min-0.png');
+  });
+});
+
+describe('the amount a solved puzzle ends on, as maru in the same bowl', () => {
+  it('is a hundred-maru for every hundred, a ten-maru for every ten, then the ones', () => {
+    expect(getAmountMaru(28).map((maru) => maru.value)).toEqual([10, 10, 1, 1, 1, 1, 1, 1, 1, 1]);
+    expect(getAmountMaru(345).map((maru) => maru.value)).toEqual([100, 100, 100, 10, 10, 10, 10, 1, 1, 1, 1, 1]);
+    expect(getAmountMaru(100).map((maru) => maru.value)).toEqual([100]);
+    for (const amount of [1, 9, 10, 11, 57, 99, 101, 250, 999]) {
+      expect(getAmountMaru(amount).reduce((sum, maru) => sum + maru.value, 0)).toBe(amount);
+    }
+    // Below a hundred it is laid as a one-minute count of the same size is.
+    expect(getAmountMaru(57)).toEqual(getResultCardMaru(57));
+    // The bigger the maru's worth, the bigger the maru.
+    const [hundred, ten, one] = getAmountMaru(111);
+    expect(hundred.radius > ten.radius && ten.radius > one.radius).toBe(true);
+  });
+
+  it('lies in the bowl whatever the amount: each maru touches it, none lies on another, all are on the picture', () => {
+    const bowl = getResultCardBowlCircle();
+    const inner = bowl.radius - RESULT_CARD_BOWL.thickness / 2;
+    // Every goal a puzzle can have: the numbered ones, and what a player may make (up to 999).
+    for (let amount = 1; amount <= 999; amount += 1) {
+      const all = getAmountMaru(amount);
+      all.forEach((maru, index) => {
+        expect(Math.abs(Math.hypot(maru.x - bowl.centerX, maru.y - bowl.centerY) + maru.radius - inner) < 0.001, `${amount}`).toBe(true);
+        expect(Math.abs(maru.x - bowl.centerX) + maru.radius <= RESULT_CARD_BOWL.halfWidth, `${amount}`).toBe(true);
+        expect(maru.y + maru.radius <= RESULT_CARD_HEIGHT, `${amount}`).toBe(true);
+        const next = all[index + 1];
+        if (next) {
+          expect(Math.hypot(next.x - maru.x, next.y - maru.y) >= maru.radius + next.radius, `${amount}`).toBe(true);
+        }
+      });
+    }
+  });
+
+  it('is nothing for no amount, and survives what is not an amount', () => {
+    expect(getAmountMaru(0)).toEqual([]);
+    expect(getAmountMaru(-5)).toEqual([]);
+    expect(getAmountMaru(Number.NaN)).toEqual([]);
+    expect(getAmountMaru(12.7).reduce((sum, maru) => sum + maru.value, 0)).toBe(12);
   });
 });

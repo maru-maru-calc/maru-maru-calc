@@ -8,6 +8,7 @@ import { createMadePuzzleStage, createRandomPuzzle, readMadePuzzle } from '@/gam
 import type { GameHost } from './game-host';
 import { preparePuzzleShare } from './share-puzzle';
 import { prepareResultShare } from './share-result';
+import { prepareSolvedShare } from './share-solved';
 
 const PUZZLE_PROGRESS_STORAGE_KEY = 'marumaru-calc:puzzle-progress';
 const LOAD_TIMEOUT_MS = 1500;
@@ -35,6 +36,7 @@ export const browserHost: GameHost = {
   noteBestQuickScore: () => {},
   prepareResultShare,
   preparePuzzleShare,
+  prepareSolvedShare,
   ShareButton,
   making: { firstBubbles: FIRST_BUBBLES, Bubbles: PuzzleMaker, Board: MakingBoard, Finished: MadePuzzleResult, createStage: createMadePuzzleStage, createRandom: createRandomPuzzle },
   getRequestedPuzzle(count) {

@@ -16,10 +16,12 @@ const WATER = '#C6E8F4';
 /**
  * The share button. The picture is drawn as soon as there is something to show (a browser only
  * opens the share sheet in the moment of a tap, with nothing to wait for), and the button appears
- * once there is a picture. A press opens the ways of sending it. `shareKey` says what the picture
- * shows: a new key draws a new picture.
+ * once there is a picture. On a phone that can pass a picture on, a press goes straight to the
+ * phone's own share sheet; elsewhere it opens the game's ways of sending. `shareKey` says what the
+ * picture shows: a new key draws a new picture. Where it sends that a puzzle was solved, it is white like
+ * the "next" button beside a solved puzzle, with a tick in its corner.
  */
-export function ShareButton({ label, testID, shareKey, prepare }: ShareButtonProps) {
+export function ShareButton({ label, testID, shareKey, prepare, isSolved = false }: ShareButtonProps) {
   const [ready, setReady] = useState<{ key: string; share: PictureShare } | undefined>(undefined);
   const [isOpen, setIsOpen] = useState(false);
   const prepareRef = useRef(prepare);
@@ -54,10 +56,23 @@ export function ShareButton({ label, testID, shareKey, prepare }: ShareButtonPro
   if (!ready || ready.key !== shareKey) {
     return null;
   }
+  const { share } = ready;
+  const openWays = () => {
+    if (share.sharesStraightAway && share.shareWithDevice) {
+      share.shareWithDevice();
+    } else {
+      setIsOpen(true);
+    }
+  };
   return (
     <>
-      <Pressable accessibilityLabel={a11yLabel(label)} accessibilityRole="button" testID={testID} onPress={() => setIsOpen(true)} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
+      <Pressable accessibilityLabel={a11yLabel(label)} accessibilityRole="button" testID={testID} onPress={openWays} style={({ pressed }) => [styles.button, isSolved && styles.buttonSolved, pressed && styles.pressed]}>
         <NavImageIcon kind="share" size={29} />
+        {isSolved ? (
+          <View pointerEvents="none" testID="share-solved-tick" style={styles.solvedTick}>
+            <NavImageIcon kind="check" size={12} color="#FFFFFF" />
+          </View>
+        ) : null}
       </Pressable>
       {isOpen ? <SharePanel share={ready.share} onClose={() => setIsOpen(false)} /> : null}
     </>
@@ -231,6 +246,23 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.6,
+  },
+  buttonSolved: {
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+  },
+  // A tick on a round blue ground, half over the button's upper right corner.
+  solvedTick: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#0284C7',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   shareBackdrop: {
     flex: 1,
