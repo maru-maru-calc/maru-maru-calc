@@ -102,6 +102,55 @@ test('a missed times-table question comes back after the others, and the replay 
   await expect(page.getByTestId('kuku-question-title')).toHaveText(/^2 × \d = \?$/);
 });
 
+test('a times-table fact missed on one visit comes back in the mixed stage on the next, until it is known', async ({ page, context }) => {
+  const rememberedMisses = (visit: Page) =>
+    visit.evaluate(() => (JSON.parse(window.localStorage.getItem('marumaru-calc:progress') ?? '{}').kukuWeak ?? []) as string[]);
+  const openKukuStage = async (visit: Page, stageId: string) => {
+    await visit.getByLabel('dentaku mode', { exact: true }).click();
+    await visit.getByLabel('9×9', { exact: true }).click();
+    await visit.getByTestId(`kuku-stage-${stageId}`).click();
+  };
+
+  await page.goto('/game');
+  await clearLaunch(page);
+  await openKukuStage(page, 'dentaku-kuku-dan-7');
+  const title = page.getByTestId('kuku-question-title');
+
+  // 7 × 1 right, 7 × 2 missed once.
+  await expect(title).toHaveText('7 × 1 = ?');
+  await enterDentakuAnswer(page, 7);
+  await page.getByLabel('skip the replay').click();
+  await expect(title).toHaveText('7 × 2 = ?', { timeout: 10000 });
+  await enterDentakuAnswer(page, 15);
+  await expect(title).toHaveText('7 × 2 = ?', { timeout: 1200 });
+  await enterDentakuAnswer(page, 14);
+  await page.getByLabel('skip the replay').click();
+  await expect(title).toHaveText('7 × 3 = ?', { timeout: 10000 });
+  await expect.poll(() => rememberedMisses(page)).toEqual(['7x2']);
+  await page.close();
+
+  // Another day: the app is opened afresh, and the mixed stage is played.
+  const nextDay = await context.newPage();
+  await nextDay.goto('/game');
+  await expect(nextDay.getByTestId('mode-select')).toBeVisible();
+  await openKukuStage(nextDay, 'dentaku-kuku-random-all');
+
+  const asked: string[] = [];
+  for (let question = 1; question <= 9; question += 1) {
+    await expect(nextDay.getByTestId('kuku-question-progress')).toHaveText(`${question}/9`, { timeout: 10000 });
+    const prompt = await nextDay.getByTestId('kuku-question-title').innerText();
+    asked.push(prompt);
+    await enterDentakuAnswer(nextDay, evaluateDentakuPrompt(prompt));
+    await nextDay.getByLabel('skip the replay').click();
+    if (prompt === '7 × 2 = ?') {
+      // Right at the first try, out of order: it is let go.
+      await expect.poll(() => rememberedMisses(nextDay)).toEqual([]);
+    }
+  }
+  expect(asked).toContain('7 × 2 = ?');
+  expect(new Set(asked).size).toBe(9);
+});
+
 test('later dentaku stages use bigger numbers, and a skipped replay ends on the answer', async ({ page }) => {
   await page.goto('/game');
 

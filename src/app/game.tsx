@@ -14,6 +14,7 @@ import { DentakuWorldSelect, WorldSelect } from '@/components/select/world-selec
 import { DENTAKU_STAGES, DENTAKU_WORLDS, DentakuStage, DentakuWorldId } from '@/game/dentaku';
 import { createNavController } from '@/game/nav-controller';
 import type { HistoryWindow, NavController } from '@/game/nav-controller';
+import { noteKukuAnswer } from '@/game/kuku-weak-facts';
 import { createInitialNavState } from '@/game/navigation';
 import type { NavOptions, NavState } from '@/game/navigation';
 import { STAGES, STAGE_ISLANDS, getStageIndexById } from '@/game/stages';
@@ -99,6 +100,7 @@ function IndexScreen() {
   const [completedStageIds, setCompletedStageIds] = useState<Set<string>>(() => new Set());
   const [completedDentakuStageIds, setCompletedDentakuStageIds] = useState<Set<string>>(() => new Set());
   const [completedLongFormStageIds, setCompletedLongFormStageIds] = useState<Set<string>>(() => new Set());
+  const [weakKukuFacts, setWeakKukuFacts] = useState<string[]>([]);
 
   const screen = nav.screen;
   const selectedIslandId = nav.worldId as WorldId;
@@ -141,6 +143,7 @@ function IndexScreen() {
       setCompletedStageIds((current) => new Set([...progress.marumaru, ...current]));
       setCompletedDentakuStageIds((current) => new Set([...progress.dentaku, ...current]));
       setCompletedLongFormStageIds((current) => new Set([...progress.longForm, ...current]));
+      setWeakKukuFacts(progress.kukuWeak);
       // Returning players skip the launch demo and start from the mode select.
       navController.start(progress.hasSeenIntro ? 'mode' : 'launch');
       setIsReady(true);
@@ -162,9 +165,10 @@ function IndexScreen() {
       marumaru: [...completedStageIds],
       dentaku: [...completedDentakuStageIds],
       longForm: [...completedLongFormStageIds],
+      kukuWeak: weakKukuFacts,
       hasSeenIntro,
     });
-  }, [completedDentakuStageIds, completedLongFormStageIds, completedStageIds, hasSeenIntro, isReady]);
+  }, [completedDentakuStageIds, completedLongFormStageIds, completedStageIds, hasSeenIntro, isReady, weakKukuFacts]);
 
   const completeLaunch = () => {
     setHasSeenIntro(true);
@@ -227,6 +231,10 @@ function IndexScreen() {
     return (
       <DentakuGame
         stage={playingDentakuStage}
+        weakKukuFacts={weakKukuFacts}
+        onKukuFactAnswered={(factId, answer, showsKnowing) => {
+          setWeakKukuFacts((current) => noteKukuAnswer(current, factId, answer, showsKnowing));
+        }}
         onBack={goBack}
         onNextStage={startNextDentakuStage}
         onStageClear={(stageId) => {
