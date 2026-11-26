@@ -1,12 +1,14 @@
 // The maru themselves, the layer that draws them, and the tray they sit in.
-import { memo, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { PanResponder, Text, View } from 'react-native';
 
 import { useBoardScale } from '@/components/marumaru/board-viewport';
-import { MIN_TOUCH_TARGET_SIZE, TAP_DRIFT_TO_BURST_THRESHOLD } from '@/components/marumaru/constants';
+import { TAP_DRIFT_TO_BURST_THRESHOLD } from '@/components/marumaru/constants';
 import {
   getBasinFrameSegments,
   getBeadLayerOpacity,
+  findBeadAt,
+  getBeadHitRadius,
   getBeadLayerZIndex,
   getContainedBeadParts,
   getContainedBeadPositions,
@@ -214,6 +216,13 @@ export const BeadLayer = memo(function BeadLayer({
   const beads = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const displayBeads = useMemo(() => getDisplayBeadsForPendingPriorityExpression(beads, expressionTokens), [beads, expressionTokens]);
   const almostMergeBeadIds = useMemo(() => findAlmostMergeBeadIds(displayBeads), [displayBeads]);
+  // Which maru a press means is asked at the moment of the press, of the maru as they are then.
+  const shownRef = useRef({ beads: displayBeads, hiddenBeadId });
+  shownRef.current = { beads: displayBeads, hiddenBeadId };
+  const findBeadAtPoint = useCallback((x: number, y: number) => {
+    const shown = shownRef.current;
+    return findBeadAt(shown.beads.filter((bead) => bead.id !== shown.hiddenBeadId), x, y);
+  }, []);
 
   return (
     <>
@@ -222,12 +231,13 @@ export const BeadLayer = memo(function BeadLayer({
           <DraggableBeadView
             key={bead.id}
             bead={bead}
+            findBeadAt={findBeadAtPoint}
             onMove={onMove}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
             isDragging={draggingBeadId === bead.id}
             isAlmostMerge={almostMergeBeadIds.has(bead.id)}
-            onTap={bead.id !== 'expression-wrap-preview' && canBurstBead(bead) ? onUnwrap : undefined}
+            onTap={onUnwrap}
           />
         ),
       )}
@@ -237,12 +247,15 @@ export const BeadLayer = memo(function BeadLayer({
 
 type DraggableBeadViewProps = {
   bead: BeadSnapshot;
+  /** The maru a press at this point of the field means: this one, or a neighbour the press is nearer to. */
+  findBeadAt: (x: number, y: number) => BeadSnapshot | undefined;
   onMove: (beadId: string, x: number, y: number) => void;
   onDragStart: (beadId: string) => void;
   onDragEnd: (beadId: string) => void;
   isDragging: boolean;
   isAlmostMerge: boolean;
-  onTap?: (beadId: string) => void;
+  /** A press let go without a drag, on a maru that can be opened. */
+  onTap: (beadId: string) => void;
 };
 
 const DraggableBeadView = memo(function DraggableBeadView(props: DraggableBeadViewProps) {
@@ -256,54 +269,72 @@ const DraggableBeadView = memo(function DraggableBeadView(props: DraggableBeadVi
   boardScaleRef.current = useBoardScale();
   const startPositionRef = useRef({ x: bead.x, y: bead.y });
   const hasDraggedRef = useRef(false);
-  const isHeldRef = useRef(false);
-  const radius = getEntityRadius(bead.value, bead.count);
-  const hitSize = Math.max(radius * 2 + 24, MIN_TOUCH_TARGET_SIZE);
+  // The maru this press took hold of: this one, or the neighbour the press was nearer to.
+  const heldRef = useRef<BeadSnapshot | undefined>(undefined);
+  const hitSize = getBeadHitRadius(bead) * 2;
   const beadOffset = hitSize / 2;
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: () => {
+        onPanResponderGrant: (event) => {
           const latest = latestRef.current;
-          startPositionRef.current = { x: latest.bead.x, y: latest.bead.y };
+          // Where in the field the press is. It is given from the corner of this maru's own
+          // ring, in screen points; the board may be shown shrunk or enlarged.
+          const { locationX, locationY } = event.nativeEvent;
+          const reach = getBeadHitRadius(latest.bead);
+          const meant =
+            Number.isFinite(locationX) && Number.isFinite(locationY)
+              ? latest.findBeadAt(latest.bead.x - reach + locationX / boardScaleRef.current, latest.bead.y - reach + locationY / boardScaleRef.current)
+              : undefined;
+          const held = meant ?? latest.bead;
+          startPositionRef.current = { x: held.x, y: held.y };
           hasDraggedRef.current = false;
-          isHeldRef.current = true;
-          latest.onDragStart(latest.bead.id);
+          heldRef.current = held;
+          latest.onDragStart(held.id);
         },
         onPanResponderMove: (_event, gesture) => {
           if (Math.hypot(gesture.dx, gesture.dy) > TAP_DRIFT_TO_BURST_THRESHOLD) {
             hasDraggedRef.current = true;
           }
-          const latest = latestRef.current;
+          const held = heldRef.current;
+          if (!held) {
+            return;
+          }
           // The finger's travel is in screen points; the board may be shown shrunk.
-          latest.onMove(latest.bead.id, startPositionRef.current.x + gesture.dx / boardScaleRef.current, startPositionRef.current.y + gesture.dy / boardScaleRef.current);
+          latestRef.current.onMove(held.id, startPositionRef.current.x + gesture.dx / boardScaleRef.current, startPositionRef.current.y + gesture.dy / boardScaleRef.current);
         },
         onPanResponderRelease: () => {
-          const latest = latestRef.current;
-          isHeldRef.current = false;
-          latest.onDragEnd(latest.bead.id);
-          if (!hasDraggedRef.current) {
-            latest.onTap?.(latest.bead.id);
+          const held = heldRef.current;
+          if (!held) {
+            return;
+          }
+          heldRef.current = undefined;
+          latestRef.current.onDragEnd(held.id);
+          if (!hasDraggedRef.current && held.id !== 'expression-wrap-preview' && canBurstBead(held)) {
+            latestRef.current.onTap(held.id);
           }
         },
         onPanResponderTerminate: () => {
-          const latest = latestRef.current;
-          isHeldRef.current = false;
-          latest.onDragEnd(latest.bead.id);
+          const held = heldRef.current;
+          if (held) {
+            heldRef.current = undefined;
+            latestRef.current.onDragEnd(held.id);
+          }
         },
       }),
     [],
   );
 
-  // A maru can disappear while it is held (it merges, say). Let go of it then, so the game does
-  // not go on thinking something is being dragged.
+  // The maru that took the press can disappear while the press lasts (it merges, say). Let go
+  // then, so the game does not go on thinking something is being dragged.
   useEffect(
     () => () => {
-      if (isHeldRef.current) {
-        isHeldRef.current = false;
-        latestRef.current.onDragEnd(latestRef.current.bead.id);
+      const held = heldRef.current;
+      if (held) {
+        heldRef.current = undefined;
+        latestRef.current.onDragEnd(held.id);
       }
     },
     [],
@@ -352,6 +383,7 @@ function areDraggableBeadPropsEqual(previous: DraggableBeadViewProps, next: Drag
     previous.bead.role === next.bead.role &&
     previous.isDragging === next.isDragging &&
     previous.isAlmostMerge === next.isAlmostMerge &&
+    previous.findBeadAt === next.findBeadAt &&
     previous.onMove === next.onMove &&
     previous.onDragStart === next.onDragStart &&
     previous.onDragEnd === next.onDragEnd &&

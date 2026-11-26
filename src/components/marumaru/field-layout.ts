@@ -11,6 +11,7 @@ import {
   FIELD_MARGIN,
   FOOTER_HEIGHT,
   HEADER_HEIGHT,
+  MIN_TOUCH_TARGET_SIZE,
   MULTIPLIER_BUBBLE_X_STEP,
   MULTIPLIER_BUBBLE_Y_STEP,
   OPERATOR_TABS_HEIGHT,
@@ -127,6 +128,34 @@ export function getGoalParts(target: number): GoalPart[] {
   }
 
   return parts;
+}
+
+/** How far from its middle a maru can be pressed: a little past its rim, and never less than a fingertip. */
+export function getBeadHitRadius(bead: Pick<BeadSnapshot, 'value' | 'count'>) {
+  return Math.max(getEntityRadius(bead.value, bead.count) * 2 + 24, MIN_TOUCH_TARGET_SIZE) / 2;
+}
+
+/**
+ * The maru a press at this point means. Maru can be pressed from well outside their rim, so the
+ * rings around neighbours lie over each other; whichever was drawn last used to take the press,
+ * even one on the very middle of the maru beside it. Now it is the maru the point is on, or else
+ * the one whose rim is nearest. Where maru lie over each other the one drawn in front wins, then
+ * the one whose middle is nearer.
+ */
+export function findBeadAt<Bead extends Pick<BeadSnapshot, 'value' | 'count' | 'x' | 'y'>>(beads: Bead[], x: number, y: number): Bead | undefined {
+  let best: { bead: Bead; gap: number; layer: number; distance: number } | undefined;
+  for (const bead of beads) {
+    const distance = Math.hypot(bead.x - x, bead.y - y);
+    if (distance > getBeadHitRadius(bead)) {
+      continue;
+    }
+    const gap = Math.max(0, distance - getEntityRadius(bead.value, bead.count));
+    const layer = getBeadLayerZIndex(bead.value);
+    if (!best || gap < best.gap || (gap === best.gap && (layer > best.layer || (layer === best.layer && distance < best.distance)))) {
+      best = { bead, gap, layer, distance };
+    }
+  }
+  return best?.bead;
 }
 
 export function getBeadLayerZIndex(value: PlaceValue) {
