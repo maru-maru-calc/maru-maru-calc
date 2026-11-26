@@ -183,6 +183,10 @@ test('web logos link back to the landing page', async ({ browser }) => {
   if (!appFrame) {
     throw new Error('play iframe was not available');
   }
+  // The app in the frame comes up some 200 to 400 ms after the page around it is ready. Until
+  // then it neither listens for "stop the music" nor has any music to stop, and a press on the
+  // logo in that moment is rightly answered by nothing. The check is about a running app.
+  await expect(appFrame.locator('[data-testid^="pending-bubble-"]').first()).toBeVisible();
   await desktopPage.getByLabel('まるまる電卓 トップページ').click();
   await desktopPage.waitForTimeout(25);
   await expect.poll(() => appFrame.evaluate(() => window.__mediaPauseCalls)).toBeGreaterThan(0);
@@ -370,7 +374,7 @@ test('going back from an uncleared next stage does not mark it complete', async 
   }
 
   await expect(page.getByTestId('current-total-value')).toHaveText('10');
-  await expect(page.getByLabel('つぎへ')).toBeVisible({ timeout: 4000 });
+  await expect(page.getByLabel('つぎへ')).toBeVisible();
   await page.getByLabel('つぎへ').click();
   await expect(page.getByTestId('operator-+')).toBeVisible();
 
@@ -550,7 +554,7 @@ test('pending bubbles show an idle tap hint', async ({ page }) => {
   await page.goto('/game');
 
   await expect(page.getByLabel('あわ 5')).toBeVisible();
-  await expect(page.getByTestId('pending-bubble-hint')).toBeVisible({ timeout: 4000 });
+  await expect(page.getByTestId('pending-bubble-hint')).toBeVisible();
 });
 
 test('the addition island is twelve stages, and what was cleared before stays cleared', async ({ page }) => {
@@ -644,7 +648,7 @@ test('a decorative bubble never takes a tap itself', async ({ page }) => {
 
 async function clearLaunch(page: Page) {
   await page.getByLabel('あわ 5').click();
-  await expect(page.getByLabel('つぎへ')).toBeVisible({ timeout: 4000 });
+  await expect(page.getByLabel('つぎへ')).toBeVisible();
   await page.getByLabel('つぎへ').click();
   await expect(page.getByTestId('mode-select')).toBeVisible();
   await page.getByLabel('まるまるモード', { exact: true }).click();

@@ -77,7 +77,7 @@ test('launch-clear and game-clear next buttons keep the same position and size',
     await page.goto('/game');
 
     await page.getByLabel('bubble-5').click();
-    await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
+    await expect(page.getByLabel('next stage')).toBeVisible();
     const launchNextBox = await page.getByLabel('next stage').boundingBox();
     expect(launchNextBox).not.toBeNull();
 
@@ -185,7 +185,7 @@ test('launch-clear and game-clear next buttons keep the same position and size',
 
 async function clearLaunch(page: Page) {
   await page.getByLabel('bubble-5').click();
-  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
+  await expect(page.getByLabel('next stage')).toBeVisible();
   await page.getByLabel('next stage').click();
   await expect(page.getByTestId('mode-select')).toBeVisible();
   await page.getByLabel('marumaru mode', { exact: true }).click();
@@ -206,7 +206,7 @@ async function clearAdditionTwos(page: Page) {
     await page.getByLabel('bubble-2').first().click();
   }
   await expect(page.getByTestId('current-total-value')).toHaveText('10');
-  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
+  await expect(page.getByLabel('next stage')).toBeVisible();
 }
 
 function assertBoxMatch(actual: { x: number; y: number; width: number; height: number } | null, expected: { x: number; y: number; width: number; height: number } | null) {

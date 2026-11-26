@@ -439,7 +439,7 @@ async function clearedDentakuStages(page: Page) {
 
 async function clearLaunch(page: Page) {
   await page.getByLabel('bubble-5').click();
-  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
+  await expect(page.getByLabel('next stage')).toBeVisible();
   await page.getByLabel('next stage').click();
   await expect(page.getByTestId('mode-select')).toBeVisible();
 }
