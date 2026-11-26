@@ -728,6 +728,96 @@ test('every numbered puzzle has a page of its own, and the older way of writing 
   expect((await readLast())?.split('\n')[1]).toBe(`${site}p/46`);
 });
 
+test('solved, a puzzle can be shown to someone: the corner button then sends that it is solved, without the way', async ({ page }) => {
+  await page.addInitScript(() => {
+    const shared: Array<{ name: string; text: string | undefined; file: File }> = [];
+    Object.assign(window, { sharedByTest: shared });
+    Object.defineProperty(Navigator.prototype, 'canShare', { configurable: true, value: (data?: ShareData) => (data?.files?.length ?? 0) > 0 });
+    Object.defineProperty(Navigator.prototype, 'share', {
+      configurable: true,
+      value: (data: ShareData) => {
+        const file = data.files?.[0] as File;
+        shared.push({ name: file.name, text: data.text, file });
+        return Promise.resolve();
+      },
+    });
+  });
+  const readShared = () =>
+    page.evaluate(async () => {
+      const all = (window as unknown as { sharedByTest: Array<{ name: string; text: string | undefined; file: File }> }).sharedByTest;
+      const last = all[all.length - 1];
+      const picture = await createImageBitmap(last.file);
+      return { count: all.length, name: last.name, type: last.file.type, text: last.text, width: picture.width, height: picture.height };
+    });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/p/46');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#46');
+  const site = new URL(page.url()).href.replace(/p\/46$/, '');
+
+  // Unsolved, the corner button sends the puzzle to be solved; there is nothing yet to say about solving it.
+  const before = (await page.getByTestId('share-puzzle').boundingBox()) as { x: number; y: number; width: number; height: number };
+  await expect(page.getByTestId('share-solved')).toHaveCount(0);
+
+  await tapWay(page, PUZZLE_STAGES[45].solution.split(' '), 300);
+  // Solved: the same button in the same corner, now white with a tick on it, and no word.
+  const solved = page.getByTestId('share-solved');
+  await expect(solved).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('share-puzzle')).toHaveCount(0);
+  expect(await solved.boundingBox()).toEqual(before);
+  await expect(page.getByTestId('share-solved-tick')).toBeVisible();
+  await expect(solved).toHaveText('');
+  await expect(page.getByLabel('share that it is solved', { exact: true })).toHaveCount(1);
+  expect(await solved.evaluate((button) => getComputedStyle(button).backgroundColor)).toBe('rgba(255, 255, 255, 0.96)');
+
+  // It is shown to somebody, so the picture is the point: the device's own share leads the ways of sending.
+  await solved.click();
+  await expect(page.getByTestId('share-panel')).toBeVisible();
+  const device = (await page.getByTestId('share-device').boundingBox()) as { y: number; height: number; width: number };
+  const firstPlace = (await page.getByTestId('share-x').boundingBox()) as { y: number; width: number };
+  expect(device.y + device.height).toBeLessThanOrEqual(firstPlace.y);
+  expect(device.width).toBeGreaterThan(3 * firstPlace.width);
+  await page.getByTestId('share-device').click();
+  await page.getByTestId('share-close').click();
+  // One upright picture named after the puzzle; with it the puzzle in one line ending in a tick, and
+  // the address of the puzzle's page, so that whoever is shown it can try. Neither says how it was solved.
+  const shared = await readShared();
+  expect(shared).toEqual({
+    count: 1,
+    name: 'maru-solved-46.png',
+    type: 'image/png',
+    text: `#46  ${PUZZLE_STAGES[45].bubbles.join(' · ')} → ${PUZZLE_STAGES[45].goal} ✓  #MaruMaruCalc\n${site}p/46`,
+    width: 1080,
+    height: 1350,
+  });
+  expect(shared.text).not.toMatch(/[+×÷]| - /);
+
+  // On to the next puzzle: the button is the plain one again, for sending that puzzle.
+  await page.getByLabel('next stage', { exact: true }).first().click({ timeout: 30_000 });
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#47');
+  await expect(page.getByTestId('share-puzzle')).toBeVisible();
+  await expect(page.getByTestId('share-solved')).toHaveCount(0);
+
+  // A puzzle a player made, solved by someone who came by its address: the same, with no number.
+  await page.goto('/puzzle?m=2.3.4-14');
+  await expect(page.getByTestId('share-puzzle')).toBeVisible();
+  await tapWay(page, ['3', '+', '4', '×', '2'], 300);
+  await expect(page.getByTestId('puzzle-choice')).toBeVisible({ timeout: 30_000 });
+  // The choices of what to do next do not lie over the button.
+  await page.getByTestId('share-solved').click();
+  await page.getByTestId('share-device').click();
+  await page.getByTestId('share-close').click();
+  expect(await readShared()).toEqual({
+    count: 1,
+    name: 'maru-solved-2.3.4-14.png',
+    type: 'image/png',
+    text: `2 · 3 · 4 → 14 ✓  #MaruMaruCalc\n${site}puzzle?m=2.3.4-14`,
+    width: 1080,
+    height: 1350,
+  });
+  // The choices are still there to go on with.
+  await expect(page.getByTestId('choose-make')).toBeVisible();
+});
+
 test('an address that asks for a puzzle there is not opens the start, as any visit does', async ({ page }) => {
   await page.goto('/puzzle?p=0');
   await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');

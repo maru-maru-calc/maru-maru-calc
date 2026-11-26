@@ -97,9 +97,17 @@ export function getPuzzleCardFileName(number: number) {
  * bubbles are set apart by dots and not by the signs to be found ("6 ? 2 ? 4"): that would look
  * as if they had to be used in this order, and any order is allowed. A puzzle a player made has
  * no number.
+ *
+ * Sent by someone who solved it, the line ends in a tick and not in a question: the same puzzle,
+ * still without its way, so that whoever reads it can try.
  */
-export function getPuzzleLine(number: number | undefined, stage: Pick<Stage, 'target' | 'bubbleCounts'>) {
-  return `${number === undefined ? '' : `#${number}  `}${stage.bubbleCounts.join(' · ')} → ${stage.target} ?`;
+export function getPuzzleLine(number: number | undefined, stage: Pick<Stage, 'target' | 'bubbleCounts'>, isSolved = false) {
+  return `${number === undefined ? '' : `#${number}  `}${stage.bubbleCounts.join(' · ')} → ${stage.target} ${isSolved ? '✓' : '?'}`;
+}
+
+/** The file of the picture that says a numbered puzzle was solved. */
+export function getSolvedCardFileName(number: number) {
+  return `maru-solved-${number}.png`;
 }
 
 /**

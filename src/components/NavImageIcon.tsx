@@ -5,8 +5,8 @@ type NavImageIconKind = 'back' | 'check' | 'close' | 'dice' | 'link' | 'next' | 
 const TEXT_BASE_COLOR = '#12334A';
 
 // Every icon is drawn from the same parts (a rounded stroke, an arrowhead of two strokes), so they
-// look like one family whatever fonts the device has. `color` is for the share arrow alone, where
-// it stands on a filled button.
+// look like one family whatever fonts the device has. `color` is for the share arrow and the tick,
+// where they stand on a filled ground.
 export function NavImageIcon({ kind, size, color }: { kind: NavImageIconKind; size: number; color?: string }) {
   if (kind === 'retry') {
     return <RetryIcon size={size} />;
@@ -33,7 +33,7 @@ export function NavImageIcon({ kind, size, color }: { kind: NavImageIconKind; si
     return <ShareIcon size={size} isDownward />;
   }
   if (kind === 'check' || kind === 'close') {
-    return <MarkIcon size={size} kind={kind} />;
+    return <MarkIcon size={size} kind={kind} color={kind === 'check' ? color : undefined} />;
   }
 
   return <ArrowIcon direction={kind === 'back' ? -1 : 1} size={size} />;
@@ -294,8 +294,8 @@ function LinkIcon({ size }: { size: number }) {
 }
 
 /** A tick ("done") or a cross ("close"), from two strokes. */
-function MarkIcon({ size, kind }: { size: number; kind: 'check' | 'close' }) {
-  const stroke = Math.max(4, Math.round(size * 0.14));
+function MarkIcon({ size, kind, color = TEXT_BASE_COLOR }: { size: number; kind: 'check' | 'close'; color?: string }) {
+  const stroke = Math.max(kind === 'check' && size < 20 ? 2 : 4, Math.round(size * 0.14));
   const strokes =
     kind === 'close'
       ? [
@@ -310,7 +310,7 @@ function MarkIcon({ size, kind }: { size: number; kind: 'check' | 'close' }) {
   return (
     <View pointerEvents="none" testID={`nav-icon-${kind}`} style={{ width: size, height: size }}>
       {strokes.map((line, index) => (
-        <View key={index} style={[styles.navStroke, { width: line.width, height: stroke, borderRadius: stroke / 2, left: line.left, top: line.top, transform: [{ rotate: line.rotate }] }]} />
+        <View key={index} style={[styles.navStroke, { width: line.width, height: stroke, borderRadius: stroke / 2, left: line.left, top: line.top, transform: [{ rotate: line.rotate }], backgroundColor: color }]} />
       ))}
     </View>
   );

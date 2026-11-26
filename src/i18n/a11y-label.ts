@@ -17,6 +17,7 @@ const JAPANESE_LABELS: Record<string, string> = {
   'play again': 'もういちど',
   'share the result': 'けっかをシェアする',
   'share this puzzle': 'このパズルをおくる',
+  'share that it is solved': 'とけたよをおくる',
   'make a puzzle': 'パズルをつくる',
   'work it out': 'けいさんしてみる',
   'work it out again': 'もういちどけいさんする',

@@ -3,6 +3,7 @@
 // No words on it, like the game, and no address either: a clock, the count, and the count again as maru lying in the
 // bowl (a ten-maru for every ten, as on the board). Drawing it is platform/share-result.ts.
 import { getBeadKind } from './beads';
+import type { PlaceValue } from './types';
 
 /** Upright, 4 to 5: the pictures are mostly sent from phones and looked at on phones. */
 export const RESULT_CARD_WIDTH = 1080;
@@ -17,7 +18,7 @@ const MARU_GAP = 8;
 // The share of the bowl's arc the maru may take before they are drawn smaller.
 const MARU_ARC_SHARE = 0.9;
 
-export type ResultCardMaru = { value: 1 | 10; x: number; y: number; radius: number };
+export type ResultCardMaru = { value: PlaceValue; x: number; y: number; radius: number };
 
 /** The circle the bowl is an arc of. */
 export function getResultCardBowlCircle() {
@@ -33,7 +34,27 @@ export function getResultCardBowlCircle() {
  */
 export function getResultCardMaru(solved: number): ResultCardMaru[] {
   const count = getCount(solved);
-  const values: Array<1 | 10> = [...Array.from({ length: Math.floor(count / 10) }, () => 10 as const), ...Array.from({ length: count % 10 }, () => 1 as const)];
+  return layMaruInBowl([...Array.from({ length: Math.floor(count / 10) }, () => 10 as const), ...Array.from({ length: count % 10 }, () => 1 as const)]);
+}
+
+/**
+ * An amount as maru lying in the same bowl, as the board leaves them when a puzzle is solved: a
+ * hundred-maru for every hundred, a ten-maru for every ten, then the ones. For the picture that
+ * says a puzzle was solved (platform/share-solved.ts).
+ */
+export function getAmountMaru(amount: number): ResultCardMaru[] {
+  const count = getCount(amount);
+  const values: PlaceValue[] = [];
+  let rest = count;
+  for (const value of [100, 10, 1] as const) {
+    values.push(...Array.from({ length: Math.floor(rest / value) }, () => value));
+    rest %= value;
+  }
+  return layMaruInBowl(values);
+}
+
+/** Maru side by side in the bottom of the bowl, in the order given, drawn smaller when they are too many for it. */
+function layMaruInBowl(values: PlaceValue[]): ResultCardMaru[] {
   if (values.length === 0) {
     return [];
   }

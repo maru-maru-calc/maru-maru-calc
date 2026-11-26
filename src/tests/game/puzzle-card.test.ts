@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getPuzzleCard, getPuzzleCardFileName, getPuzzleLine, getPuzzlePage, getSitePath, PUZZLE_CARD_PANEL, readPuzzlePage, readRequestedPuzzle } from '@/components/puzzle/puzzle-card';
+import { getPuzzleCard, getPuzzleCardFileName, getPuzzleLine, getPuzzlePage, getSitePath, getSolvedCardFileName, PUZZLE_CARD_PANEL, readPuzzlePage, readRequestedPuzzle } from '@/components/puzzle/puzzle-card';
 import { createMadePuzzleStage } from '@/game/made-puzzle';
 import { PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
 import { RESULT_CARD_HEIGHT, RESULT_CARD_WIDTH } from '@/game/result-card';
@@ -82,6 +82,15 @@ describe('the puzzle in one line, for the message its address is posted with', (
 
   it('has no number for a puzzle a player made', () => {
     expect(getPuzzleLine(undefined, createMadePuzzleStage({ bubbles: [2, 4, 10, 5], goal: 28 }))).toBe('2 · 4 · 10 · 5 → 28 ?');
+  });
+
+  it('ends in a tick when it is sent by someone who solved it, and still does not say how', () => {
+    expect(getPuzzleLine(1, { target: 11, bubbleCounts: [2, 8, 6] }, true)).toBe('#1  2 · 8 · 6 → 11 ✓');
+    expect(getPuzzleLine(undefined, createMadePuzzleStage({ bubbles: [2, 3, 4], goal: 14 }), true)).toBe('2 · 3 · 4 → 14 ✓');
+    PUZZLE_GAME_STAGES.forEach((stage, index) => {
+      expect(getPuzzleLine(index + 1, stage, true)).toMatch(/^#[0-9]+ {2}[0-9]+( · [0-9]+)+ → [0-9]+ ✓$/);
+    });
+    expect(getSolvedCardFileName(46)).toBe('maru-solved-46.png');
   });
 });
 

@@ -38,7 +38,14 @@ export type PictureShare = {
 export type SharedPuzzle = { number: number } | { made: MadePuzzle };
 
 /** What the share button is told: its name, what the picture shows (a new key draws a new picture), and how to draw it. */
-export type ShareButtonProps = { label: string; testID: string; shareKey: string; prepare: () => Promise<PictureShare | undefined> };
+export type ShareButtonProps = {
+  label: string;
+  testID: string;
+  shareKey: string;
+  prepare: () => Promise<PictureShare | undefined>;
+  /** Whether what it sends is that a puzzle was solved: the button then stands out, with a tick on it. */
+  isSolved?: boolean;
+};
 
 /**
  * Everything of making a puzzle: its three screens, and a made puzzle as a stage the board can
@@ -91,6 +98,11 @@ export type GameHost = {
    * opens that puzzle. Undefined where nothing can be shared.
    */
   preparePuzzleShare: ((puzzle: SharedPuzzle, stage: Stage) => Promise<PictureShare | undefined>) | undefined;
+  /**
+   * Gets a picture ready that says this puzzle was solved (without the way), with the address
+   * that opens the puzzle for whoever is shown it. Undefined where nothing can be shared.
+   */
+  prepareSolvedShare: ((puzzle: SharedPuzzle, stage: Stage) => Promise<PictureShare | undefined>) | undefined;
   /**
    * The puzzle this visit asks for (the address of a shared puzzle): one of the `count` numbered
    * ones, or a made one. Undefined where a visit cannot ask for one, or when it asks for none.

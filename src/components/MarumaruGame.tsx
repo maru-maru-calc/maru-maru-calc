@@ -174,8 +174,8 @@ export function MarumaruGame({
   resetSignal?: number;
   /** A short text (a count) shown in the corner under the bowl, opposite the undo button. */
   cornerBadge?: string;
-  /** Something of the screen's own for that corner (a button), given the stage being played and its number. */
-  cornerSlot?: (stage: Stage, stageNumber: number) => ReactNode;
+  /** Something of the screen's own for that corner (a button), given the stage being played, its number, and whether it has been solved. */
+  cornerSlot?: (stage: Stage, stageNumber: number, isSolved: boolean) => ReactNode;
   /** Whether the header also draws the goal as maru, beside the number. */
   showsGoalAsMaru?: boolean;
   /** The stages to play, numbered from 1 in this order. Left out: the stages of まるまるモード. */
@@ -2191,7 +2191,7 @@ export function MarumaruGame({
       {isFailed ? <FailedWaterOverlay failedAt={failedAt} /> : null}
       {cornerSlot ? (
         <View pointerEvents="box-none" testID="corner-slot" style={[styles.cornerSlot, isSideBySide && styles.fieldCornerBesidePanel]}>
-          {cornerSlot(stage, stageNumberInIsland)}
+          {cornerSlot(stage, stageNumberInIsland, isClear)}
         </View>
       ) : null}
       {cornerBadge === undefined ? null : (
