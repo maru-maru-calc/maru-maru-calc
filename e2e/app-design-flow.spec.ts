@@ -553,6 +553,46 @@ test('pending bubbles show an idle tap hint', async ({ page }) => {
   await expect(page.getByTestId('pending-bubble-hint')).toBeVisible({ timeout: 4000 });
 });
 
+test('the addition island is twelve stages, and what was cleared before stays cleared', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!window.localStorage.getItem('marumaru-calc:progress')) {
+      window.localStorage.setItem(
+        'marumaru-calc:progress',
+        JSON.stringify({
+          version: 1,
+          // Cleared when the island had 25 stages. "four-six" and "20-fives" are among the 13 that are gone.
+          marumaru: ['addition-10-ones', 'addition-10-twos', 'addition-10-four-six', 'addition-20-fives', 'addition-120-times'],
+          dentaku: [],
+          longForm: [],
+          hasSeenIntro: true,
+        }),
+      );
+    }
+  });
+  await page.goto('/game');
+  await page.getByLabel('まるまるモード', { exact: true }).click();
+  await expect(page.getByTestId('world-select')).toBeVisible();
+
+  // Three of today's twelve; the two stages that are gone are not counted.
+  await expect(page.getByLabel('たしざん', { exact: true })).toContainText('3/12');
+  await expect(page.getByLabel('ひきざん', { exact: true })).toContainText('0/25');
+
+  await page.getByLabel('たしざん', { exact: true }).click();
+  const stages = page.locator('[data-testid^="stage-addition-"]');
+  await expect(stages).toHaveCount(12);
+  await expect(page.getByTestId('stage-done-starfish')).toHaveCount(3);
+  for (const cleared of ['addition-10-ones', 'addition-10-twos', 'addition-120-times']) {
+    await expect(page.getByTestId(`stage-${cleared}`).getByTestId('stage-done-starfish')).toBeVisible();
+  }
+  // The numbers run from #1 to #12, ending with the hundreds.
+  await expect(stages.first()).toContainText('#1');
+  await expect(stages.last()).toContainText('#12');
+  await expect(stages.last()).toContainText('120');
+  // Nothing is lost from what was saved: the old stages may come back one day.
+  const saved = await page.evaluate(() => JSON.parse(window.localStorage.getItem('marumaru-calc:progress') ?? '{}').marumaru as string[]);
+  expect(saved).toContain('addition-10-four-six');
+});
+
 test('a decorative bubble pops when the water under it is tapped', async ({ page }) => {
   // Where the bubbles are depends on the time; the clock is wound forward until one is in open water.
   await page.clock.install();
