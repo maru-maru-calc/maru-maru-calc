@@ -335,24 +335,30 @@ test('a wide window with room to spare shows the board bigger, and a dragged mar
 
   await page.locator('[data-testid^="pending-bubble-"]').first().click();
   await page.waitForTimeout(2500);
-  // The topmost maru of the pile: nothing lies on it, and there is free water above.
-  const [startX, startY] = await page.evaluate(() => {
+  // Press on the topmost maru of the pile: there is free water above it. Maru take a press from
+  // well outside their rim, so the one that is taken hold of may be its neighbour: that one is watched.
+  const [pressX, pressY, startX, startY] = await page.evaluate(() => {
     const top = Array.from(document.querySelectorAll('[data-testid^="bead-"]'))
       .map((element) => element.getBoundingClientRect())
       .sort((left, right) => left.y - right.y)[0];
-    return [top.x + top.width / 2, top.y + top.height / 2];
+    const x = top.x + top.width / 2;
+    const y = top.y + top.height / 2;
+    const taken = document.elementFromPoint(x, y)?.closest('[data-testid^="bead-"]') as HTMLElement;
+    taken.setAttribute('data-held', '1');
+    const box = taken.getBoundingClientRect();
+    return [x, y, box.x + box.width / 2, box.y + box.height / 2];
   });
-  await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('[data-testid^="bead-"]')?.setAttribute('data-held', '1'), [startX, startY]);
-  await page.mouse.move(startX, startY);
+  await page.mouse.move(pressX, pressY);
   await page.mouse.down();
-  await page.mouse.move(startX + 15, startY - 45, { steps: 6 });
-  await page.mouse.move(startX + 30, startY - 90, { steps: 6 });
+  await page.mouse.move(pressX + 15, pressY - 45, { steps: 6 });
+  await page.mouse.move(pressX + 30, pressY - 90, { steps: 6 });
   await page.waitForTimeout(250);
   const held = await page.evaluate(() => {
     const box = (document.querySelector('[data-held]') as HTMLElement).getBoundingClientRect();
     return [box.x + box.width / 2, box.y + box.height / 2];
   });
   await page.mouse.up();
+  // It moved as far as the pointer did.
   expect(Math.abs(held[0] - (startX + 30))).toBeLessThan(5);
   expect(Math.abs(held[1] - (startY - 90))).toBeLessThan(5);
 });
