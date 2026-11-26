@@ -84,11 +84,11 @@ describe('the puzzle in one line, for the message its address is posted with', (
     expect(getPuzzleLine(undefined, createMadePuzzleStage({ bubbles: [2, 4, 10, 5], goal: 28 }))).toBe('2 · 4 · 10 · 5 → 28 ?');
   });
 
-  it('ends in a tick when it is sent by someone who solved it, and still does not say how', () => {
-    expect(getPuzzleLine(1, { target: 11, bubbleCounts: [2, 8, 6] }, true)).toBe('#1  2 · 8 · 6 → 11 ✓');
-    expect(getPuzzleLine(undefined, createMadePuzzleStage({ bubbles: [2, 3, 4], goal: 14 }), true)).toBe('2 · 3 · 4 → 14 ✓');
+  it('ends in "!" when it is sent by someone who solved it, and still does not say how', () => {
+    expect(getPuzzleLine(1, { target: 11, bubbleCounts: [2, 8, 6] }, true)).toBe('#1  2 · 8 · 6 → 11 !');
+    expect(getPuzzleLine(undefined, createMadePuzzleStage({ bubbles: [2, 3, 4], goal: 14 }), true)).toBe('2 · 3 · 4 → 14 !');
     PUZZLE_GAME_STAGES.forEach((stage, index) => {
-      expect(getPuzzleLine(index + 1, stage, true)).toMatch(/^#[0-9]+ {2}[0-9]+( · [0-9]+)+ → [0-9]+ ✓$/);
+      expect(getPuzzleLine(index + 1, stage, true)).toMatch(/^#[0-9]+ {2}[0-9]+( · [0-9]+)+ → [0-9]+ !$/);
     });
     expect(getSolvedCardFileName(46)).toBe('maru-solved-46.png');
   });

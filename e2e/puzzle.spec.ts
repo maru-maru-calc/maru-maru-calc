@@ -759,12 +759,14 @@ test('solved, a puzzle can be shown to someone: the corner button then sends tha
   await expect(page.getByTestId('share-solved')).toHaveCount(0);
 
   await tapWay(page, PUZZLE_STAGES[45].solution.split(' '), 300);
-  // Solved: the same button in the same corner, now white with a tick on it, and no word.
+  // Solved: the same button in the same corner, now white with a starfish on its corner (one of those that drift up over a solved board), and no word.
   const solved = page.getByTestId('share-solved');
   await expect(solved).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('share-puzzle')).toHaveCount(0);
   expect(await solved.boundingBox()).toEqual(before);
-  await expect(page.getByTestId('share-solved-tick')).toBeVisible();
+  await expect(page.getByTestId('share-solved-mark')).toBeVisible();
+  // No sign from outside the game marks it: no tick.
+  await expect(solved.getByTestId('nav-icon-check')).toHaveCount(0);
   await expect(solved).toHaveText('');
   await expect(page.getByLabel('share that it is solved', { exact: true })).toHaveCount(1);
   expect(await solved.evaluate((button) => getComputedStyle(button).backgroundColor)).toBe('rgba(255, 255, 255, 0.96)');
@@ -778,14 +780,14 @@ test('solved, a puzzle can be shown to someone: the corner button then sends tha
   expect(device.width).toBeGreaterThan(3 * firstPlace.width);
   await page.getByTestId('share-device').click();
   await page.getByTestId('share-close').click();
-  // One upright picture named after the puzzle; with it the puzzle in one line ending in a tick, and
+  // One upright picture named after the puzzle; with it the puzzle in one line ending in "!", and
   // the address of the puzzle's page, so that whoever is shown it can try. Neither says how it was solved.
   const shared = await readShared();
   expect(shared).toEqual({
     count: 1,
     name: 'maru-solved-46.png',
     type: 'image/png',
-    text: `#46  ${PUZZLE_STAGES[45].bubbles.join(' · ')} → ${PUZZLE_STAGES[45].goal} ✓  #MaruMaruCalc\n${site}p/46`,
+    text: `#46  ${PUZZLE_STAGES[45].bubbles.join(' · ')} → ${PUZZLE_STAGES[45].goal} !  #MaruMaruCalc\n${site}p/46`,
     width: 1080,
     height: 1350,
   });
@@ -810,7 +812,7 @@ test('solved, a puzzle can be shown to someone: the corner button then sends tha
     count: 1,
     name: 'maru-solved-2.3.4-14.png',
     type: 'image/png',
-    text: `2 · 3 · 4 → 14 ✓  #MaruMaruCalc\n${site}puzzle?m=2.3.4-14`,
+    text: `2 · 3 · 4 → 14 !  #MaruMaruCalc\n${site}puzzle?m=2.3.4-14`,
     width: 1080,
     height: 1350,
   });
@@ -849,7 +851,7 @@ test('on a phone the share button goes straight to the phone\'s own share, with 
   await expect(page.getByTestId('share-solved')).toBeVisible({ timeout: 30_000 });
   await page.getByTestId('share-solved').tap();
   await expect.poll(readShared).toHaveLength(2);
-  expect((await readShared())[1]).toEqual({ name: 'maru-solved-46.png', text: `${line} ✓  #MaruMaruCalc\n${site}p/46` });
+  expect((await readShared())[1]).toEqual({ name: 'maru-solved-46.png', text: `${line} !  #MaruMaruCalc\n${site}p/46` });
   await expect(page.getByTestId('share-panel')).toHaveCount(0);
   await context.close();
 

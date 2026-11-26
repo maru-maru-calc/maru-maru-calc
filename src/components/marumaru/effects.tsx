@@ -457,7 +457,8 @@ export function ClearBubbleFireworks({ fieldWidth, fieldHeight }: { fieldWidth: 
   );
 }
 
-function RoundedStarfish({ size, style }: { size: number; style?: StyleProp<ViewStyle> }) {
+/** The starfish that drifts up over a solved stage: five rounded arms around a pale middle. */
+export function RoundedStarfish({ size, style }: { size: number; style?: StyleProp<ViewStyle> }) {
   const armWidth = size * 0.34;
   const armHeight = size * 0.5;
   const center = size / 2;
