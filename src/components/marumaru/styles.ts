@@ -1004,6 +1004,13 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Where the count stands in the one-minute game: the screen's own button, opposite "undo".
+  cornerSlot: {
+    position: 'absolute',
+    left: GRID * 3,
+    bottom: 0,
+    zIndex: 45,
+  },
   cornerBadge: {
     position: 'absolute',
     left: GRID * 3,

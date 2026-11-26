@@ -1,7 +1,8 @@
+import type { Stage } from '@/game/types';
 import type { PuzzleSaveSlot } from '@/storage/puzzle-progress';
 
-/** A picture of a result, drawn and ready: `share` hands it over at once, so it can be called from a tap. */
-export type ResultShare = { share: () => void };
+/** A picture drawn and ready: `share` hands it over at once, so it can be called from a tap. */
+export type PictureShare = { share: () => void };
 
 /**
  * What the puzzle game needs from wherever it runs: a web page of its own (browser-host.ts) or
@@ -23,5 +24,15 @@ export type GameHost = {
    * cannot be shared (YouTube's rules allow no way out of the game); resolves to undefined when
    * the picture could not be made.
    */
-  prepareResultShare: ((solved: number) => Promise<ResultShare | undefined>) | undefined;
+  prepareResultShare: ((solved: number) => Promise<PictureShare | undefined>) | undefined;
+  /**
+   * Gets a picture of one of the numbered puzzles ready for the player to send to someone, with
+   * the address that opens that puzzle. Undefined where nothing can be shared.
+   */
+  preparePuzzleShare: ((number: number, stage: Stage) => Promise<PictureShare | undefined>) | undefined;
+  /**
+   * The numbered puzzle this visit asks for (the address of a shared puzzle), out of `count`.
+   * Undefined where a visit cannot ask for one, or when it asks for none.
+   */
+  getRequestedPuzzle: ((count: number) => number | undefined) | undefined;
 };

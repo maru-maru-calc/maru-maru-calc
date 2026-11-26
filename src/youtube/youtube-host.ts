@@ -92,5 +92,8 @@ export function createYouTubeHost(
     },
     // A game on YouTube may not lead out of it.
     prepareResultShare: undefined,
+    preparePuzzleShare: undefined,
+    // There is one way in, and it leads to the start.
+    getRequestedPuzzle: undefined,
   };
 }

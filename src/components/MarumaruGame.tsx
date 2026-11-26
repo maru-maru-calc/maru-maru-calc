@@ -1,6 +1,6 @@
 import * as Matter from 'matter-js';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import type { Dispatch, ReactNode, SetStateAction } from 'react';
 import { PixelRatio, Pressable, Text, View } from 'react-native';
 
 import { SFX } from '@/audio/sfx';
@@ -160,6 +160,7 @@ export function MarumaruGame({
   onAllBubblesUsed,
   resetSignal = 0,
   cornerBadge,
+  cornerSlot,
 }: {
   /**
    * Called the moment the last bubble goes in, with whether the amount is the goal. A game played
@@ -170,6 +171,8 @@ export function MarumaruGame({
   resetSignal?: number;
   /** A short text (a count) shown in the corner under the bowl, opposite the undo button. */
   cornerBadge?: string;
+  /** Something of the screen's own for that corner (a button), given the stage being played and its number. */
+  cornerSlot?: (stage: Stage, stageNumber: number) => ReactNode;
   /** Whether the header also draws the goal as maru, beside the number. */
   showsGoalAsMaru?: boolean;
   /** The stages to play, numbered from 1 in this order. Left out: the stages of まるまるモード. */
@@ -2183,6 +2186,11 @@ export function MarumaruGame({
       {divisionSplitAnimation ? <DivisionSplitOverlay animation={divisionSplitAnimation} /> : null}
       {divisionFailedAnimation ? <DivisionFailedOverlay animation={divisionFailedAnimation} /> : null}
       {isFailed ? <FailedWaterOverlay failedAt={failedAt} /> : null}
+      {cornerSlot ? (
+        <View pointerEvents="box-none" testID="corner-slot" style={[styles.cornerSlot, isSideBySide && styles.fieldCornerBesidePanel]}>
+          {cornerSlot(stage, stageNumberInIsland)}
+        </View>
+      ) : null}
       {cornerBadge === undefined ? null : (
         <View pointerEvents="none" testID="corner-badge" style={[styles.cornerBadge, isSideBySide && styles.fieldCornerBesidePanel]}>
           <Text style={styles.cornerBadgeText}>{cornerBadge}</Text>
