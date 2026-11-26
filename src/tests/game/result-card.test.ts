@@ -46,8 +46,13 @@ describe('the picture of a one-minute result', () => {
   });
 
   it('draws them at full size for any count a minute can hold, and smaller only when the bowl is full', () => {
-    expect(getResultCardMaru(29).every((maru) => maru.radius === (maru.value === 10 ? 40 : 28))).toBe(true);
-    expect(getResultCardMaru(99).every((maru) => maru.radius < (maru.value === 10 ? 40 : 28))).toBe(true);
+    expect(getResultCardMaru(20).every((maru) => maru.radius === (maru.value === 10 ? 50 : 35))).toBe(true);
+    expect(getResultCardMaru(19).every((maru) => maru.radius === (maru.value === 10 ? 50 : 35))).toBe(true);
+    expect(getResultCardMaru(99).every((maru) => maru.radius < (maru.value === 10 ? 50 : 35))).toBe(true);
+  });
+
+  it('is upright', () => {
+    expect(RESULT_CARD_HEIGHT > RESULT_CARD_WIDTH).toBe(true);
   });
 
   it('survives a count that is not a whole number or not a count at all', () => {

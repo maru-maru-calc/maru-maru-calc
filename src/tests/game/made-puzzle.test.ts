@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { countWays, createMadePuzzleStage, getMadePuzzleQuery, isMadePuzzleShape, readMadePuzzle, writeMadePuzzle } from '@/game/made-puzzle';
+import { countWays, countWaysByGoal, createMadePuzzleStage, createRandomPuzzle, getMadePuzzleQuery, isMadePuzzleShape, readMadePuzzle, writeMadePuzzle } from '@/game/made-puzzle';
+import { solveStage } from '@/game/stage-rules';
 import { PUZZLE_STAGES } from '@/game/puzzle-stages';
 
 describe('a puzzle a player made', () => {
@@ -38,11 +39,53 @@ describe('a puzzle a player made', () => {
     }
   });
 
+  it('agrees with playing a puzzle in every possible way', () => {
+    // The plain count of winning ways, with the two readings of a start folded into one.
+    for (const puzzle of [{ bubbles: [2, 3, 4], goal: 14 }, { bubbles: [2, 4, 10, 5], goal: 28 }, { bubbles: [3, 3, 6, 2], goal: 12 }, { bubbles: [2, 2, 2], goal: 8 }]) {
+      const seen = new Set<string>();
+      for (const way of solveStage(createMadePuzzleStage(puzzle)).winning) {
+        const steps = way.split(' ');
+        if ((steps[1] === '+' || steps[1] === '×') && Number(steps[2]) < Number(steps[0])) {
+          [steps[0], steps[2]] = [steps[2], steps[0]];
+        }
+        seen.add(steps.join(' '));
+      }
+      expect(countWays(puzzle)).toBe(seen.size);
+    }
+  });
+
+  it('makes a puzzle by chance: different numbers, a goal that can be reached, in one way where there is one', () => {
+    let seed = 7;
+    const random = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed / 2147483648;
+    };
+    for (let count = 2; count <= 6; count += 1) {
+      for (let round = 0; round < (count === 6 ? 3 : 12); round += 1) {
+        const puzzle = createRandomPuzzle(count, random);
+        expect(puzzle.bubbles.length).toBe(count);
+        expect(new Set(puzzle.bubbles).size).toBe(count);
+        expect(isMadePuzzleShape(puzzle)).toBe(true);
+        const ways = countWaysByGoal(puzzle.bubbles);
+        expect((ways.get(puzzle.goal) ?? 0) >= 1).toBe(true);
+        // No other goal within reach has fewer ways.
+        const fewest = Math.min(...[...ways.entries()].filter(([goal]) => Number.isInteger(goal) && goal >= 1 && goal <= 999).map(([, n]) => n));
+        expect(ways.get(puzzle.goal)).toBe(fewest);
+        // What it makes can be sent and read back.
+        expect(readMadePuzzle(`?m=${writeMadePuzzle(puzzle)}`)).toEqual(puzzle);
+      }
+    }
+    // A count out of range is brought into it.
+    expect(createRandomPuzzle(1, random).bubbles.length).toBe(2);
+    expect(createRandomPuzzle(9, random).bubbles.length).toBe(6);
+  });
+
   it('counts six bubbles without taking long', () => {
     const started = Date.now();
     const ways = countWays({ bubbles: [7, 11, 10, 6, 9, 8], goal: 43 });
     expect(ways > 0).toBe(true);
     expect(Date.now() - started < 5000).toBe(true);
+    console.log(`      (six bubbles counted in ${Date.now() - started}ms)`);
   });
 
   it('carries no puzzle when the address has none, or one that cannot be played', () => {

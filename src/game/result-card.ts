@@ -1,19 +1,19 @@
 // The picture of a one-minute result that a player can share: where its parts go.
 //
-// No words on it, like the game: a clock, the count, and the count again as maru lying in the
+// No words on it, like the game, and no address either: a clock, the count, and the count again as maru lying in the
 // bowl (a ten-maru for every ten, as on the board). Drawing it is platform/share-result.ts.
 import { getBeadKind } from './beads';
 
-/** A size most places show whole: wide, about 1.9 to 1. */
-export const RESULT_CARD_WIDTH = 1200;
-export const RESULT_CARD_HEIGHT = 630;
+/** Upright, 4 to 5: the pictures are mostly sent from phones and looked at on phones. */
+export const RESULT_CARD_WIDTH = 1080;
+export const RESULT_CARD_HEIGHT = 1350;
 
 /** The bowl: an arc of a circle, as on the board. */
-export const RESULT_CARD_BOWL = { centerX: 600, bottomY: 540, halfWidth: 380, depth: 200, thickness: 14 };
+export const RESULT_CARD_BOWL = { centerX: 540, bottomY: 1170, halfWidth: 430, depth: 300, thickness: 18 };
 
 // Maru are drawn this many times as big as on the board.
-const MARU_SCALE = 2;
-const MARU_GAP = 6;
+const MARU_SCALE = 2.5;
+const MARU_GAP = 8;
 // The share of the bowl's arc the maru may take before they are drawn smaller.
 const MARU_ARC_SHARE = 0.9;
 
@@ -29,7 +29,7 @@ export function getResultCardBowlCircle() {
 /**
  * The count as maru lying side by side in the bottom of the bowl: the tens on the left, then the
  * ones. They touch the bowl and not each other, and are drawn smaller when there are too many
- * for the bowl (from thirty up; nobody solves that many in a minute).
+ * for the bowl (from the high twenties up; nobody solves that many in a minute).
  */
 export function getResultCardMaru(solved: number): ResultCardMaru[] {
   const count = getCount(solved);

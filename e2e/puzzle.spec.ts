@@ -485,7 +485,10 @@ test('the one-minute result can be handed to the device\'s "share" as a picture'
   await expect(share).toHaveText('');
   expect((await share.boundingBox())?.width).toBe((await page.getByTestId('quick-result-again').boundingBox())?.width);
 
+  // A press opens the ways of sending; the device's own share is the one that takes the picture along.
   await share.click();
+  await expect(page.getByTestId('share-panel')).toBeVisible();
+  await page.getByTestId('share-device').click();
   const shared = await page.evaluate(async () => {
     const all = (window as unknown as { sharedByTest: Array<{ name: string; type: string; size: number; text: string | undefined; file: File }> }).sharedByTest;
     const picture = await createImageBitmap(all[0].file);
@@ -502,7 +505,8 @@ test('the one-minute result can be handed to the device\'s "share" as a picture'
     }
     return { count: all.length, name: all[0].name, type: all[0].type, size: all[0].size, text: all[0].text, width: picture.width, height: picture.height, corner: Array.from(pixels.slice(0, 3)).join(), colors: colors.size };
   });
-  expect(shared).toMatchObject({ count: 1, name: 'maru-1min-1.png', type: 'image/png', width: 1200, height: 630, corner: '198,232,244' });
+  // Upright: it is sent from a phone and looked at on a phone.
+  expect(shared).toMatchObject({ count: 1, name: 'maru-1min-1.png', type: 'image/png', width: 1080, height: 1350, corner: '198,232,244' });
   expect(shared.size).toBeGreaterThan(5000);
   expect(shared.colors).toBeGreaterThan(20);
   // The address of the game goes with it: this page's own, nothing a visit added.
@@ -525,10 +529,16 @@ test('where the browser cannot share pictures, the result is saved as a file', a
   await page.clock.fastForward(62_000);
   await expect(page.getByTestId('quick-result')).toBeVisible();
 
-  const download = page.waitForEvent('download');
   await page.getByTestId('quick-result-share').click();
+  // No share of the device's own to offer: the picture can be kept as a file.
+  await expect(page.getByTestId('share-panel')).toBeVisible();
+  await expect(page.getByTestId('share-device')).toHaveCount(0);
+  const download = page.waitForEvent('download');
+  await page.getByTestId('share-save').click();
   expect((await download).suggestedFilename()).toBe('maru-1min-0.png');
-  // The result is still there, and "again" still works.
+  // Closed, the result is still there, and "again" still works.
+  await page.getByTestId('share-close').click();
+  await expect(page.getByTestId('share-panel')).toHaveCount(0);
   await page.getByTestId('quick-result-again').click();
   await expect(page.getByTestId('quick-time-left')).toBeVisible();
 });
@@ -560,6 +570,8 @@ test('a puzzle can be sent as a picture, and the address that goes with it opens
   expect(Math.round(shareBox.x)).toBe(Math.round(390 - (undoBox.x + undoBox.width)));
 
   await share.click();
+  await page.getByTestId('share-device').click();
+  await page.getByTestId('share-close').click();
   const readShared = () =>
     page.evaluate(async () => {
       const all = (window as unknown as { sharedByTest: Array<{ name: string; text: string | undefined; file: File }> }).sharedByTest;
@@ -568,7 +580,7 @@ test('a puzzle can be sent as a picture, and the address that goes with it opens
       return { count: all.length, name: last.name, type: last.file.type, text: last.text, width: picture.width, height: picture.height };
     });
   const shared = await readShared();
-  expect(shared).toMatchObject({ count: 1, name: 'maru-puzzle-46.png', type: 'image/png', width: 1200, height: 630 });
+  expect(shared).toMatchObject({ count: 1, name: 'maru-puzzle-46.png', type: 'image/png', width: 1080, height: 1350 });
   const here = new URL(page.url());
   expect(shared.text).toBe(`${here.origin}${here.pathname}?p=46`);
   // Sending it is not a move: the puzzle is as it was.
@@ -600,6 +612,7 @@ test('a puzzle can be sent as a picture, and the address that goes with it opens
   await page.getByLabel('next stage', { exact: true }).first().click({ timeout: 30_000 });
   await expect(page.getByTestId('stage-goal-number')).toHaveText('#47');
   await page.getByTestId('share-puzzle').click();
+  await page.getByTestId('share-device').click();
   expect(await readShared()).toMatchObject({ count: 2, name: 'maru-puzzle-47.png', text: `${here.origin}${here.pathname}?p=47` });
 });
 
@@ -691,25 +704,26 @@ test('a player can make a puzzle: the bubbles, a goal from working them out, the
   await expect(page.getByTestId('share-puzzle')).toHaveCount(0);
   await tapWay(page, ['3', '×', '4', '+', '2'], 300);
 
-  // Step three: the puzzle as it will be sent. 14 can be reached in two ways (3 × 4 + 2, and 3 + 4 × 2).
+  // Step three: the puzzle as it will be sent, with nothing written on the screen.
   await expect(page.getByTestId('made-puzzle')).toBeVisible();
-  expect(countWays({ bubbles: [2, 3, 4], goal: 14 })).toBe(2);
-  await expect(page.getByTestId('made-puzzle-ways-count')).toHaveText('2');
   await expect(page.getByTestId('made-puzzle-picture')).toBeVisible();
+  expect((await page.getByTestId('made-puzzle').innerText()).trim()).toBe('');
   await page.getByTestId('made-puzzle-share').click();
+  await page.getByTestId('share-device').click();
+  await page.getByTestId('share-close').click();
   const shared = await page.evaluate(async () => {
     const all = (window as unknown as { sharedByTest: Array<{ name: string; text: string | undefined; file: File }> }).sharedByTest;
     const picture = await createImageBitmap(all[0].file);
     return { count: all.length, name: all[0].name, type: all[0].file.type, text: all[0].text, width: picture.width, height: picture.height };
   });
   const here = new URL(page.url());
-  expect(shared).toEqual({ count: 1, name: 'maru-made-2.3.4-14.png', type: 'image/png', text: `${here.origin}${here.pathname}?m=2.3.4-14`, width: 1200, height: 630 });
+  expect(shared).toEqual({ count: 1, name: 'maru-made-2.3.4-14.png', type: 'image/png', text: `${here.origin}${here.pathname}?m=2.3.4-14`, width: 1080, height: 1350 });
 
   // Worked out again another way, it is another puzzle: 2 + 3 + 4 = 9.
   await page.getByTestId('made-puzzle-again').click();
   await expect(page.getByTestId('stage-goal-target')).toHaveText('?');
   await tapWay(page, ['2', '+', '3', '+', '4'], 300);
-  await expect(page.getByTestId('made-puzzle-ways-count')).toHaveText(String(countWays({ bubbles: [2, 3, 4], goal: 9 })));
+  await expect(page.getByTestId('made-puzzle')).toBeVisible();
 
   // The maker can play it as anyone would, and come back.
   await page.getByTestId('made-puzzle-play').click();
@@ -774,7 +788,6 @@ test('while a puzzle is made, an amount that cannot be a goal starts the board o
   // 2 × 3 = 6 is one.
   await tapWay(page, ['2', '×', '3'], 300);
   await expect(page.getByTestId('made-puzzle')).toBeVisible();
-  await expect(page.getByTestId('made-puzzle-ways-count')).toHaveText('1');
 });
 
 test('held sideways, the screens for making a puzzle fit', async ({ page }) => {
@@ -802,7 +815,7 @@ test('held sideways, the screens for making a puzzle fit', async ({ page }) => {
       expect((part?.y ?? 0) + (part?.height ?? 0), testId).toBeLessThanOrEqual(390);
     }
   };
-  await onScreen(['maker-back', 'maker-next', 'maker-more-0', 'maker-less-5', 'maker-bubble-5', 'maker-add', 'maker-remove']);
+  await onScreen(['maker-back', 'maker-next', 'maker-more-0', 'maker-less-5', 'maker-bubble-5', 'maker-add', 'maker-remove', 'maker-random']);
 
   for (let count = 6; count > 2; count -= 1) {
     await page.getByTestId('maker-remove').click();
@@ -811,7 +824,121 @@ test('held sideways, the screens for making a puzzle fit', async ({ page }) => {
   await tapWay(page, ['2', '+', '3'], 300);
   await expect(page.getByTestId('made-puzzle-picture')).toBeVisible();
   await expect(page.getByTestId('made-puzzle-share')).toBeVisible();
-  await onScreen(['made-puzzle-picture', 'made-puzzle-ways', 'made-puzzle-back', 'made-puzzle-again', 'made-puzzle-play', 'made-puzzle-share']);
+  await onScreen(['made-puzzle-picture', 'made-puzzle-back', 'made-puzzle-again', 'made-puzzle-random', 'made-puzzle-play', 'made-puzzle-share']);
+  // The ways of sending fit a phone held sideways too.
+  await page.getByTestId('made-puzzle-share').click();
+  await onScreen(['share-panel', 'share-picture', 'share-x', 'share-line', 'share-facebook', 'share-bluesky', 'share-hatena', 'share-copy', 'share-save', 'share-close']);
+});
+
+test('the ways of sending: five places that post the link, the link to copy, the picture to keep', async ({ page }) => {
+  await page.addInitScript(() => {
+    const opened: string[] = [];
+    const copied: string[] = [];
+    Object.assign(window, { openedByTest: opened, copiedByTest: copied });
+    window.open = (address?: string | URL) => {
+      opened.push(String(address));
+      return null;
+    };
+    Object.defineProperty(Navigator.prototype, 'clipboard', { configurable: true, value: { writeText: (text: string) => (copied.push(text), Promise.resolve()) } });
+    Object.defineProperty(Navigator.prototype, 'share', { configurable: true, value: undefined });
+    Object.defineProperty(Navigator.prototype, 'canShare', { configurable: true, value: undefined });
+  });
+  await page.goto('/puzzle?p=46');
+  await page.getByTestId('share-puzzle').click();
+  const panel = page.getByTestId('share-panel');
+  await expect(panel).toBeVisible();
+  await expect(page.getByTestId('share-picture')).toBeVisible();
+
+  // It lies over the whole screen at the screen's own size, all of it in view.
+  for (const testId of ['share-panel', 'share-picture', 'share-x', 'share-line', 'share-facebook', 'share-bluesky', 'share-hatena', 'share-copy', 'share-save', 'share-close']) {
+    const part = (await page.getByTestId(testId).boundingBox()) as { x: number; y: number; width: number; height: number };
+    expect(part.x, testId).toBeGreaterThanOrEqual(0);
+    expect(part.y, testId).toBeGreaterThanOrEqual(0);
+    expect(part.x + part.width, testId).toBeLessThanOrEqual(390);
+    expect(part.y + part.height, testId).toBeLessThanOrEqual(844);
+  }
+  // The picture is shown upright, as it is sent.
+  const picture = (await page.getByTestId('share-picture').boundingBox()) as { width: number; height: number };
+  expect(picture.height / picture.width).toBeCloseTo(1350 / 1080, 1);
+
+  // Each place gets the address that opens this puzzle, and nothing else.
+  const here = new URL(page.url());
+  const address = encodeURIComponent(`${here.origin}${here.pathname}?p=46`);
+  for (const place of ['x', 'line', 'facebook', 'bluesky', 'hatena']) {
+    await page.getByTestId(`share-${place}`).click();
+  }
+  expect(await page.evaluate(() => (window as unknown as { openedByTest: string[] }).openedByTest)).toEqual([
+    `https://twitter.com/intent/tweet?url=${address}`,
+    `https://social-plugins.line.me/lineit/share?url=${address}`,
+    `https://www.facebook.com/sharer/sharer.php?u=${address}`,
+    `https://bsky.app/intent/compose?text=${address}`,
+    `https://b.hatena.ne.jp/add?mode=confirm&url=${address}`,
+  ]);
+  // Each place is shown by its own mark, whole and in its own proportions; the sheet has no word on it.
+  expect((await panel.innerText()).trim()).toBe('');
+  const marks = await panel.locator('[data-testid^="share-"] img').evaluateAll((images) =>
+    images.filter((image) => !(image as HTMLImageElement).src.startsWith('blob:')).map((image) => ({ loaded: (image as HTMLImageElement).naturalWidth > 0, source: (image as HTMLImageElement).src.split('/').pop()?.split('.')[0] })),
+  );
+  expect(marks.map((mark) => mark.loaded)).toEqual([true, true, true, true, true]);
+
+  // The link is copied as it is, and the button says so with a tick.
+  await expect(page.getByTestId('nav-icon-check')).toHaveCount(0);
+  await page.getByTestId('share-copy').click();
+  await expect(page.getByTestId('nav-icon-check')).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { copiedByTest: string[] }).copiedByTest)).toEqual([`${here.origin}${here.pathname}?p=46`]);
+
+  // A press beside the sheet closes it; none of this was a move on the board.
+  await page.getByTestId('share-panel-backdrop').click({ position: { x: 5, y: 5 } });
+  await expect(panel).toHaveCount(0);
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(PUZZLE_STAGES[45].bubbles.length);
+});
+
+test('the die makes a whole puzzle of as many bubbles as were chosen, one that can be solved', async ({ page }) => {
+  await page.addInitScript(() => {
+    const shared: string[] = [];
+    Object.assign(window, { sharedByTest: shared });
+    Object.defineProperty(Navigator.prototype, 'canShare', { configurable: true, value: () => true });
+    Object.defineProperty(Navigator.prototype, 'share', { configurable: true, value: (data: ShareData) => (shared.push(String(data.text)), Promise.resolve()) });
+  });
+  await openPuzzleGame(page);
+  await solveStartPuzzle(page);
+  await page.getByTestId('choose-make').click();
+  await page.getByTestId('maker-add').click();
+  await page.getByTestId('maker-add').click();
+  await expect(page.locator('[data-testid^="maker-bubble-"]')).toHaveCount(5);
+
+  // One press: the finished puzzle, without the board in between.
+  await page.getByTestId('maker-random').click();
+  await expect(page.getByTestId('made-puzzle-picture')).toBeVisible();
+  const readPuzzle = async () => {
+    await page.getByTestId('made-puzzle-share').click();
+    await page.getByTestId('share-device').click();
+    await page.getByTestId('share-close').click();
+    const texts = await page.evaluate(() => (window as unknown as { sharedByTest: string[] }).sharedByTest);
+    const [, bubbleText, goalText] = /[?]m=([0-9.]+)-([0-9]+)$/.exec(texts[texts.length - 1]) as RegExpExecArray;
+    return { bubbles: bubbleText.split('.').map(Number), goal: Number(goalText) };
+  };
+  const first = await readPuzzle();
+  expect(first.bubbles).toHaveLength(5);
+  expect(new Set(first.bubbles).size).toBe(5);
+  expect(countWays(first)).toBeGreaterThan(0);
+
+  // The die again, from here: another puzzle of five.
+  const seen = new Set([JSON.stringify(first)]);
+  for (let roll = 0; roll < 3; roll += 1) {
+    await page.getByTestId('made-puzzle-random').click();
+    await expect(page.getByTestId('made-puzzle-picture')).toBeVisible();
+    const next = await readPuzzle();
+    expect(next.bubbles).toHaveLength(5);
+    expect(countWays(next)).toBeGreaterThan(0);
+    seen.add(JSON.stringify(next));
+  }
+  expect(seen.size).toBeGreaterThan(1);
+
+  // It plays like any made puzzle, and "back" from its bubbles keeps the count.
+  await page.getByTestId('made-puzzle-play').click();
+  await expect(page.getByTestId('stage-goal-pencil')).toBeVisible();
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(5);
 });
 
 /** How much bigger or smaller than it is laid out the board is shown. */

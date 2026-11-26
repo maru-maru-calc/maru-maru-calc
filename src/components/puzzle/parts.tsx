@@ -1,5 +1,4 @@
 // The puzzle game's own small screens: the choice after the start puzzle, the one-minute result, the end.
-import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,7 +7,7 @@ import { HEADER_ACTION_BUTTON_SIZE, RADIUS_LG } from '@/components/marumaru/cons
 import { ClockIcon, NavImageIcon, PencilIcon } from '@/components/NavImageIcon';
 import { a11yLabel } from '@/i18n/a11y-label';
 import { SIDE_PANEL_WIDTH } from '@/layout/fit-board';
-import type { GameHost, PictureShare } from '@/platform/game-host';
+import type { GameHost } from '@/platform/game-host';
 
 const INK = '#12334A';
 const ACCENT = '#0284C7';
@@ -61,52 +60,6 @@ export function PuzzleChoice({
 }
 
 /**
- * The button that hands a picture to the device's "share". The picture is drawn as soon as there
- * is something to show (a browser only opens the share sheet in the moment of a tap, with nothing
- * to wait for), and the button appears once there is a picture to hand over. `shareKey` says what
- * the picture shows: a new key draws a new picture.
- */
-export function ShareButton({ label, testID, shareKey, prepare }: { label: string; testID: string; shareKey: string; prepare: () => Promise<PictureShare | undefined> }) {
-  const [ready, setReady] = useState<{ key: string; share: PictureShare } | undefined>(undefined);
-  const prepareRef = useRef(prepare);
-  prepareRef.current = prepare;
-  useEffect(() => {
-    let isCurrent = true;
-    let made: PictureShare | undefined;
-    void prepareRef.current().then(
-      (share) => {
-        if (!share) {
-          return;
-        }
-        if (isCurrent) {
-          made = share;
-          setReady({ key: shareKey, share });
-        } else {
-          // Drawn too late to be of use: the screen has moved on.
-          share.release();
-        }
-      },
-      () => {},
-    );
-    return () => {
-      isCurrent = false;
-      // A picture is kept in memory until it is let go: one for every puzzle played would add up.
-      made?.release();
-    };
-  }, [shareKey]);
-
-  // A picture of something else (the puzzle before this one) is not handed over.
-  if (!ready || ready.key !== shareKey) {
-    return null;
-  }
-  return (
-    <Pressable accessibilityLabel={a11yLabel(label)} accessibilityRole="button" testID={testID} onPress={() => ready.share.share()} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
-      <NavImageIcon kind="share" size={29} />
-    </Pressable>
-  );
-}
-
-/**
  * After a minute: how many were solved, and the player's own five best. Where the game may lead
  * out of itself, a third button hands a picture of the result to the device's "share".
  */
@@ -115,6 +68,7 @@ export function QuickResult({
   scores,
   rank,
   prepareShare,
+  ShareButton,
   onAgain,
   onBack,
 }: {
@@ -122,6 +76,7 @@ export function QuickResult({
   scores: number[];
   rank: number | undefined;
   prepareShare: GameHost['prepareResultShare'];
+  ShareButton: GameHost['ShareButton'];
   onAgain: () => void;
   onBack: () => void;
 }) {
@@ -166,7 +121,7 @@ export function QuickResult({
           <Pressable accessibilityLabel={a11yLabel('play again')} accessibilityRole="button" testID="quick-result-again" onPress={onAgain} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
             <NavImageIcon kind="retry" size={29} />
           </Pressable>
-          {prepareShare ? <ShareButton label="share the result" testID="quick-result-share" shareKey={`result-${solved}`} prepare={() => prepareShare(solved)} /> : null}
+          {prepareShare && ShareButton ? <ShareButton label="share the result" testID="quick-result-share" shareKey={`result-${solved}`} prepare={() => prepareShare(solved)} /> : null}
         </View>
       </View>
     </SafeAreaView>
