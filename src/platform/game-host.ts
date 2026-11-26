@@ -12,6 +12,12 @@ export type ShareLinkId = 'x' | 'line' | 'facebook' | 'bluesky' | 'hatena';
  * sending them. Everything here can be called from a tap, with nothing to wait for first.
  */
 export type PictureShare = {
+  /**
+   * What the ways of sending put first. A puzzle is sent to be solved by as many as will: the
+   * places that post it lead. A result is shown to somebody: the picture is the point, so the
+   * device's own share leads, which is the one way the picture goes along.
+   */
+  lead: 'places' | 'device';
   /** Shows the picture on the screen, until `release` gives its memory back. */
   previewUrl: string;
   release: () => void;

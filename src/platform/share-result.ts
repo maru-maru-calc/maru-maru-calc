@@ -5,7 +5,7 @@ import type { PictureShare } from '@/platform/game-host';
 import { CARD_FONT, CARD_INK, drawBowl, drawClock, drawMaru, drawWater, preparePictureShare } from '@/platform/share-picture';
 
 export function prepareResultShare(solved: number): Promise<PictureShare | undefined> {
-  return preparePictureShare(getResultCardFileName(solved), undefined, (context) => {
+  return preparePictureShare(getResultCardFileName(solved), { page: 'puzzle', lead: 'device' }, (context) => {
     drawWater(context);
     drawBowl(context, getResultCardBowlCircle(), RESULT_CARD_BOWL.thickness);
     for (const maru of getResultCardMaru(solved)) {

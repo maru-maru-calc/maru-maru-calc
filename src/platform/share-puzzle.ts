@@ -1,6 +1,6 @@
 // The picture of one puzzle, as the board stands before the first move, and the address that
 // opens that puzzle.
-import { getPuzzleCard, getPuzzleCardFileName, getPuzzleQuery, PUZZLE_CARD_FIELD, PUZZLE_CARD_PANEL } from '@/components/puzzle/puzzle-card';
+import { getPuzzleCard, getPuzzleCardFileName, getPuzzleLine, getPuzzlePage, PUZZLE_CARD_FIELD, PUZZLE_CARD_PANEL } from '@/components/puzzle/puzzle-card';
 import type { PuzzleCard, PuzzleCardBubble, PuzzleCardOperator } from '@/components/puzzle/puzzle-card';
 import { getBeadKind } from '@/game/beads';
 import { getMadePuzzleQuery, writeMadePuzzle } from '@/game/made-puzzle';
@@ -17,8 +17,9 @@ const K = PUZZLE_CARD_FIELD.scale;
 export function preparePuzzleShare(puzzle: SharedPuzzle, stage: Stage): Promise<PictureShare | undefined> {
   const isMade = 'made' in puzzle;
   const fileName = isMade ? `maru-made-${writeMadePuzzle(puzzle.made)}.png` : getPuzzleCardFileName(puzzle.number);
-  const query = isMade ? getMadePuzzleQuery(puzzle.made) : getPuzzleQuery(puzzle.number);
-  return preparePictureShare(fileName, query, (context) => {
+  // A numbered puzzle has a page of its own; a made one is told to the game's page after "?".
+  const page = isMade ? `puzzle?${getMadePuzzleQuery(puzzle.made)}` : getPuzzlePage(puzzle.number);
+  return preparePictureShare(fileName, { page, line: getPuzzleLine(isMade ? undefined : puzzle.number, stage), lead: 'places' }, (context) => {
     const card = getPuzzleCard(isMade ? 'pencil' : puzzle.number, stage);
     // Only small bubbles drift here: big ones would lie over the puzzle's own.
     drawWater(context, [

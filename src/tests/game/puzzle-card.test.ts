@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getPuzzleCard, getPuzzleCardFileName, getPuzzleQuery, PUZZLE_CARD_PANEL, readRequestedPuzzle } from '@/components/puzzle/puzzle-card';
+import { getPuzzleCard, getPuzzleCardFileName, getPuzzleLine, getPuzzlePage, getSitePath, PUZZLE_CARD_PANEL, readPuzzlePage, readRequestedPuzzle } from '@/components/puzzle/puzzle-card';
 import { createMadePuzzleStage } from '@/game/made-puzzle';
 import { PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
 import { RESULT_CARD_HEIGHT, RESULT_CARD_WIDTH } from '@/game/result-card';
@@ -65,21 +65,64 @@ describe('the picture of one puzzle', () => {
     expect(card.operators.every((operator) => operator.limit === 'infinite')).toBe(true);
   });
 
-  it('names the file and the address after the number', () => {
+  it('names the file and the page after the number', () => {
     expect(getPuzzleCardFileName(46)).toBe('maru-puzzle-46.png');
-    expect(getPuzzleQuery(46)).toBe('p=46');
+    expect(getPuzzlePage(46)).toBe('p/46');
   });
 });
 
-describe('the puzzle an address asks for', () => {
+describe('the puzzle in one line, for the message its address is posted with', () => {
+  it('is its number, its bubbles as they are laid out, and its goal: figures and signs, no words', () => {
+    expect(getPuzzleLine(46, PUZZLE_GAME_STAGES[45])).toBe(`#46  ${PUZZLE_GAME_STAGES[45].bubbleCounts.join(' · ')} → ${PUZZLE_GAME_STAGES[45].target} ?`);
+    expect(getPuzzleLine(1, { target: 11, bubbleCounts: [2, 8, 6] })).toBe('#1  2 · 8 · 6 → 11 ?');
+    PUZZLE_GAME_STAGES.forEach((stage, index) => {
+      expect(getPuzzleLine(index + 1, stage)).toMatch(/^#[0-9]+ {2}[0-9]+( · [0-9]+)+ → [0-9]+ \?$/);
+    });
+  });
+
+  it('has no number for a puzzle a player made', () => {
+    expect(getPuzzleLine(undefined, createMadePuzzleStage({ bubbles: [2, 4, 10, 5], goal: 28 }))).toBe('2 · 4 · 10 · 5 → 28 ?');
+  });
+});
+
+describe('the page of one puzzle', () => {
+  it('is read from the path it is served at, with or without the site\'s own path before it', () => {
+    expect(readPuzzlePage('/maru-maru-calc/p/46', 100)).toBe(46);
+    expect(readPuzzlePage('/p/1', 100)).toBe(1);
+    expect(readPuzzlePage('/maru-maru-calc/p/100', 100)).toBe(100);
+    expect(readPuzzlePage('/maru-maru-calc/p/46/', 100)).toBe(46);
+    expect(readPuzzlePage('/p/007', 100)).toBe(7);
+    // What a shared address ends in is read back as the same puzzle.
+    expect(readPuzzlePage(`/maru-maru-calc/${getPuzzlePage(83)}`, 100)).toBe(83);
+  });
+
+  it('is none on any other page, or for a puzzle there is not', () => {
+    for (const pathname of ['', '/', '/puzzle', '/maru-maru-calc/puzzle', '/p', '/p/', '/p/0', '/p/101', '/p/-3', '/p/4.5', '/p/abc', '/p/46/x', '/p/99999', '/xp/46x', '/P/46', '/maru-maru-calc/play']) {
+      expect(readPuzzlePage(pathname, 100)).toBe(undefined);
+    }
+    expect(readPuzzlePage('/p/46', 0)).toBe(undefined);
+  });
+
+  it('and the game\'s page both give the site\'s own path, which every shared address starts from', () => {
+    expect(getSitePath('/maru-maru-calc/puzzle')).toBe('/maru-maru-calc/');
+    expect(getSitePath('/maru-maru-calc/p/46')).toBe('/maru-maru-calc/');
+    expect(getSitePath('/maru-maru-calc/p/46/')).toBe('/maru-maru-calc/');
+    expect(getSitePath('/maru-maru-calc/puzzle/')).toBe('/maru-maru-calc/');
+    // Served at the top of a site, as while the app is developed.
+    expect(getSitePath('/puzzle')).toBe('/');
+    expect(getSitePath('/p/7')).toBe('/');
+    // A site that happens to be called "p" is not a puzzle's page.
+    expect(getSitePath('/p/puzzle')).toBe('/p/');
+  });
+});
+
+describe('the puzzle an address asks for after "?" (how addresses were written before puzzles had pages)', () => {
   it('is the number after "p", whatever else the address carries', () => {
     expect(readRequestedPuzzle('?p=46', 100)).toBe(46);
     expect(readRequestedPuzzle('?p=1', 100)).toBe(1);
     expect(readRequestedPuzzle('?p=100', 100)).toBe(100);
     expect(readRequestedPuzzle('?utm_source=x&p=7&fbclid=abc', 100)).toBe(7);
     expect(readRequestedPuzzle('?p=007', 100)).toBe(7);
-    // What the picture's own address gives is read back as the same puzzle.
-    expect(readRequestedPuzzle(`?${getPuzzleQuery(83)}`, 100)).toBe(83);
   });
 
   it('is none when the address asks for nothing, or for a puzzle there is not', () => {
