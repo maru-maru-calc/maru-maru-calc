@@ -16,6 +16,7 @@ const JAPANESE_LABELS: Record<string, string> = {
   'one-minute game': '1ぷんチャレンジ',
   'play again': 'もういちど',
   'share the result': 'けっかをシェアする',
+  'share this puzzle': 'このパズルをおくる',
   'Next stage': 'つぎへ',
   'maru logo': 'まるまる電卓',
   'maru maru calc logo': 'まるまる電卓 トップページ',

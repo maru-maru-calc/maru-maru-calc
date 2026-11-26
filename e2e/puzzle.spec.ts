@@ -12,6 +12,8 @@ test('solving the start puzzle offers the puzzles in order and the one-minute ga
   // The start puzzle is number zero: its header reads like every other puzzle's.
   await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
   await expect(page.getByTestId('puzzle-choice')).toHaveCount(0);
+  // The start puzzle is a different one every visit: there is no address for it to send.
+  await expect(page.getByTestId('share-puzzle')).toHaveCount(0);
 
   await solveStartPuzzle(page);
 
@@ -38,6 +40,7 @@ test('in the one-minute game a solved puzzle counts and a new one follows; a wro
   // The puzzles of the one-minute game have no numbers: a clock stands where the number would be.
   await expect(page.getByTestId('stage-goal-clock')).toBeVisible();
   await expect(page.getByTestId('stage-goal-number')).toHaveCount(0);
+  await expect(page.getByTestId('share-puzzle')).toHaveCount(0);
   await expect(page.getByTestId('corner-badge')).toHaveText('0');
   await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(3);
 
@@ -305,8 +308,12 @@ test('held sideways, the board is at full size: the goal, the operators and the 
     expect(part.y).toBeGreaterThanOrEqual(0);
     expect(part.y + part.height).toBeLessThanOrEqual(390);
   }
-  const besidePanel = [...(await page.locator('[data-testid^="pending-bubble-"]').evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().toJSON() as { x: number; y: number; width: number; height: number }))), await box('undo-move')];
-  expect(besidePanel).toHaveLength(7);
+  const besidePanel = [
+    ...(await page.locator('[data-testid^="pending-bubble-"]').evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().toJSON() as { x: number; y: number; width: number; height: number }))),
+    await box('undo-move'),
+    await box('share-puzzle'),
+  ];
+  expect(besidePanel).toHaveLength(8);
   for (const part of besidePanel) {
     expect(part.x).toBeGreaterThanOrEqual(panel.x + panel.width);
     expect(part.x + part.width).toBeLessThanOrEqual(844);
@@ -523,6 +530,90 @@ test('where the browser cannot share pictures, the result is saved as a file', a
   // The result is still there, and "again" still works.
   await page.getByTestId('quick-result-again').click();
   await expect(page.getByTestId('quick-time-left')).toBeVisible();
+});
+
+test('a puzzle can be sent as a picture, and the address that goes with it opens that puzzle', async ({ page, browser }) => {
+  await page.addInitScript(() => {
+    const shared: Array<{ name: string; text: string | undefined; file: File }> = [];
+    Object.assign(window, { sharedByTest: shared });
+    Object.defineProperty(Navigator.prototype, 'canShare', { configurable: true, value: (data?: ShareData) => (data?.files?.length ?? 0) > 0 });
+    Object.defineProperty(Navigator.prototype, 'share', {
+      configurable: true,
+      value: (data: ShareData) => {
+        const file = data.files?.[0] as File;
+        shared.push({ name: file.name, text: data.text, file });
+        return Promise.resolve();
+      },
+    });
+  });
+  await openPuzzle(page, 46);
+
+  // The button is in the corner opposite "undo", the same button: no word on it.
+  const share = page.getByTestId('share-puzzle');
+  await expect(share).toBeVisible();
+  await expect(share).toHaveText('');
+  const shareBox = (await share.boundingBox()) as { x: number; y: number; width: number; height: number };
+  const undoBox = (await page.getByTestId('undo-move').boundingBox()) as { x: number; y: number; width: number; height: number };
+  expect(shareBox.y).toBe(undoBox.y);
+  expect(shareBox.width).toBe(undoBox.width);
+  expect(Math.round(shareBox.x)).toBe(Math.round(390 - (undoBox.x + undoBox.width)));
+
+  await share.click();
+  const readShared = () =>
+    page.evaluate(async () => {
+      const all = (window as unknown as { sharedByTest: Array<{ name: string; text: string | undefined; file: File }> }).sharedByTest;
+      const last = all[all.length - 1];
+      const picture = await createImageBitmap(last.file);
+      return { count: all.length, name: last.name, type: last.file.type, text: last.text, width: picture.width, height: picture.height };
+    });
+  const shared = await readShared();
+  expect(shared).toMatchObject({ count: 1, name: 'maru-puzzle-46.png', type: 'image/png', width: 1200, height: 630 });
+  const here = new URL(page.url());
+  expect(shared.text).toBe(`${here.origin}${here.pathname}?p=46`);
+  // Sending it is not a move: the puzzle is as it was.
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(PUZZLE_STAGES[45].bubbles.length);
+
+  // Someone who has never played opens that address: puzzle 46 is there at once, without the start puzzle.
+  const friendContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const friend = await friendContext.newPage();
+  await friend.goto(shared.text as string);
+  await expect(friend.getByTestId('stage-goal-number')).toHaveText('#46');
+  await expect(friend.getByTestId('stage-goal-target')).toHaveText(String(PUZZLE_STAGES[45].goal));
+  expect((await readBoard(friend)).bubbles).toEqual([...PUZZLE_STAGES[45].bubbles].sort((left, right) => left - right));
+  await expect(friend.getByTestId('puzzle-choice')).toHaveCount(0);
+
+  // It is the real puzzle: solved, it is kept as solved, and the next one follows.
+  await tapWay(friend, PUZZLE_STAGES[45].solution.split(' '), 300);
+  await friend.getByLabel('next stage', { exact: true }).first().click({ timeout: 30_000 });
+  await expect(friend.getByTestId('stage-goal-number')).toHaveText('#47');
+  expect(await friend.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '{}').solved ?? [], SAVE_KEY)).toHaveLength(1);
+  // "Back" leads to the list, and from there to the start, as for anyone.
+  await friend.getByLabel('Back', { exact: true }).click();
+  await expect(friend.getByLabel('puzzle 46, solved')).toBeVisible();
+  await friend.getByTestId('puzzle-list-back').click();
+  await expect(friend.getByTestId('stage-goal-number')).toHaveText('#0');
+  await friendContext.close();
+
+  // On the next puzzle the picture is of that one.
+  await tapWay(page, PUZZLE_STAGES[45].solution.split(' '), 300);
+  await page.getByLabel('next stage', { exact: true }).first().click({ timeout: 30_000 });
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#47');
+  await page.getByTestId('share-puzzle').click();
+  expect(await readShared()).toMatchObject({ count: 2, name: 'maru-puzzle-47.png', text: `${here.origin}${here.pathname}?p=47` });
+});
+
+test('an address that asks for a puzzle there is not opens the start, as any visit does', async ({ page }) => {
+  for (const query of ['?p=0', '?p=101', '?p=abc', '?q=46']) {
+    await page.goto(`/puzzle${query}`);
+    await expect(page.getByTestId('stage-goal-number'), query).toHaveText('#0');
+  }
+  // And one there is, with other things in the address around it.
+  await page.goto('/puzzle?from=somewhere&p=100');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#100');
+  // A "#" after it too: the router rewrites such an address while the page comes up.
+  await page.goto('/puzzle?p=46&x=1#somewhere');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#46');
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(PUZZLE_STAGES[99].bubbles.length);
 });
 
 /** How much bigger or smaller than it is laid out the board is shown. */

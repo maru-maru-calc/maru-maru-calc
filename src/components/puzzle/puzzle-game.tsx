@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MarumaruGame } from '@/components/MarumaruGame';
 import { FitToScreen } from '@/components/puzzle/fit-to-screen';
-import { PuzzleChoice, PuzzleEnd, puzzleScreenStyle, QuickResult } from '@/components/puzzle/parts';
+import { PuzzleChoice, PuzzleEnd, puzzleScreenStyle, QuickResult, ShareButton } from '@/components/puzzle/parts';
 import { PuzzleList } from '@/components/puzzle/puzzle-list';
 import { QuickGame } from '@/components/puzzle/quick-game';
 import { createPuzzleGameStage, getPuzzleProgress, pickStartPuzzle, PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
@@ -44,7 +44,13 @@ function PuzzleScreens({ host }: { host: GameHost }) {
     void loadPuzzleProgress(host.saveSlot, host.loadTimeoutMs).then((loaded) => {
       if (isCurrent) {
         setProgress(loaded);
-        setScreen({ name: 'start', stage: createPuzzleGameStage(pickStartPuzzle(loaded.startVisits), 1), round: 0, isSolved: false });
+        // A visit by the address of a shared puzzle goes straight to that puzzle.
+        const requested = host.getRequestedPuzzle?.(PUZZLE_GAME_STAGES.length);
+        setScreen(
+          requested === undefined
+            ? { name: 'start', stage: createPuzzleGameStage(pickStartPuzzle(loaded.startVisits), 1), round: 0, isSolved: false }
+            : { name: 'play', firstIndex: requested - 1, round: 0 },
+        );
       }
     });
     return () => {
@@ -106,6 +112,7 @@ function PuzzleScreens({ host }: { host: GameHost }) {
   }
 
   if (screen.name === 'play') {
+    const { preparePuzzleShare } = host;
     return (
       <MarumaruGame
         key={`play-${screen.round}`}
@@ -115,6 +122,11 @@ function PuzzleScreens({ host }: { host: GameHost }) {
         onBack={() => setScreen({ name: 'list' })}
         onStageClear={(stageId) => update(addSolvedPuzzle(progress, stageId))}
         onLastStageNext={() => setScreen({ name: 'end' })}
+        cornerSlot={
+          preparePuzzleShare
+            ? (stage, number) => <ShareButton label="share this puzzle" testID="share-puzzle" shareKey={stage.id} prepare={() => preparePuzzleShare(number, stage)} />
+            : undefined
+        }
       />
     );
   }
