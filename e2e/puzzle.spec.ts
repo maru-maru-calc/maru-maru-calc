@@ -827,10 +827,10 @@ test('held sideways, the screens for making a puzzle fit', async ({ page }) => {
   await onScreen(['made-puzzle-picture', 'made-puzzle-back', 'made-puzzle-again', 'made-puzzle-random', 'made-puzzle-play', 'made-puzzle-share']);
   // The ways of sending fit a phone held sideways too.
   await page.getByTestId('made-puzzle-share').click();
-  await onScreen(['share-panel', 'share-picture', 'share-x', 'share-line', 'share-facebook', 'share-copy', 'share-save', 'share-close']);
+  await onScreen(['share-panel', 'share-picture', 'share-x', 'share-line', 'share-facebook', 'share-bluesky', 'share-hatena', 'share-copy', 'share-save', 'share-close']);
 });
 
-test('the ways of sending: places that post the link, the link to copy, the picture to keep', async ({ page }) => {
+test('the ways of sending: five places that post the link, the link to copy, the picture to keep', async ({ page }) => {
   await page.addInitScript(() => {
     const opened: string[] = [];
     const copied: string[] = [];
@@ -850,7 +850,7 @@ test('the ways of sending: places that post the link, the link to copy, the pict
   await expect(page.getByTestId('share-picture')).toBeVisible();
 
   // It lies over the whole screen at the screen's own size, all of it in view.
-  for (const testId of ['share-panel', 'share-picture', 'share-x', 'share-line', 'share-facebook', 'share-copy', 'share-save', 'share-close']) {
+  for (const testId of ['share-panel', 'share-picture', 'share-x', 'share-line', 'share-facebook', 'share-bluesky', 'share-hatena', 'share-copy', 'share-save', 'share-close']) {
     const part = (await page.getByTestId(testId).boundingBox()) as { x: number; y: number; width: number; height: number };
     expect(part.x, testId).toBeGreaterThanOrEqual(0);
     expect(part.y, testId).toBeGreaterThanOrEqual(0);
@@ -864,14 +864,22 @@ test('the ways of sending: places that post the link, the link to copy, the pict
   // Each place gets the address that opens this puzzle, and nothing else.
   const here = new URL(page.url());
   const address = encodeURIComponent(`${here.origin}${here.pathname}?p=46`);
-  await page.getByTestId('share-x').click();
-  await page.getByTestId('share-line').click();
-  await page.getByTestId('share-facebook').click();
+  for (const place of ['x', 'line', 'facebook', 'bluesky', 'hatena']) {
+    await page.getByTestId(`share-${place}`).click();
+  }
   expect(await page.evaluate(() => (window as unknown as { openedByTest: string[] }).openedByTest)).toEqual([
     `https://twitter.com/intent/tweet?url=${address}`,
     `https://social-plugins.line.me/lineit/share?url=${address}`,
     `https://www.facebook.com/sharer/sharer.php?u=${address}`,
+    `https://bsky.app/intent/compose?text=${address}`,
+    `https://b.hatena.ne.jp/add?mode=confirm&url=${address}`,
   ]);
+  // Each place is shown by its own mark, whole and in its own proportions; the sheet has no word on it.
+  expect((await panel.innerText()).trim()).toBe('');
+  const marks = await panel.locator('[data-testid^="share-"] img').evaluateAll((images) =>
+    images.filter((image) => !(image as HTMLImageElement).src.startsWith('blob:')).map((image) => ({ loaded: (image as HTMLImageElement).naturalWidth > 0, source: (image as HTMLImageElement).src.split('/').pop()?.split('.')[0] })),
+  );
+  expect(marks.map((mark) => mark.loaded)).toEqual([true, true, true, true, true]);
 
   // The link is copied as it is, and the button says so with a tick.
   await expect(page.getByTestId('nav-icon-check')).toHaveCount(0);

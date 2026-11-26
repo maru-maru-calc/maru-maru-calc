@@ -5,7 +5,7 @@ import type { Stage } from '@/game/types';
 import type { PuzzleSaveSlot } from '@/storage/puzzle-progress';
 
 /** The places a link can be posted to straight from the game. */
-export type ShareLinkId = 'x' | 'line' | 'facebook';
+export type ShareLinkId = 'x' | 'line' | 'facebook' | 'bluesky' | 'hatena';
 
 /**
  * A picture drawn and ready, with the address that leads to what it shows, and the ways of

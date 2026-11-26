@@ -106,6 +106,8 @@ const SHARE_PAGES: Record<ShareLinkId, (address: string) => string> = {
   x: (address) => `https://twitter.com/intent/tweet?url=${address}`,
   line: (address) => `https://social-plugins.line.me/lineit/share?url=${address}`,
   facebook: (address) => `https://www.facebook.com/sharer/sharer.php?u=${address}`,
+  bluesky: (address) => `https://bsky.app/intent/compose?text=${address}`,
+  hatena: (address) => `https://b.hatena.ne.jp/add?mode=confirm&url=${address}`,
 };
 
 async function copyText(text: string): Promise<boolean> {

@@ -2,7 +2,8 @@
 // host (platform/browser-host.ts), so a build where nothing can be shared does not carry it, nor
 // the names of the places it posts to.
 import { useEffect, useRef, useState } from 'react';
-import { Image, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Image, Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import type { ImageSourcePropType } from 'react-native';
 
 import { HEADER_ACTION_BUTTON_SIZE, RADIUS_LG } from '@/components/marumaru/constants';
 import { NavImageIcon } from '@/components/NavImageIcon';
@@ -10,9 +11,7 @@ import { RESULT_CARD_HEIGHT, RESULT_CARD_WIDTH } from '@/game/result-card';
 import { a11yLabel } from '@/i18n/a11y-label';
 import type { PictureShare, ShareButtonProps, ShareLinkId } from '@/platform/game-host';
 
-const INK = '#12334A';
 const WATER = '#C6E8F4';
-const FONT = 'Helvetica';
 
 /**
  * The share button. The picture is drawn as soon as there is something to show (a browser only
@@ -65,13 +64,16 @@ export function ShareButton({ label, testID, shareKey, prepare }: ShareButtonPro
   );
 }
 
-// The names of the places a link can be posted to. They are other people's names, not words of
-// the game, and their signs are theirs to draw: until their own pictures are put in, the name
-// stands for each.
-const SHARE_PLACES: Array<{ id: ShareLinkId; name: string }> = [
-  { id: 'x', name: 'X' },
-  { id: 'line', name: 'LINE' },
-  { id: 'facebook', name: 'Facebook' },
+// The places a link can be posted to, each shown by its own mark (assets/share/SOURCES.md says
+// where the pictures come from). The marks are theirs: they are shown as they are, whole and in
+// their own proportions, and never drawn here. The names are for screen readers.
+const SHARE_PLACES: Array<{ id: ShareLinkId; name: string; mark: ImageSourcePropType; width: number; height: number }> = [
+  { id: 'x', name: 'X', mark: require('../../../assets/share/x.png'), width: 25, height: 25.6 },
+  { id: 'line', name: 'LINE', mark: require('../../../assets/share/line.png'), width: 32, height: 32 },
+  { id: 'facebook', name: 'Facebook', mark: require('../../../assets/share/facebook.png'), width: 32, height: 32 },
+  { id: 'bluesky', name: 'Bluesky', mark: require('../../../assets/share/bluesky.svg'), width: 32, height: 28.2 },
+  // Its picture is 40 across, made for a button of 20: shown no bigger than this, it stays sharp enough.
+  { id: 'hatena', name: 'Hatena Bookmark', mark: require('../../../assets/share/hatena.png'), width: 28, height: 28 },
 ];
 
 /**
@@ -123,9 +125,9 @@ function SharePanel({ share, onClose }: { share: PictureShare; onClose: () => vo
             accessibilityRole="button"
             testID={`share-${place.id}`}
             onPress={() => share.openLink(place.id)}
-            style={({ pressed }) => [tileStyle, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.sharePlace, isTight && styles.sharePlaceSmall, pressed && styles.pressed]}
           >
-            <Text numberOfLines={1} style={[styles.sharePlaceName, place.name.length > 4 && styles.sharePlaceNameLong]}>{place.name}</Text>
+            <Image source={place.mark} resizeMode="contain" style={{ width: place.width * (isTight ? 0.8 : 1), height: place.height * (isTight ? 0.8 : 1) }} />
           </Pressable>
         ))}
       </View>
@@ -209,7 +211,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   shareRowSmall: {
-    gap: 8,
+    gap: 6,
   },
   shareTileSmall: {
     width: 74,
@@ -256,15 +258,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sharePlaceName: {
-    color: INK,
-    fontSize: 20,
-    lineHeight: 24,
-    fontWeight: '900',
-    fontFamily: FONT,
+  // A white square with room around the mark, as the places ask for theirs.
+  sharePlace: {
+    width: 56,
+    height: 56,
+    borderRadius: RADIUS_LG,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 3,
+    borderColor: 'rgba(186, 230, 253, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sharePlaceNameLong: {
-    fontSize: 14,
-    lineHeight: 18,
+  sharePlaceSmall: {
+    width: 44,
+    height: 44,
   },
 });
