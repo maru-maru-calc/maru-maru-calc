@@ -1,5 +1,5 @@
 // The operator buttons and the expression display.
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, type StyleProp, Text, View, type ViewStyle } from 'react-native';
 
 import { OPERATORS, OPERATOR_NAMES } from '@/components/marumaru/constants';
 import { canUseOperator } from '@/components/marumaru/operators';
@@ -18,6 +18,7 @@ export function OperatorRail({
   hasActiveSelection,
   isLocked,
   onSelect,
+  style,
 }: {
   selectedOperator: OperatorSymbol;
   operatorSign: BeadSign;
@@ -26,9 +27,13 @@ export function OperatorRail({
   hasActiveSelection: boolean;
   isLocked: boolean;
   onSelect: (operator: OperatorButtonSymbol) => void;
+  /** Where the rail goes when it is not the row above the bowl (the panel beside it). */
+  style?: StyleProp<ViewStyle>;
 }) {
+  const isGrid = style !== undefined;
+
   return (
-    <View style={styles.operatorRail}>
+    <View style={[styles.operatorRail, style]}>
       {OPERATORS.map((operator) => {
         const usage = operatorUsage[operator];
         const isUsable = canUseOperator(usage);
@@ -47,6 +52,7 @@ export function OperatorRail({
             onPress={() => onSelect(operator)}
             style={({ pressed }) => [
               styles.operatorButton,
+              isGrid && styles.operatorButtonInGrid,
               isMainSelected && styles.selectedOperatorButton,
               isSignSelected && styles.selectedSignOperatorButton,
               isDisabled && styles.disabledOperatorButton,

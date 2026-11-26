@@ -2,9 +2,11 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useBoardViewport } from '@/components/marumaru/board-viewport';
 import { HEADER_ACTION_BUTTON_SIZE, RADIUS_LG } from '@/components/marumaru/constants';
 import { ClockIcon, NavImageIcon } from '@/components/NavImageIcon';
 import { a11yLabel } from '@/i18n/a11y-label';
+import { SIDE_PANEL_WIDTH } from '@/layout/fit-board';
 
 const INK = '#12334A';
 const ACCENT = '#0284C7';
@@ -16,8 +18,11 @@ const FONT = 'Helvetica';
  * one-minute game. No words; the numbers say where each stands.
  */
 export function PuzzleChoice({ nextPuzzle, best, onPuzzles, onQuick }: { nextPuzzle: number | undefined; best: number | undefined; onPuzzles: () => void; onQuick: () => void }) {
+  // Over the bowl: beside the panel when the board is laid out side by side.
+  const isSideBySide = useBoardViewport().arrangement === 'sideBySide';
+
   return (
-    <View pointerEvents="box-none" testID="puzzle-choice" style={styles.choiceLayer}>
+    <View pointerEvents="box-none" testID="puzzle-choice" style={[styles.choiceLayer, isSideBySide && styles.choiceLayerBesidePanel]}>
       <View style={styles.choiceRow}>
         <Pressable accessibilityLabel={a11yLabel('puzzles in order')} accessibilityRole="button" testID="choose-puzzles" onPress={onPuzzles} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
           <NavImageIcon kind="next" size={34} />
@@ -34,19 +39,40 @@ export function PuzzleChoice({ nextPuzzle, best, onPuzzles, onQuick }: { nextPuz
 
 /** After a minute: how many were solved, and the player's own five best. */
 export function QuickResult({ solved, scores, rank, onAgain, onBack }: { solved: number; scores: number[]; rank: number | undefined; onAgain: () => void; onBack: () => void }) {
+  // On a screen that is wider than tall there is no room for all of it in a column: the count
+  // and the five best go side by side.
+  const isSideBySide = useBoardViewport().arrangement === 'sideBySide';
+  const count = (
+    <>
+      <ClockIcon size={44} />
+      <Text testID="quick-result-count" style={styles.bigNumber}>{solved}</Text>
+    </>
+  );
+  const best = (
+    <View testID="quick-result-best" style={styles.bestList}>
+      {scores.map((score, index) => (
+        <View key={`${index}-${score}`} testID={index === rank ? 'quick-result-rank' : undefined} style={[styles.bestRow, index === rank && styles.bestRowCurrent]}>
+          <Text style={styles.bestPlace}>{index + 1}</Text>
+          <Text style={styles.bestScore}>{score}</Text>
+        </View>
+      ))}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.screen}>
       <View testID="quick-result" style={styles.center}>
-        <ClockIcon size={44} />
-        <Text testID="quick-result-count" style={styles.bigNumber}>{solved}</Text>
-        <View testID="quick-result-best" style={styles.bestList}>
-          {scores.map((score, index) => (
-            <View key={`${index}-${score}`} testID={index === rank ? 'quick-result-rank' : undefined} style={[styles.bestRow, index === rank && styles.bestRowCurrent]}>
-              <Text style={styles.bestPlace}>{index + 1}</Text>
-              <Text style={styles.bestScore}>{score}</Text>
-            </View>
-          ))}
-        </View>
+        {isSideBySide ? (
+          <View style={styles.resultRow}>
+            <View style={styles.resultCount}>{count}</View>
+            {best}
+          </View>
+        ) : (
+          <>
+            {count}
+            {best}
+          </>
+        )}
         <View style={styles.buttonRow}>
           <Pressable accessibilityLabel={a11yLabel('Back')} accessibilityRole="button" testID="quick-result-back" onPress={onBack} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
             <NavImageIcon kind="back" size={29} />
@@ -95,6 +121,18 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  choiceLayerBesidePanel: {
+    left: SIDE_PANEL_WIDTH,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 48,
+  },
+  resultCount: {
+    alignItems: 'center',
+    gap: 8,
   },
   choiceRow: {
     flexDirection: 'row',

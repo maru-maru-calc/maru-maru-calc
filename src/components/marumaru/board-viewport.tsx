@@ -13,7 +13,7 @@ export const BoardViewportProvider = BoardViewportContext.Provider;
 export function useBoardViewport(): BoardViewport {
   const given = useContext(BoardViewportContext);
   const { width, height } = useWindowDimensions();
-  return given ?? { width, height, scale: 1 };
+  return given ?? { width, height, scale: 1, arrangement: 'stacked' };
 }
 
 /**

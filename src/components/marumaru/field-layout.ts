@@ -8,8 +8,12 @@ import {
   PENDING_BUBBLE_ROW_FILL_LIMIT,
   PENDING_BUBBLE_SECOND_ROW_OFFSET,
   FIELD_ENTITY_INSET,
+  FIELD_MARGIN,
+  FOOTER_HEIGHT,
+  HEADER_HEIGHT,
   MULTIPLIER_BUBBLE_X_STEP,
   MULTIPLIER_BUBBLE_Y_STEP,
+  OPERATOR_TABS_HEIGHT,
 } from '@/components/marumaru/constants';
 import type {
   BackgroundBubbleSpec,
@@ -21,6 +25,29 @@ import type {
 } from '@/components/marumaru/types';
 import { getBeadKind } from '@/game/beads';
 import { BeadSign, BeadSnapshot, PlaceValue } from '@/game/types';
+import { SIDE_BY_SIDE_FIELD_MAX_ASPECT, SIDE_BY_SIDE_MIN_HEIGHT, SIDE_PANEL_WIDTH } from '@/layout/fit-board';
+import type { BoardViewport } from '@/layout/fit-board';
+
+/**
+ * The size of the field (the water the bowl and the bubbles are in) on a board of this size.
+ * Stacked, the header, the operators and the line of the calculation take their height off it.
+ * Side by side, it has the whole height and the width the panel leaves, up to a bowl that is not
+ * stretched flat.
+ */
+export function getFieldSize({ width, height, arrangement }: Pick<BoardViewport, 'width' | 'height' | 'arrangement'>) {
+  if (arrangement === 'sideBySide') {
+    const fieldHeight = Math.max(SIDE_BY_SIDE_MIN_HEIGHT, height);
+    return {
+      width: Math.max(240, Math.min(width - SIDE_PANEL_WIDTH, Math.round(fieldHeight * SIDE_BY_SIDE_FIELD_MAX_ASPECT))),
+      height: fieldHeight,
+    };
+  }
+
+  return {
+    width: Math.max(240, width - FIELD_MARGIN * 2),
+    height: Math.max(360, height - HEADER_HEIGHT - FOOTER_HEIGHT - OPERATOR_TABS_HEIGHT - 20),
+  };
+}
 
 export function clampEntityX(entity: Pick<BeadEntity, 'value' | 'count' | 'body'>, fieldWidth: number) {
   const radius = getEntityRadius(entity.value, entity.count);
@@ -173,7 +200,7 @@ export function getMultiplierClusterRadius(count: number) {
  * Where the bubbles wait. `rows` is 'one' for a single row whatever their number, as the learning app
  * has always laid them out, or 'fit' to use a second row when one would be too crowded.
  */
-export function createPendingBubbles(fieldWidth: number, counts: number[], rows: 'one' | 'fit' = 'one'): PendingBubble[] {
+export function createPendingBubbles(fieldWidth: number, counts: number[], rows: 'one' | 'fit' = 'one', rowY: number = BUBBLE_ROW_Y): PendingBubble[] {
   const placeRow = (rowCounts: number[], firstIndex: number, y: number): PendingBubble[] => {
     const gap = fieldWidth / (rowCounts.length + 1);
     return rowCounts.map((count, place) => ({
@@ -188,13 +215,13 @@ export function createPendingBubbles(fieldWidth: number, counts: number[], rows:
   // ones, would lie so far over each other that some could not be tapped; they go in two rows.
   const widthInOneRow = counts.reduce((sum, count) => sum + getEntityRadius(1, count) * 2, 0);
   if (rows === 'one' || (counts.length < 5 && widthInOneRow <= fieldWidth * PENDING_BUBBLE_ROW_FILL_LIMIT)) {
-    return placeRow(counts, 0, BUBBLE_ROW_Y);
+    return placeRow(counts, 0, rowY);
   }
 
   const upperCount = Math.ceil(counts.length / 2);
   return [
-    ...placeRow(counts.slice(0, upperCount), 0, BUBBLE_ROW_Y),
-    ...placeRow(counts.slice(upperCount), upperCount, BUBBLE_ROW_Y + PENDING_BUBBLE_SECOND_ROW_OFFSET),
+    ...placeRow(counts.slice(0, upperCount), 0, rowY),
+    ...placeRow(counts.slice(upperCount), upperCount, rowY + PENDING_BUBBLE_SECOND_ROW_OFFSET),
   ];
 }
 
