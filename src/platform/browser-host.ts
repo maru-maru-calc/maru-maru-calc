@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { readRequestedPuzzle } from '@/components/puzzle/puzzle-card';
-import { readMadePuzzle } from '@/game/made-puzzle';
+import { FIRST_BUBBLES, MadePuzzleResult, MakingBoard, PuzzleMaker } from '@/components/puzzle/puzzle-maker';
+import { createMadePuzzleStage, readMadePuzzle } from '@/game/made-puzzle';
 
 import type { GameHost } from './game-host';
 import { preparePuzzleShare } from './share-puzzle';
@@ -33,6 +34,7 @@ export const browserHost: GameHost = {
   noteBestQuickScore: () => {},
   prepareResultShare,
   preparePuzzleShare,
+  making: { firstBubbles: FIRST_BUBBLES, Bubbles: PuzzleMaker, Board: MakingBoard, Finished: MadePuzzleResult, createStage: createMadePuzzleStage },
   getRequestedPuzzle(count) {
     if (typeof window === 'undefined') {
       return undefined;

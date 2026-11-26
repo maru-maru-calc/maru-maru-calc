@@ -11,9 +11,7 @@ import { MarumaruGame } from '@/components/MarumaruGame';
 import { FitToScreen } from '@/components/puzzle/fit-to-screen';
 import { PuzzleChoice, PuzzleEnd, puzzleScreenStyle, QuickResult, ShareButton } from '@/components/puzzle/parts';
 import { PuzzleList } from '@/components/puzzle/puzzle-list';
-import { FIRST_BUBBLES, MadePuzzleResult, MakingBoard, PuzzleMaker } from '@/components/puzzle/puzzle-maker';
 import { QuickGame } from '@/components/puzzle/quick-game';
-import { createMadePuzzleStage } from '@/game/made-puzzle';
 import type { MadePuzzle } from '@/game/made-puzzle';
 import { createPuzzleGameStage, getPuzzleProgress, pickStartPuzzle, PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
 import type { Stage } from '@/game/types';
@@ -33,7 +31,8 @@ type Screen =
   | { name: 'makeBoard'; bubbles: number[]; round: number }
   | { name: 'made'; puzzle: MadePuzzle }
   // A made puzzle being played: one that came by its address, or the maker's own (for whom "back" leads to the finished puzzle).
-  | { name: 'playMade'; puzzle: MadePuzzle; round: number; isSolved: boolean; isOwn: boolean }
+  // The stage is made once and kept: a new one on every drawing would start the board over.
+  | { name: 'playMade'; puzzle: MadePuzzle; stage: Stage; round: number; isSolved: boolean; isOwn: boolean }
   | { name: 'end' };
 
 export function PuzzleGame({ host }: { host: GameHost }) {
@@ -59,7 +58,9 @@ function PuzzleScreens({ host }: { host: GameHost }) {
           requested === undefined
             ? { name: 'start', stage: createPuzzleGameStage(pickStartPuzzle(loaded.startVisits), 1), round: 0, isSolved: false }
             : 'made' in requested
-              ? { name: 'playMade', puzzle: requested.made, round: 0, isSolved: false, isOwn: false }
+              ? host.making
+                ? { name: 'playMade', puzzle: requested.made, stage: host.making.createStage(requested.made), round: 0, isSolved: false, isOwn: false }
+                : { name: 'start', stage: createPuzzleGameStage(pickStartPuzzle(loaded.startVisits), 1), round: 0, isSolved: false }
               : { name: 'play', firstIndex: requested.number - 1, round: 0 },
         );
       }
@@ -101,8 +102,8 @@ function PuzzleScreens({ host }: { host: GameHost }) {
     setScreen({ name: 'quick', round: Date.now() });
   };
   // A made puzzle exists only in the address it is sent with: where nothing can be sent, none can be made.
-  const { preparePuzzleShare } = host;
-  const showMaker = preparePuzzleShare ? () => setScreen({ name: 'make', bubbles: FIRST_BUBBLES }) : undefined;
+  const { preparePuzzleShare, making } = host;
+  const showMaker = preparePuzzleShare && making ? () => setScreen({ name: 'make', bubbles: making.firstBubbles }) : undefined;
 
   if (screen.name === 'start') {
     return (
@@ -173,9 +174,9 @@ function PuzzleScreens({ host }: { host: GameHost }) {
     );
   }
 
-  if (screen.name === 'make') {
+  if (screen.name === 'make' && making) {
     return (
-      <PuzzleMaker
+      <making.Bubbles
         bubbles={screen.bubbles}
         onChange={(bubbles) => setScreen({ name: 'make', bubbles })}
         onBack={showStart}
@@ -184,9 +185,9 @@ function PuzzleScreens({ host }: { host: GameHost }) {
     );
   }
 
-  if (screen.name === 'makeBoard') {
+  if (screen.name === 'makeBoard' && making) {
     return (
-      <MakingBoard
+      <making.Board
         key={`make-${screen.round}`}
         bubbles={screen.bubbles}
         onBack={() => setScreen({ name: 'make', bubbles: screen.bubbles })}
@@ -195,15 +196,15 @@ function PuzzleScreens({ host }: { host: GameHost }) {
     );
   }
 
-  if (screen.name === 'made' && preparePuzzleShare) {
+  if (screen.name === 'made' && making && preparePuzzleShare) {
     const { puzzle } = screen;
     return (
-      <MadePuzzleResult
+      <making.Finished
         puzzle={puzzle}
         prepareShare={preparePuzzleShare}
         onBack={() => setScreen({ name: 'make', bubbles: puzzle.bubbles })}
         onAgain={() => setScreen({ name: 'makeBoard', bubbles: puzzle.bubbles, round: Date.now() })}
-        onPlay={() => setScreen({ name: 'playMade', puzzle, round: Date.now(), isSolved: false, isOwn: true })}
+        onPlay={() => setScreen({ name: 'playMade', puzzle, stage: making.createStage(puzzle), round: Date.now(), isSolved: false, isOwn: true })}
       />
     );
   }
@@ -214,7 +215,7 @@ function PuzzleScreens({ host }: { host: GameHost }) {
       <View style={puzzleScreenStyle}>
         <MarumaruGame
           key={`made-${screen.round}`}
-          stages={[createMadePuzzleStage(puzzle)]}
+          stages={[screen.stage]}
           stageMark="pencil"
           showsGoalAsMaru={false}
           // The maker goes back to the finished puzzle; someone who came by its address, to the start.

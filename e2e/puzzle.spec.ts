@@ -736,6 +736,9 @@ test('the address of a made puzzle opens it for anyone; solved, it is not one of
   await tapWay(page, ['3', '+', '4', '×', '2'], 300);
   // Solved: the same three choices as after the start puzzle, the pencil among them.
   await expect(page.getByTestId('puzzle-choice')).toBeVisible({ timeout: 30_000 });
+  // The board behind them stays as it was solved: no bubble comes back.
+  await page.waitForTimeout(1500);
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(0);
   await expect(page.getByTestId('choose-make')).toBeVisible();
   await expect(page.getByTestId('choose-puzzles-number')).toHaveText('#1');
   expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '{}').solved ?? [], SAVE_KEY)).toEqual([]);

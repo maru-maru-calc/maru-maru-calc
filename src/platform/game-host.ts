@@ -1,3 +1,5 @@
+import type { ComponentType } from 'react';
+
 import type { MadePuzzle } from '@/game/made-puzzle';
 import type { Stage } from '@/game/types';
 import type { PuzzleSaveSlot } from '@/storage/puzzle-progress';
@@ -10,6 +12,28 @@ export type PictureShare = { share: () => void; previewUrl: string; release: () 
 
 /** A puzzle that can be sent and asked for by address: one of the numbered ones, or one a player made. */
 export type SharedPuzzle = { number: number } | { made: MadePuzzle };
+
+/**
+ * Everything of making a puzzle: its three screens, and a made puzzle as a stage the board can
+ * play. It comes from the host so that a build where nothing can be made does not carry it.
+ */
+export type PuzzleMaking = {
+  /** The bubbles a new puzzle starts from. */
+  firstBubbles: number[];
+  /** Step one: the bubbles. */
+  Bubbles: ComponentType<{ bubbles: number[]; onChange: (bubbles: number[]) => void; onBack: () => void; onNext: () => void }>;
+  /** Step two: the board on which the maker works them out; what they come to is the goal. */
+  Board: ComponentType<{ bubbles: number[]; onBack: () => void; onMade: (puzzle: MadePuzzle) => void }>;
+  /** Step three: the finished puzzle, as it will be sent. */
+  Finished: ComponentType<{
+    puzzle: MadePuzzle;
+    prepareShare: (puzzle: SharedPuzzle, stage: Stage) => Promise<PictureShare | undefined>;
+    onBack: () => void;
+    onAgain: () => void;
+    onPlay: () => void;
+  }>;
+  createStage: (puzzle: MadePuzzle) => Stage;
+};
 
 /**
  * What the puzzle game needs from wherever it runs: a web page of its own (browser-host.ts) or
@@ -34,8 +58,7 @@ export type GameHost = {
   prepareResultShare: ((solved: number) => Promise<PictureShare | undefined>) | undefined;
   /**
    * Gets a picture of a puzzle ready for the player to send to someone, with the address that
-   * opens that puzzle. Undefined where nothing can be shared; there puzzles cannot be made
-   * either, as a made puzzle exists only in the address it is sent with.
+   * opens that puzzle. Undefined where nothing can be shared.
    */
   preparePuzzleShare: ((puzzle: SharedPuzzle, stage: Stage) => Promise<PictureShare | undefined>) | undefined;
   /**
@@ -43,4 +66,9 @@ export type GameHost = {
    * ones, or a made one. Undefined where a visit cannot ask for one, or when it asks for none.
    */
   getRequestedPuzzle: ((count: number) => SharedPuzzle | undefined) | undefined;
+  /**
+   * Making a puzzle of one's own. Undefined where nothing can be shared: a made puzzle exists
+   * only in the address it is sent with.
+   */
+  making: PuzzleMaking | undefined;
 };
