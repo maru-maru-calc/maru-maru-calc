@@ -335,24 +335,30 @@ test('a wide window with room to spare shows the board bigger, and a dragged mar
 
   await page.locator('[data-testid^="pending-bubble-"]').first().click();
   await page.waitForTimeout(2500);
-  // The topmost maru of the pile: nothing lies on it, and there is free water above.
-  const [startX, startY] = await page.evaluate(() => {
+  // Press on the topmost maru of the pile: there is free water above it. Maru take a press from
+  // well outside their rim, so the one that is taken hold of may be its neighbour: that one is watched.
+  const [pressX, pressY, startX, startY] = await page.evaluate(() => {
     const top = Array.from(document.querySelectorAll('[data-testid^="bead-"]'))
       .map((element) => element.getBoundingClientRect())
       .sort((left, right) => left.y - right.y)[0];
-    return [top.x + top.width / 2, top.y + top.height / 2];
+    const x = top.x + top.width / 2;
+    const y = top.y + top.height / 2;
+    const taken = document.elementFromPoint(x, y)?.closest('[data-testid^="bead-"]') as HTMLElement;
+    taken.setAttribute('data-held', '1');
+    const box = taken.getBoundingClientRect();
+    return [x, y, box.x + box.width / 2, box.y + box.height / 2];
   });
-  await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('[data-testid^="bead-"]')?.setAttribute('data-held', '1'), [startX, startY]);
-  await page.mouse.move(startX, startY);
+  await page.mouse.move(pressX, pressY);
   await page.mouse.down();
-  await page.mouse.move(startX + 15, startY - 45, { steps: 6 });
-  await page.mouse.move(startX + 30, startY - 90, { steps: 6 });
+  await page.mouse.move(pressX + 15, pressY - 45, { steps: 6 });
+  await page.mouse.move(pressX + 30, pressY - 90, { steps: 6 });
   await page.waitForTimeout(250);
   const held = await page.evaluate(() => {
     const box = (document.querySelector('[data-held]') as HTMLElement).getBoundingClientRect();
     return [box.x + box.width / 2, box.y + box.height / 2];
   });
   await page.mouse.up();
+  // It moved as far as the pointer did.
   expect(Math.abs(held[0] - (startX + 30))).toBeLessThan(5);
   expect(Math.abs(held[1] - (startY - 90))).toBeLessThan(5);
 });
@@ -399,13 +405,96 @@ test('held sideways, the choice is over the bowl and the one-minute result fits 
   await page.clock.fastForward(62_000);
   await expect(page.getByTestId('quick-result')).toBeVisible();
 
-  for (const testId of ['quick-result-count', 'quick-result-best', 'quick-result-back', 'quick-result-again']) {
+  for (const testId of ['quick-result-count', 'quick-result-best', 'quick-result-back', 'quick-result-again', 'quick-result-share']) {
     const part = await page.getByTestId(testId).boundingBox();
     expect(part, testId).not.toBeNull();
     expect(part?.y, testId).toBeGreaterThanOrEqual(0);
     expect((part?.y ?? 0) + (part?.height ?? 0), testId).toBeLessThanOrEqual(390);
   }
   await expect(page.getByTestId('quick-result-best').locator('> div')).toHaveCount(5);
+});
+
+test('the one-minute result can be handed to the device\'s "share" as a picture', async ({ page }) => {
+  // A browser that can share files, as a phone's can: what it is handed is kept for the test to look at.
+  await page.addInitScript(() => {
+    const shared: Array<{ name: string; type: string; size: number; text: string | undefined; file: File }> = [];
+    Object.assign(window, { sharedByTest: shared });
+    Object.defineProperty(Navigator.prototype, 'canShare', { configurable: true, value: (data?: ShareData) => (data?.files?.length ?? 0) > 0 });
+    Object.defineProperty(Navigator.prototype, 'share', {
+      configurable: true,
+      value: (data: ShareData) => {
+        const file = data.files?.[0] as File;
+        shared.push({ name: file.name, type: file.type, size: file.size, text: data.text, file });
+        return Promise.resolve();
+      },
+    });
+  });
+  await page.clock.install();
+  await openPuzzleGame(page);
+  await page.clock.resume();
+  await solveStartPuzzle(page);
+  await page.getByTestId('choose-quick').click();
+  await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(3);
+
+  // One puzzle solved, then the minute runs out.
+  const board = await readBoard(page);
+  await tapWay(page, findWay(board.bubbles, board.goal) ?? [], 120);
+  await expect(page.getByTestId('corner-badge')).toHaveText('1');
+  await page.clock.fastForward(62_000);
+  await expect(page.getByTestId('quick-result-count')).toHaveText('1');
+
+  // The third button, drawn like the others: no word on it.
+  const share = page.getByTestId('quick-result-share');
+  await expect(share).toBeVisible();
+  await expect(share).toHaveText('');
+  expect((await share.boundingBox())?.width).toBe((await page.getByTestId('quick-result-again').boundingBox())?.width);
+
+  await share.click();
+  const shared = await page.evaluate(async () => {
+    const all = (window as unknown as { sharedByTest: Array<{ name: string; type: string; size: number; text: string | undefined; file: File }> }).sharedByTest;
+    const picture = await createImageBitmap(all[0].file);
+    // The corner is water, and the picture is not all water: something was drawn on it.
+    const canvas = document.createElement('canvas');
+    canvas.width = picture.width;
+    canvas.height = picture.height;
+    const context = canvas.getContext('2d') as CanvasRenderingContext2D;
+    context.drawImage(picture, 0, 0);
+    const pixels = context.getImageData(0, 0, picture.width, picture.height).data;
+    const colors = new Set<string>();
+    for (let index = 0; index < pixels.length; index += 4 * 97) {
+      colors.add(`${pixels[index]},${pixels[index + 1]},${pixels[index + 2]}`);
+    }
+    return { count: all.length, name: all[0].name, type: all[0].type, size: all[0].size, text: all[0].text, width: picture.width, height: picture.height, corner: Array.from(pixels.slice(0, 3)).join(), colors: colors.size };
+  });
+  expect(shared).toMatchObject({ count: 1, name: 'maru-1min-1.png', type: 'image/png', width: 1200, height: 630, corner: '198,232,244' });
+  expect(shared.size).toBeGreaterThan(5000);
+  expect(shared.colors).toBeGreaterThan(20);
+  // The address of the game goes with it: this page's own, nothing a visit added.
+  const here = new URL(page.url());
+  expect(shared.text).toBe(here.origin + here.pathname);
+  expect(shared.text).toMatch(/\/puzzle$/);
+});
+
+test('where the browser cannot share pictures, the result is saved as a file', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'share', { configurable: true, value: undefined });
+    Object.defineProperty(Navigator.prototype, 'canShare', { configurable: true, value: undefined });
+  });
+  await page.clock.install();
+  await openPuzzleGame(page);
+  await page.clock.resume();
+  await solveStartPuzzle(page);
+  await page.getByTestId('choose-quick').click();
+  await expect(page.getByTestId('quick-time-left')).toBeVisible();
+  await page.clock.fastForward(62_000);
+  await expect(page.getByTestId('quick-result')).toBeVisible();
+
+  const download = page.waitForEvent('download');
+  await page.getByTestId('quick-result-share').click();
+  expect((await download).suggestedFilename()).toBe('maru-1min-0.png');
+  // The result is still there, and "again" still works.
+  await page.getByTestId('quick-result-again').click();
+  await expect(page.getByTestId('quick-time-left')).toBeVisible();
 });
 
 /** How much bigger or smaller than it is laid out the board is shown. */

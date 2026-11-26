@@ -1,5 +1,8 @@
 import type { PuzzleSaveSlot } from '@/storage/puzzle-progress';
 
+/** A picture of a result, drawn and ready: `share` hands it over at once, so it can be called from a tap. */
+export type ResultShare = { share: () => void };
+
 /**
  * What the puzzle game needs from wherever it runs: a web page of its own (browser-host.ts) or
  * YouTube's game platform (youtube/youtube-host.ts), which insists on doing the saving, the
@@ -15,4 +18,10 @@ export type GameHost = {
   noteReady: () => void;
   /** The player's best one-minute count has gone up to `score`. */
   noteBestQuickScore: (score: number) => void;
+  /**
+   * Gets a picture of a one-minute result ready for the player to share. Undefined where results
+   * cannot be shared (YouTube's rules allow no way out of the game); resolves to undefined when
+   * the picture could not be made.
+   */
+  prepareResultShare: ((solved: number) => Promise<ResultShare | undefined>) | undefined;
 };

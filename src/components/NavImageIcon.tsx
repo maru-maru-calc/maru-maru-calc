@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
-type NavImageIconKind = 'back' | 'next' | 'retry' | 'skip' | 'undo';
+type NavImageIconKind = 'back' | 'next' | 'retry' | 'share' | 'skip' | 'undo';
 
 const TEXT_BASE_COLOR = '#12334A';
 
@@ -15,6 +15,9 @@ export function NavImageIcon({ kind, size }: { kind: NavImageIconKind; size: num
   }
   if (kind === 'skip') {
     return <SkipIcon size={size} />;
+  }
+  if (kind === 'share') {
+    return <ShareIcon size={size} />;
   }
 
   return <ArrowIcon direction={kind === 'back' ? -1 : 1} size={size} />;
@@ -159,6 +162,53 @@ function ArrowIcon({ direction, size }: { direction: -1 | 1; size: number }) {
             left: direction < 0 ? size * 0.18 : size * 0.44,
             top: center - head / 2,
             transform: [{ rotate: direction < 0 ? '-45deg' : '135deg' }],
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+/** An arrow going up out of an open tray: "send this out". */
+function ShareIcon({ size }: { size: number }) {
+  const stroke = Math.max(4, Math.round(size * 0.14));
+  const head = Math.round(size * 0.34);
+  const trayWidth = Math.round(size * 0.8);
+  const trayHeight = Math.round(size * 0.4);
+  const shaftHeight = Math.round(size * 0.56);
+
+  return (
+    <View pointerEvents="none" testID="nav-icon-share" style={{ width: size, height: size }}>
+      <View
+        style={[
+          styles.arrowHead,
+          {
+            width: trayWidth,
+            height: trayHeight,
+            left: (size - trayWidth) / 2,
+            top: size - trayHeight,
+            borderLeftWidth: stroke,
+            borderRightWidth: stroke,
+            borderBottomWidth: stroke,
+            borderBottomLeftRadius: stroke * 1.4,
+            borderBottomRightRadius: stroke * 1.4,
+          },
+        ]}
+      />
+      <View style={[styles.navStroke, { width: stroke, height: shaftHeight, borderRadius: stroke / 2, left: (size - stroke) / 2, top: Math.round(size * 0.08) }]} />
+      <View
+        style={[
+          styles.arrowHead,
+          {
+            width: head,
+            height: head,
+            borderLeftWidth: stroke,
+            borderTopWidth: stroke,
+            borderRadius: Math.max(1, Math.round(stroke * 0.38)),
+            left: (size - head) / 2,
+            // Turned, its corner is the arrow's tip, just inside the top of the icon.
+            top: Math.round(size * 0.04 + head * 0.21),
+            transform: [{ rotate: '45deg' }],
           },
         ]}
       />

@@ -90,5 +90,7 @@ export function createYouTubeHost(
         void sdk.engagement.sendScore({ value: score }).catch(() => {});
       }
     },
+    // A game on YouTube may not lead out of it.
+    prepareResultShare: undefined,
   };
 }

@@ -149,7 +149,7 @@ function PuzzleScreens({ host }: { host: GameHost }) {
   }
 
   if (screen.name === 'quickResult') {
-    return <QuickResult solved={screen.solved} scores={progress.quickScores} rank={screen.rank} onAgain={showQuick} onBack={showStart} />;
+    return <QuickResult solved={screen.solved} scores={progress.quickScores} rank={screen.rank} prepareShare={host.prepareResultShare} onAgain={showQuick} onBack={showStart} />;
   }
 
   return <PuzzleEnd solved={getPuzzleProgress(progress.solved).solved} total={PUZZLE_GAME_STAGES.length} onBack={showStart} />;
