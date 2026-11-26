@@ -6,6 +6,7 @@ import { Image, Modal, Pressable, StyleSheet, useWindowDimensions, View } from '
 import type { ImageSourcePropType } from 'react-native';
 
 import { HEADER_ACTION_BUTTON_SIZE, RADIUS_LG } from '@/components/marumaru/constants';
+import { RoundedStarfish } from '@/components/marumaru/effects';
 import { NavImageIcon } from '@/components/NavImageIcon';
 import { RESULT_CARD_HEIGHT, RESULT_CARD_WIDTH } from '@/game/result-card';
 import { a11yLabel } from '@/i18n/a11y-label';
@@ -19,7 +20,8 @@ const WATER = '#C6E8F4';
  * once there is a picture. On a phone that can pass a picture on, a press goes straight to the
  * phone's own share sheet; elsewhere it opens the game's ways of sending. `shareKey` says what the
  * picture shows: a new key draws a new picture. Where it sends that a puzzle was solved, it is white like
- * the "next" button beside a solved puzzle, with a tick in its corner.
+ * the "next" button beside a solved puzzle, with a starfish on its corner: one of those that drift
+ * up over the board at that moment.
  */
 export function ShareButton({ label, testID, shareKey, prepare, isSolved = false }: ShareButtonProps) {
   const [ready, setReady] = useState<{ key: string; share: PictureShare } | undefined>(undefined);
@@ -69,8 +71,8 @@ export function ShareButton({ label, testID, shareKey, prepare, isSolved = false
       <Pressable accessibilityLabel={a11yLabel(label)} accessibilityRole="button" testID={testID} onPress={openWays} style={({ pressed }) => [styles.button, isSolved && styles.buttonSolved, pressed && styles.pressed]}>
         <NavImageIcon kind="share" size={29} />
         {isSolved ? (
-          <View pointerEvents="none" testID="share-solved-tick" style={styles.solvedTick}>
-            <NavImageIcon kind="check" size={12} color="#FFFFFF" />
+          <View pointerEvents="none" testID="share-solved-mark" style={styles.solvedMark}>
+            <RoundedStarfish size={22} />
           </View>
         ) : null}
       </Pressable>
@@ -250,19 +252,14 @@ const styles = StyleSheet.create({
   buttonSolved: {
     backgroundColor: 'rgba(255, 255, 255, 0.96)',
   },
-  // A tick on a round blue ground, half over the button's upper right corner.
-  solvedTick: {
+  // A starfish, half over the button's upper right corner.
+  solvedMark: {
     position: 'absolute',
-    top: -6,
-    right: -6,
+    top: -9,
+    right: -9,
     width: 22,
     height: 22,
-    borderRadius: 11,
-    backgroundColor: '#0284C7',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
+    transform: [{ rotate: '-14deg' }],
   },
   shareBackdrop: {
     flex: 1,

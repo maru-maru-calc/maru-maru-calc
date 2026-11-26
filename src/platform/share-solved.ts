@@ -1,6 +1,8 @@
 // The picture that says a puzzle was solved, to show to whoever sent it: the puzzle's number and
-// its goal, a tick, and the goal as maru lying in the bowl, as the board leaves them. Not the way
-// to the goal: the one who gets it can still try. It goes with the address of the same puzzle.
+// its goal, the goal as maru lying in the bowl, as the board leaves them, and over the bowl what
+// the board itself does at that moment: bubbles bursting like fireworks, and starfish among them.
+// No sign from outside the game says "done". Not the way to the goal either: the one who gets
+// the picture can still try. It goes with the address of the same puzzle.
 import { getPuzzleLine, getPuzzlePage, getSolvedCardFileName } from '@/components/puzzle/puzzle-card';
 import { getBeadKind } from '@/game/beads';
 import { getMadePuzzleQuery, writeMadePuzzle } from '@/game/made-puzzle';
@@ -10,21 +12,23 @@ import type { PictureShare, SharedPuzzle } from '@/platform/game-host';
 import { drawBowl, drawMaru, drawWater, preparePictureShare } from '@/platform/share-picture';
 import { drawTitle } from '@/platform/share-puzzle';
 
-const ACCENT = '#0284C7';
-// The tick, in the middle between the title and the bowl.
-const TICK = { centerX: 540, centerY: 610, radius: 122 };
-// A few of the bubbles that burst over the board when a puzzle is solved, standing still: [x, y, radius, colour].
-const CONFETTI: Array<[number, number, number, string]> = [
-  [330, 500, 16, 'rgba(236, 72, 153, 0.76)'],
-  [258, 640, 11, 'rgba(34, 197, 94, 0.78)'],
-  [352, 752, 14, 'rgba(234, 179, 8, 0.76)'],
-  [420, 420, 9, 'rgba(6, 182, 212, 0.84)'],
-  [668, 430, 13, 'rgba(234, 179, 8, 0.76)'],
-  [756, 512, 10, 'rgba(34, 197, 94, 0.78)'],
-  [826, 632, 16, 'rgba(14, 165, 233, 0.88)'],
-  [738, 748, 12, 'rgba(236, 72, 153, 0.76)'],
-  [560, 800, 9, 'rgba(6, 182, 212, 0.84)'],
-  [196, 548, 8, 'rgba(14, 165, 233, 0.88)'],
+// How many times as big as on the board the fireworks and the starfish are drawn.
+const K = 2.4;
+// The bubbles that burst over the board when a puzzle is solved, as the board has them (their
+// colours, their white rims), caught a little after the burst: [x, y, how many, how far they fly].
+const BURSTS: Array<[number, number, number, number]> = [
+  [540, 640, 10, 92],
+  [276, 700, 8, 72],
+  [806, 668, 8, 78],
+];
+const BURST_COLORS = ['rgba(14, 165, 233, 0.88)', 'rgba(6, 182, 212, 0.84)', 'rgba(34, 197, 94, 0.78)', 'rgba(234, 179, 8, 0.76)', 'rgba(236, 72, 153, 0.76)'];
+// How far through its flight a burst is caught: far enough out to read as a burst, not yet faded.
+const BURST_PROGRESS = 0.62;
+// The starfish that drift up among them, one to a burst: [x, y, size, turned by so many degrees].
+const STARFISH: Array<[number, number, number, number]> = [
+  [596, 566, 80, -16],
+  [250, 640, 64, 2],
+  [846, 600, 64, 20],
 ];
 
 export function prepareSolvedShare(puzzle: SharedPuzzle, stage: Stage): Promise<PictureShare | undefined> {
@@ -45,26 +49,82 @@ export function prepareSolvedShare(puzzle: SharedPuzzle, stage: Stage): Promise<
     }
     drawTitle(context, { mark: isMade ? 'pencil' : puzzle.number, goal: stage.target }, { centerX: 540, baseline: 330, scale: 1.3 });
 
-    for (const [x, y, radius, color] of CONFETTI) {
-      context.beginPath();
-      context.arc(x, y, radius, 0, Math.PI * 2);
-      context.fillStyle = color;
-      context.fill();
+    BURSTS.forEach((burst, index) => drawBurst(context, burst, index));
+    for (const [x, y, size, degrees] of STARFISH) {
+      drawStarfish(context, x, y, size, degrees);
     }
-    // The tick: white on a round blue ground, the same blue as the number.
-    const { centerX, centerY, radius } = TICK;
-    context.beginPath();
-    context.arc(centerX, centerY, radius, 0, Math.PI * 2);
-    context.fillStyle = ACCENT;
-    context.fill();
-    context.beginPath();
-    context.moveTo(centerX - radius * 0.44, centerY + radius * 0.04);
-    context.lineTo(centerX - radius * 0.12, centerY + radius * 0.36);
-    context.lineTo(centerX + radius * 0.46, centerY - radius * 0.3);
-    context.lineWidth = radius * 0.24;
-    context.lineCap = 'round';
-    context.lineJoin = 'round';
-    context.strokeStyle = '#FFFFFF';
-    context.stroke();
   });
+}
+
+/** One burst of bubbles, each flying out from the middle as on the board. */
+function drawBurst(context: CanvasRenderingContext2D, [centerX, centerY, count, spread]: [number, number, number, number], burstIndex: number) {
+  const ease = 1 - Math.pow(1 - BURST_PROGRESS, 3);
+  for (let index = 0; index < count; index += 1) {
+    const angle = -Math.PI / 2 + (Math.PI * 2 * index) / count;
+    const distance = spread * ease * (0.78 + (index % 5) * 0.08) * K;
+    const radius = ((7 + (index % 4) * 3 + (1 - BURST_PROGRESS) * 3) / 2) * K;
+    const rise = BURST_PROGRESS * (18 + (index % 6) * 5) * K * 0.5;
+    const x = centerX + Math.cos(angle) * distance;
+    const y = centerY + Math.sin(angle) * distance - rise;
+    context.save();
+    context.shadowColor = 'rgba(56, 189, 248, 0.7)';
+    context.shadowBlur = 16 * K * 0.5;
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fillStyle = BURST_COLORS[(burstIndex + index) % BURST_COLORS.length];
+    context.fill();
+    context.restore();
+    context.lineWidth = 2 * K * 0.8;
+    context.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+    context.stroke();
+  }
+}
+
+/** The starfish that drift up over a solved puzzle: five rounded arms around a pale middle. */
+function drawStarfish(context: CanvasRenderingContext2D, centerX: number, centerY: number, size: number, degrees: number) {
+  const armWidth = size * 0.34;
+  const armHeight = size * 0.5;
+  const rim = Math.max(2, size * 0.035);
+  context.save();
+  context.translate(centerX, centerY);
+  context.rotate((degrees * Math.PI) / 180);
+  for (let index = 0; index < 5; index += 1) {
+    context.save();
+    context.rotate((index * 72 * Math.PI) / 180);
+    // An arm: a rounded bar pointing up, its middle a little way out from the starfish's.
+    capsule(context, -armWidth / 2, -size * 0.23 - armHeight / 2, armWidth, armHeight);
+    context.fillStyle = '#EAB308';
+    context.fill();
+    context.lineWidth = rim;
+    context.strokeStyle = 'rgba(202, 138, 4, 0.28)';
+    context.stroke();
+    context.restore();
+  }
+  context.beginPath();
+  context.arc(0, 0, size * 0.21, 0, Math.PI * 2);
+  context.fillStyle = '#FDE68A';
+  context.fill();
+  context.lineWidth = rim;
+  context.strokeStyle = 'rgba(202, 138, 4, 0.34)';
+  context.stroke();
+  for (const dot of [-72, 0, 72]) {
+    const angle = (dot * Math.PI) / 180;
+    context.beginPath();
+    context.arc(Math.cos(angle) * size * 0.18, Math.sin(angle) * size * 0.18, size * 0.06, 0, Math.PI * 2);
+    context.fillStyle = 'rgba(180, 120, 12, 0.36)';
+    context.fill();
+  }
+  context.restore();
+}
+
+/** A bar with round ends. */
+function capsule(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number) {
+  const radius = Math.min(width, height) / 2;
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.arcTo(x + width, y, x + width, y + height, radius);
+  context.arcTo(x + width, y + height, x, y + height, radius);
+  context.arcTo(x, y + height, x, y, radius);
+  context.arcTo(x, y, x + width, y, radius);
+  context.closePath();
 }
