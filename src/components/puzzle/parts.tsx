@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBoardViewport } from '@/components/marumaru/board-viewport';
 import { HEADER_ACTION_BUTTON_SIZE, RADIUS_LG } from '@/components/marumaru/constants';
-import { ClockIcon, NavImageIcon } from '@/components/NavImageIcon';
+import { ClockIcon, NavImageIcon, PencilIcon } from '@/components/NavImageIcon';
 import { a11yLabel } from '@/i18n/a11y-label';
 import { SIDE_PANEL_WIDTH } from '@/layout/fit-board';
 import type { GameHost, PictureShare } from '@/platform/game-host';
@@ -19,21 +19,42 @@ const FONT = 'Helvetica';
  * Shown over the board once the start puzzle is solved: on to the puzzles in order, or the
  * one-minute game. No words; the numbers say where each stands.
  */
-export function PuzzleChoice({ nextPuzzle, best, onPuzzles, onQuick }: { nextPuzzle: number | undefined; best: number | undefined; onPuzzles: () => void; onQuick: () => void }) {
+export function PuzzleChoice({
+  nextPuzzle,
+  best,
+  onPuzzles,
+  onQuick,
+  onMake,
+}: {
+  nextPuzzle: number | undefined;
+  best: number | undefined;
+  onPuzzles: () => void;
+  onQuick: () => void;
+  /** Making a puzzle of one's own, where the game can send one. */
+  onMake: (() => void) | undefined;
+}) {
   // Over the bowl: beside the panel when the board is laid out side by side.
   const isSideBySide = useBoardViewport().arrangement === 'sideBySide';
+  // Three in a row are narrower, so the row still fits the narrowest board.
+  const choiceStyle = onMake ? [styles.choice, styles.choiceOfThree] : styles.choice;
 
   return (
     <View pointerEvents="box-none" testID="puzzle-choice" style={[styles.choiceLayer, isSideBySide && styles.choiceLayerBesidePanel]}>
-      <View style={styles.choiceRow}>
-        <Pressable accessibilityLabel={a11yLabel('puzzles in order')} accessibilityRole="button" testID="choose-puzzles" onPress={onPuzzles} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
+      <View style={[styles.choiceRow, onMake && styles.choiceRowOfThree]}>
+        <Pressable accessibilityLabel={a11yLabel('puzzles in order')} accessibilityRole="button" testID="choose-puzzles" onPress={onPuzzles} style={({ pressed }) => [choiceStyle, pressed && styles.pressed]}>
           <NavImageIcon kind="next" size={34} />
           <Text testID="choose-puzzles-number" style={styles.choiceNumber}>{nextPuzzle === undefined ? '✓' : `#${nextPuzzle}`}</Text>
         </Pressable>
-        <Pressable accessibilityLabel={a11yLabel('one-minute game')} accessibilityRole="button" testID="choose-quick" onPress={onQuick} style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
+        <Pressable accessibilityLabel={a11yLabel('one-minute game')} accessibilityRole="button" testID="choose-quick" onPress={onQuick} style={({ pressed }) => [choiceStyle, pressed && styles.pressed]}>
           <ClockIcon size={34} />
           <Text testID="choose-quick-best" style={styles.choiceNumber}>{best === undefined ? '–' : String(best)}</Text>
         </Pressable>
+        {onMake ? (
+          <Pressable accessibilityLabel={a11yLabel('make a puzzle')} accessibilityRole="button" testID="choose-make" onPress={onMake} style={({ pressed }) => [choiceStyle, pressed && styles.pressed]}>
+            <PencilIcon size={34} />
+            <Text style={styles.choiceNumber}>?</Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -51,16 +72,26 @@ export function ShareButton({ label, testID, shareKey, prepare }: { label: strin
   prepareRef.current = prepare;
   useEffect(() => {
     let isCurrent = true;
+    let made: PictureShare | undefined;
     void prepareRef.current().then(
       (share) => {
-        if (isCurrent && share) {
+        if (!share) {
+          return;
+        }
+        if (isCurrent) {
+          made = share;
           setReady({ key: shareKey, share });
+        } else {
+          // Drawn too late to be of use: the screen has moved on.
+          share.release();
         }
       },
       () => {},
     );
     return () => {
       isCurrent = false;
+      // A picture is kept in memory until it is let go: one for every puzzle played would add up.
+      made?.release();
     };
   }, [shareKey]);
 
@@ -193,6 +224,12 @@ const styles = StyleSheet.create({
   choiceRow: {
     flexDirection: 'row',
     gap: 20,
+  },
+  choiceRowOfThree: {
+    gap: 10,
+  },
+  choiceOfThree: {
+    width: 96,
   },
   choice: {
     width: 112,

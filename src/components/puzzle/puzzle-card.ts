@@ -16,14 +16,15 @@ export const PUZZLE_CARD_PANEL = { left: 52, right: 468, titleBaseline: 158, ope
 export type PuzzleCardBubble = { count: number; x: number; y: number; radius: number; maru: Array<{ value: PlaceValue; x: number; y: number; radius: number }> };
 export type PuzzleCardOperator = { symbol: OperatorSymbol; x: number; y: number; width: number; height: number; limit: OperatorUsageLimit };
 export type PuzzleCard = {
-  number: number;
+  /** What stands before the goal: the puzzle's number, or a pencil on a puzzle a player made. */
+  mark: number | 'pencil';
   goal: number;
   bubbles: PuzzleCardBubble[];
   bowl: { centerX: number; centerY: number; radius: number; halfAngle: number; thickness: number };
   operators: PuzzleCardOperator[];
 };
 
-export function getPuzzleCard(number: number, stage: Pick<Stage, 'target' | 'bubbleCounts' | 'operatorLimits'>): PuzzleCard {
+export function getPuzzleCard(mark: number | 'pencil', stage: Pick<Stage, 'target' | 'bubbleCounts' | 'operatorLimits'>): PuzzleCard {
   const toCardX = (x: number) => FIELD.left + x * FIELD.scale;
   const toCardY = (y: number) => FIELD.top + y * FIELD.scale;
 
@@ -64,7 +65,7 @@ export function getPuzzleCard(number: number, stage: Pick<Stage, 'target' | 'bub
     limit: stage.operatorLimits?.[symbol] ?? 'infinite',
   }));
 
-  return { number, goal: stage.target, bubbles, bowl, operators };
+  return { mark, goal: stage.target, bubbles, bowl, operators };
 }
 
 /** The file's name: no words a player has to read, only what tells two puzzles apart. */

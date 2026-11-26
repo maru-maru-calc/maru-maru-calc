@@ -37,7 +37,11 @@ export async function preparePictureShare(fileName: string, query: string | unde
   const file = new File([blob], fileName, { type: 'image/png' });
   const canShareFile = canShare(file);
 
+  const previewUrl = URL.createObjectURL(blob);
+
   return {
+    previewUrl,
+    release: () => URL.revokeObjectURL(previewUrl),
     share() {
       if (!canShareFile) {
         saveFile(file);
@@ -131,12 +135,13 @@ export function drawMaru(context: CanvasRenderingContext2D, x: number, y: number
 }
 
 /** The game's address, small, in a bottom corner. */
-export function drawAddress(context: CanvasRenderingContext2D, shownAddress: string, side: 'left' | 'right', size = 26) {
+export function drawAddress(context: CanvasRenderingContext2D, shownAddress: string, side: 'left' | 'right', size = 26, maxWidth = RESULT_CARD_WIDTH - 72) {
   context.font = `700 ${size}px ${CARD_FONT}`;
   context.textBaseline = 'alphabetic';
   context.textAlign = side;
   context.fillStyle = 'rgba(18, 51, 74, 0.6)';
-  context.fillText(shownAddress, side === 'right' ? RESULT_CARD_WIDTH - 36 : 36, RESULT_CARD_HEIGHT - 28, RESULT_CARD_WIDTH - 72);
+  // Longer than `maxWidth`, it is drawn narrower, not cut off.
+  context.fillText(shownAddress, side === 'right' ? RESULT_CARD_WIDTH - 36 : 36, RESULT_CARD_HEIGHT - 28, maxWidth);
 }
 
 /** The same clock face as the one-minute game's sign. */

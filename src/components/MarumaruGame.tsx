@@ -158,6 +158,7 @@ export function MarumaruGame({
   stageMark,
   showsGoalAsMaru = true,
   onAllBubblesUsed,
+  goalText,
   resetSignal = 0,
   cornerBadge,
   cornerSlot,
@@ -166,7 +167,9 @@ export function MarumaruGame({
    * Called the moment the last bubble goes in, with whether the amount is the goal. A game played
    * against the clock moves on from here instead of waiting for the maru to settle.
    */
-  onAllBubblesUsed?: (isGoal: boolean) => void;
+  onAllBubblesUsed?: (isGoal: boolean, total: number) => void;
+  /** Shown in the header instead of the goal ("?" while a puzzle is being made and has none yet). */
+  goalText?: string;
   /** Changing this number starts the stage over. */
   resetSignal?: number;
   /** A short text (a count) shown in the corner under the bowl, opposite the undo button. */
@@ -1080,7 +1083,7 @@ export function MarumaruGame({
     setMovesMade(positionsRef.current.length);
     const latest = positionsRef.current[positionsRef.current.length - 1];
     if (latest.pendingBubbles.length === 0) {
-      onAllBubblesUsedRef.current?.(latest.total === target);
+      onAllBubblesUsedRef.current?.(latest.total === target, latest.total);
     }
   };
 
@@ -2127,7 +2130,7 @@ export function MarumaruGame({
               isWrong={kukuInputState === 'wrong'}
             />
           ) : (
-            <StageGoalTitle showsGoalParts={showsGoalAsMaru} stageMark={stageMark ?? stageNumberInIsland} target={target} maxWidth={titleMaxWidth} />
+            <StageGoalTitle showsGoalParts={showsGoalAsMaru} stageMark={stageMark ?? stageNumberInIsland} target={target} goalText={goalText} maxWidth={titleMaxWidth} />
           )}
         </View>
       </View>

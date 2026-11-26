@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { getPuzzleCard, getPuzzleCardFileName, getPuzzleQuery, PUZZLE_CARD_PANEL, readRequestedPuzzle } from '@/components/puzzle/puzzle-card';
+import { createMadePuzzleStage } from '@/game/made-puzzle';
 import { PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
 import { RESULT_CARD_HEIGHT, RESULT_CARD_WIDTH } from '@/game/result-card';
 
@@ -8,7 +9,7 @@ describe('the picture of one puzzle', () => {
   it('shows the puzzle as the board has it: the number, the goal, every bubble, every operator with its count', () => {
     PUZZLE_GAME_STAGES.forEach((stage, index) => {
       const card = getPuzzleCard(index + 1, stage);
-      expect(card.number).toBe(index + 1);
+      expect(card.mark).toBe(index + 1);
       expect(card.goal).toBe(stage.target);
       expect(card.bubbles.map((bubble) => bubble.count)).toEqual(stage.bubbleCounts);
       expect(card.operators.map((operator) => operator.symbol)).toEqual(['+', '-', '×', '÷']);
@@ -51,6 +52,16 @@ describe('the picture of one puzzle', () => {
     expect(minus.x >= plus.x + plus.width).toBe(true);
     expect(card.bubbles.length).toBe(6);
     expect(new Set(card.bubbles.map((bubble) => bubble.y)).size).toBe(2);
+  });
+
+  it('has a pencil where the number would be, on a puzzle a player made', () => {
+    const made = createMadePuzzleStage({ bubbles: [2, 4, 10, 5], goal: 28 });
+    const card = getPuzzleCard('pencil', made);
+    expect(card.mark).toBe('pencil');
+    expect(card.goal).toBe(28);
+    expect(card.bubbles.map((bubble) => bubble.count)).toEqual([2, 4, 10, 5]);
+    // Every operator is free: none has a count.
+    expect(card.operators.every((operator) => operator.limit === 'infinite')).toBe(true);
   });
 
   it('names the file and the address after the number', () => {
