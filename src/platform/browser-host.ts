@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { GameHost } from './game-host';
+import { prepareResultShare } from './share-result';
 
 const PUZZLE_PROGRESS_STORAGE_KEY = 'marumaru-calc:puzzle-progress';
 const LOAD_TIMEOUT_MS = 1500;
@@ -22,4 +23,5 @@ export const browserHost: GameHost = {
   },
   noteReady: () => {},
   noteBestQuickScore: () => {},
+  prepareResultShare,
 };

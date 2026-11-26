@@ -1,4 +1,5 @@
 // The puzzle game's own small screens: the choice after the start puzzle, the one-minute result, the end.
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -7,6 +8,7 @@ import { HEADER_ACTION_BUTTON_SIZE, RADIUS_LG } from '@/components/marumaru/cons
 import { ClockIcon, NavImageIcon } from '@/components/NavImageIcon';
 import { a11yLabel } from '@/i18n/a11y-label';
 import { SIDE_PANEL_WIDTH } from '@/layout/fit-board';
+import type { GameHost, ResultShare } from '@/platform/game-host';
 
 const INK = '#12334A';
 const ACCENT = '#0284C7';
@@ -37,8 +39,45 @@ export function PuzzleChoice({ nextPuzzle, best, onPuzzles, onQuick }: { nextPuz
   );
 }
 
-/** After a minute: how many were solved, and the player's own five best. */
-export function QuickResult({ solved, scores, rank, onAgain, onBack }: { solved: number; scores: number[]; rank: number | undefined; onAgain: () => void; onBack: () => void }) {
+/**
+ * After a minute: how many were solved, and the player's own five best. Where the game may lead
+ * out of itself, a third button hands a picture of the result to the device's "share".
+ */
+export function QuickResult({
+  solved,
+  scores,
+  rank,
+  prepareShare,
+  onAgain,
+  onBack,
+}: {
+  solved: number;
+  scores: number[];
+  rank: number | undefined;
+  prepareShare: GameHost['prepareResultShare'];
+  onAgain: () => void;
+  onBack: () => void;
+}) {
+  // The picture is drawn as soon as the result is up; the button appears once there is one to hand over.
+  const [share, setShare] = useState<ResultShare | undefined>(undefined);
+  useEffect(() => {
+    if (!prepareShare) {
+      return undefined;
+    }
+    let isCurrent = true;
+    void prepareShare(solved).then(
+      (ready) => {
+        if (isCurrent) {
+          setShare(ready);
+        }
+      },
+      () => {},
+    );
+    return () => {
+      isCurrent = false;
+    };
+  }, [prepareShare, solved]);
+
   // On a screen that is wider than tall there is no room for all of it in a column: the count
   // and the five best go side by side.
   const isSideBySide = useBoardViewport().arrangement === 'sideBySide';
@@ -80,6 +119,11 @@ export function QuickResult({ solved, scores, rank, onAgain, onBack }: { solved:
           <Pressable accessibilityLabel={a11yLabel('play again')} accessibilityRole="button" testID="quick-result-again" onPress={onAgain} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
             <NavImageIcon kind="retry" size={29} />
           </Pressable>
+          {share ? (
+            <Pressable accessibilityLabel={a11yLabel('share the result')} accessibilityRole="button" testID="quick-result-share" onPress={share.share} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
+              <NavImageIcon kind="share" size={29} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </SafeAreaView>
