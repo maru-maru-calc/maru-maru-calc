@@ -66,8 +66,11 @@ export function ShareButton({ label, testID, shareKey, prepare }: ShareButtonPro
 
 // The places a link can be posted to, each shown by its own mark (assets/share/SOURCES.md says
 // where the pictures come from). The marks are theirs: they are shown as they are, whole and in
-// their own proportions, and never drawn here. The names are for screen readers.
-const SHARE_PLACES: Array<{ id: ShareLinkId; name: string; mark: ImageSourcePropType; width: number; height: number }> = [
+// their own proportions, and never drawn here. The names are for screen readers. The first three
+// are where most players are; they are the big buttons where the places lead.
+type SharePlace = { id: ShareLinkId; name: string; mark: ImageSourcePropType; width: number; height: number };
+const MAIN_PLACES = 3;
+const SHARE_PLACES: SharePlace[] = [
   { id: 'x', name: 'X', mark: require('../../../assets/share/x.png'), width: 25, height: 25.6 },
   { id: 'line', name: 'LINE', mark: require('../../../assets/share/line.png'), width: 32, height: 32 },
   { id: 'facebook', name: 'Facebook', mark: require('../../../assets/share/facebook.png'), width: 32, height: 32 },
@@ -77,18 +80,32 @@ const SHARE_PLACES: Array<{ id: ShareLinkId; name: string; mark: ImageSourceProp
 ];
 
 /**
- * The ways of sending: the picture itself on top, then a row of places that post the link, and
- * under it the link to copy, the picture to keep, and the device's own share (which is the one
- * way the picture goes along). It lies over the whole screen, at the screen's own size.
+ * The ways of sending, under the picture itself: two rows, as wide as each other. What comes
+ * first depends on what is sent (PictureShare's `lead`).
+ *
+ * A puzzle, sent to be solved: the three places most players use are the big buttons, and under
+ * them the small ones: the other places, the address to copy, the picture to keep, and the
+ * device's own share where there is one.
+ *
+ * A result, shown to somebody: where the device can pass a picture on, that is the one big
+ * button (it is the only way the picture goes along), with all five places small under it and
+ * the address and the picture last. Where it cannot, the places lead as for a puzzle.
+ *
+ * It lies over the whole screen, at the screen's own size.
  */
 function SharePanel({ share, onClose }: { share: PictureShare; onClose: () => void }) {
   const [hasCopied, setHasCopied] = useState(false);
   const { width, height } = useWindowDimensions();
   // On a screen too short for the picture above the buttons (a phone held sideways), the buttons go beside it.
   const isShort = height < 520;
+  // Smaller buttons where the usual size does not fit in a row: beside the picture, or on a narrow phone.
+  const isTight = isShort || width < 372;
+  const deviceLeads = share.lead === 'device' && share.shareWithDevice !== undefined;
+  // What the buttons under the picture take of the screen's height: three rows where the device's share leads, else two.
+  const buttonsHeight = 308 + (deviceLeads ? (isTight ? 52 : 60) : 0);
   const pictureHeight = isShort
     ? Math.max(100, Math.min(height - 64, 300))
-    : Math.max(120, Math.min(height - 300, 360, ((Math.min(width, 380) - 48) * RESULT_CARD_HEIGHT) / RESULT_CARD_WIDTH));
+    : Math.max(120, Math.min(height - buttonsHeight, 360, ((Math.min(width, 380) - 48) * RESULT_CARD_HEIGHT) / RESULT_CARD_WIDTH));
 
   // Escape closes it, as it closes any sheet laid over a page.
   useEffect(() => {
@@ -104,8 +121,6 @@ function SharePanel({ share, onClose }: { share: PictureShare; onClose: () => vo
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  // Smaller buttons where three of the usual size do not fit in a row: beside the picture, or on a narrow phone.
-  const isTight = isShort || width < 372;
   const tileStyle = isTight ? [styles.shareTile, styles.shareTileSmall] : styles.shareTile;
   const picture = (
     <Image accessibilityLabel={a11yLabel('the picture that is sent')} testID="share-picture" source={{ uri: share.previewUrl }} style={[styles.sharePicture, { height: pictureHeight, width: (pictureHeight * RESULT_CARD_WIDTH) / RESULT_CARD_HEIGHT }]} />
@@ -115,40 +130,65 @@ function SharePanel({ share, onClose }: { share: PictureShare; onClose: () => vo
       <NavImageIcon kind="close" size={18} />
     </Pressable>
   );
-  const buttons = (
+  const placeButton = (place: SharePlace, isBig: boolean) => (
+    <Pressable
+      key={place.id}
+      accessibilityLabel={`${place.name}: ${a11yLabel('post the link')}`}
+      accessibilityRole="button"
+      testID={`share-${place.id}`}
+      onPress={() => share.openLink(place.id)}
+      style={({ pressed }) => [styles.sharePlace, isTight && styles.sharePlaceSmall, isBig && (isTight ? styles.sharePlaceBigSmall : styles.sharePlaceBig), pressed && styles.pressed]}
+    >
+      <Image source={place.mark} resizeMode="contain" style={{ width: place.width * (isTight ? 0.8 : 1), height: place.height * (isTight ? 0.8 : 1) }} />
+    </Pressable>
+  );
+  const smallTile = isTight ? [styles.sharePlace, styles.sharePlaceSmall] : styles.sharePlace;
+  const copyButton = (
+    <Pressable
+      accessibilityLabel={a11yLabel('copy the link')}
+      accessibilityRole="button"
+      testID="share-copy"
+      onPress={() => {
+        void share.copyAddress().then(setHasCopied);
+      }}
+      style={({ pressed }) => [deviceLeads ? tileStyle : smallTile, pressed && styles.pressed]}
+    >
+      <NavImageIcon kind={hasCopied ? 'check' : 'link'} size={deviceLeads ? 29 : isTight ? 22 : 26} />
+    </Pressable>
+  );
+  const saveButton = (
+    <Pressable accessibilityLabel={a11yLabel('save the picture')} accessibilityRole="button" testID="share-save" onPress={share.save} style={({ pressed }) => [deviceLeads ? tileStyle : smallTile, pressed && styles.pressed]}>
+      <NavImageIcon kind="save" size={deviceLeads ? 29 : isTight ? 22 : 26} />
+    </Pressable>
+  );
+  const rowStyle = [styles.shareRow, isTight && styles.shareRowSmall];
+  const buttons = deviceLeads ? (
     <>
-      <View style={[styles.shareRow, isTight && styles.shareRowSmall]}>
-        {SHARE_PLACES.map((place) => (
-          <Pressable
-            key={place.id}
-            accessibilityLabel={`${place.name}: ${a11yLabel('post the link')}`}
-            accessibilityRole="button"
-            testID={`share-${place.id}`}
-            onPress={() => share.openLink(place.id)}
-            style={({ pressed }) => [styles.sharePlace, isTight && styles.sharePlaceSmall, pressed && styles.pressed]}
-          >
-            <Image source={place.mark} resizeMode="contain" style={{ width: place.width * (isTight ? 0.8 : 1), height: place.height * (isTight ? 0.8 : 1) }} />
-          </Pressable>
-        ))}
+      <Pressable
+        accessibilityLabel={a11yLabel('send with another app')}
+        accessibilityRole="button"
+        testID="share-device"
+        onPress={share.shareWithDevice}
+        style={({ pressed }) => [styles.shareDevice, isTight && styles.shareDeviceSmall, pressed && styles.pressed]}
+      >
+        <NavImageIcon kind="share" size={isTight ? 26 : 30} color="#FFFFFF" />
+      </Pressable>
+      <View style={rowStyle}>{SHARE_PLACES.map((place) => placeButton(place, false))}</View>
+      <View style={rowStyle}>
+        {copyButton}
+        {saveButton}
       </View>
-      <View style={[styles.shareRow, isTight && styles.shareRowSmall]}>
-        <Pressable
-          accessibilityLabel={a11yLabel('copy the link')}
-          accessibilityRole="button"
-          testID="share-copy"
-          onPress={() => {
-            void share.copyAddress().then(setHasCopied);
-          }}
-          style={({ pressed }) => [tileStyle, pressed && styles.pressed]}
-        >
-          <NavImageIcon kind={hasCopied ? 'check' : 'link'} size={29} />
-        </Pressable>
-        <Pressable accessibilityLabel={a11yLabel('save the picture')} accessibilityRole="button" testID="share-save" onPress={share.save} style={({ pressed }) => [tileStyle, pressed && styles.pressed]}>
-          <NavImageIcon kind="save" size={29} />
-        </Pressable>
+    </>
+  ) : (
+    <>
+      <View style={[styles.shareRow, styles.shareRowBig]}>{SHARE_PLACES.slice(0, MAIN_PLACES).map((place) => placeButton(place, true))}</View>
+      <View style={rowStyle}>
+        {SHARE_PLACES.slice(MAIN_PLACES).map((place) => placeButton(place, false))}
+        {copyButton}
+        {saveButton}
         {share.shareWithDevice ? (
-          <Pressable accessibilityLabel={a11yLabel('send with another app')} accessibilityRole="button" testID="share-device" onPress={share.shareWithDevice} style={({ pressed }) => [tileStyle, pressed && styles.pressed]}>
-            <NavImageIcon kind="more" size={29} />
+          <Pressable accessibilityLabel={a11yLabel('send with another app')} accessibilityRole="button" testID="share-device" onPress={share.shareWithDevice} style={({ pressed }) => [smallTile, pressed && styles.pressed]}>
+            <NavImageIcon kind="share" size={isTight ? 22 : 26} />
           </Pressable>
         ) : null}
       </View>
@@ -215,6 +255,31 @@ const styles = StyleSheet.create({
   },
   shareTileSmall: {
     width: 74,
+    height: 48,
+  },
+  // The three big places fill the width of the five small tiles under them (3 × 104 + 2 × 8 = 5 × 56 + 4 × 12).
+  sharePlaceBig: {
+    width: 104,
+    height: 64,
+  },
+  sharePlaceBigSmall: {
+    width: 76,
+    height: 48,
+  },
+  shareRowBig: {
+    gap: 8,
+  },
+  // As wide as the row of five places under it, and filled: the one button that stands out.
+  shareDevice: {
+    width: 5 * 56 + 4 * 12,
+    height: 56,
+    borderRadius: RADIUS_LG,
+    backgroundColor: '#0284C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shareDeviceSmall: {
+    width: 5 * 44 + 4 * 6,
     height: 48,
   },
   shareSheet: {

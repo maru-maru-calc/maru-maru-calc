@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { readRequestedPuzzle } from '@/components/puzzle/puzzle-card';
+import { readPuzzlePage, readRequestedPuzzle } from '@/components/puzzle/puzzle-card';
 import { FIRST_BUBBLES, MadePuzzleResult, MakingBoard, PuzzleMaker } from '@/components/puzzle/puzzle-maker';
 import { ShareButton } from '@/components/puzzle/share-button';
 import { createMadePuzzleStage, createRandomPuzzle, readMadePuzzle } from '@/game/made-puzzle';
@@ -43,7 +43,8 @@ export const browserHost: GameHost = {
     }
     // Still on the page that was opened: what it was opened with. Reached from another page of the site: what the address says now.
     const search = ADDRESS_AT_LOAD?.pathname === window.location.pathname ? ADDRESS_AT_LOAD.search : window.location.search;
-    const number = readRequestedPuzzle(search, count);
+    // A puzzle's own page ("/p/46"), or the older way of asking for it ("/puzzle?p=46").
+    const number = readPuzzlePage(window.location.pathname, count) ?? readRequestedPuzzle(search, count);
     if (number !== undefined) {
       return { number };
     }

@@ -1,12 +1,13 @@
 import { StyleSheet, View } from 'react-native';
 
-type NavImageIconKind = 'back' | 'check' | 'close' | 'dice' | 'link' | 'more' | 'next' | 'play' | 'retry' | 'save' | 'share' | 'skip' | 'undo';
+type NavImageIconKind = 'back' | 'check' | 'close' | 'dice' | 'link' | 'next' | 'play' | 'retry' | 'save' | 'share' | 'skip' | 'undo';
 
 const TEXT_BASE_COLOR = '#12334A';
 
 // Every icon is drawn from the same parts (a rounded stroke, an arrowhead of two strokes), so they
-// look like one family whatever fonts the device has.
-export function NavImageIcon({ kind, size }: { kind: NavImageIconKind; size: number }) {
+// look like one family whatever fonts the device has. `color` is for the share arrow alone, where
+// it stands on a filled button.
+export function NavImageIcon({ kind, size, color }: { kind: NavImageIconKind; size: number; color?: string }) {
   if (kind === 'retry') {
     return <RetryIcon size={size} />;
   }
@@ -17,7 +18,7 @@ export function NavImageIcon({ kind, size }: { kind: NavImageIconKind; size: num
     return <SkipIcon size={size} />;
   }
   if (kind === 'share') {
-    return <ShareIcon size={size} />;
+    return <ShareIcon size={size} color={color} />;
   }
   if (kind === 'play') {
     return <PlayIcon size={size} />;
@@ -30,9 +31,6 @@ export function NavImageIcon({ kind, size }: { kind: NavImageIconKind; size: num
   }
   if (kind === 'save') {
     return <ShareIcon size={size} isDownward />;
-  }
-  if (kind === 'more') {
-    return <MoreIcon size={size} />;
   }
   if (kind === 'check' || kind === 'close') {
     return <MarkIcon size={size} kind={kind} />;
@@ -295,19 +293,6 @@ function LinkIcon({ size }: { size: number }) {
   );
 }
 
-/** Three dots: "the rest". */
-function MoreIcon({ size }: { size: number }) {
-  const dot = Math.max(4, Math.round(size * 0.2));
-
-  return (
-    <View pointerEvents="none" testID="nav-icon-more" style={{ width: size, height: size, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-      {[0, 1, 2].map((index) => (
-        <View key={index} style={{ width: dot, height: dot, borderRadius: dot / 2, backgroundColor: TEXT_BASE_COLOR }} />
-      ))}
-    </View>
-  );
-}
-
 /** A tick ("done") or a cross ("close"), from two strokes. */
 function MarkIcon({ size, kind }: { size: number; kind: 'check' | 'close' }) {
   const stroke = Math.max(4, Math.round(size * 0.14));
@@ -332,7 +317,7 @@ function MarkIcon({ size, kind }: { size: number; kind: 'check' | 'close' }) {
 }
 
 /** An arrow going up out of an open tray: "send this out". Downward, into the tray: "keep this". */
-function ShareIcon({ size, isDownward = false }: { size: number; isDownward?: boolean }) {
+function ShareIcon({ size, isDownward = false, color = TEXT_BASE_COLOR }: { size: number; isDownward?: boolean; color?: string }) {
   const stroke = Math.max(4, Math.round(size * 0.14));
   const head = Math.round(size * 0.34);
   const trayWidth = Math.round(size * 0.8);
@@ -354,10 +339,11 @@ function ShareIcon({ size, isDownward = false }: { size: number; isDownward?: bo
             borderBottomWidth: stroke,
             borderBottomLeftRadius: stroke * 1.4,
             borderBottomRightRadius: stroke * 1.4,
+            borderColor: color,
           },
         ]}
       />
-      <View style={[styles.navStroke, { width: stroke, height: shaftHeight, borderRadius: stroke / 2, left: (size - stroke) / 2, top: Math.round(size * 0.08) }]} />
+      <View style={[styles.navStroke, { width: stroke, height: shaftHeight, borderRadius: stroke / 2, left: (size - stroke) / 2, top: Math.round(size * 0.08), backgroundColor: color }]} />
       <View
         style={[
           styles.arrowHead,
@@ -371,6 +357,7 @@ function ShareIcon({ size, isDownward = false }: { size: number; isDownward?: bo
             // Turned, its corner is the arrow's tip: just inside the top of the icon, or at the foot of the shaft.
             top: isDownward ? Math.round(size * 0.08) + shaftHeight - Math.round(head * 1.1) : Math.round(size * 0.04 + head * 0.21),
             transform: [{ rotate: isDownward ? '225deg' : '45deg' }],
+            borderColor: color,
           },
         ]}
       />

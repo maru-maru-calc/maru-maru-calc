@@ -10,6 +10,7 @@
     "export:web": "expo export --platform web --output-dir dist && node scripts/patch-web-metadata.js && node scripts/add-route-pages.js && node scripts/add-service-worker.js",
     "export:youtube": "MARUMARU_TARGET=youtube expo export --platform web --output-dir dist-youtube-raw && node scripts/build-youtube.js",
     "e2e": "playwright test",
+    "make:puzzle-cards": "playwright test --config scripts/puzzle-link-cards/playwright.config.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

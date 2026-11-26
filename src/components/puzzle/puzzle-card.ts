@@ -15,6 +15,21 @@ const BUBBLE_ROW_Y = 72;
 // The top of the picture: the goal over a row of four operators.
 export const PUZZLE_CARD_PANEL = { centerX: 540, titleBaseline: 196, operatorsLeft: 48, operatorsTop: 246, operatorWidth: 228, operatorHeight: 124, operatorGap: 24 };
 
+/** Where a picture of a puzzle puts the field and the row of operators. */
+export type PuzzleCardLayout = {
+  /** The board's field (its size on the board), how many times as big it is drawn, and where. */
+  field: { width: number; height: number; scale: number; left: number; top: number };
+  /** How far down the field the first row of bubbles sits. */
+  bubbleRowY: number;
+  operators: { left: number; top: number; width: number; height: number; gap: number };
+};
+
+const UPRIGHT: PuzzleCardLayout = {
+  field: PUZZLE_CARD_FIELD,
+  bubbleRowY: BUBBLE_ROW_Y,
+  operators: { left: PUZZLE_CARD_PANEL.operatorsLeft, top: PUZZLE_CARD_PANEL.operatorsTop, width: PUZZLE_CARD_PANEL.operatorWidth, height: PUZZLE_CARD_PANEL.operatorHeight, gap: PUZZLE_CARD_PANEL.operatorGap },
+};
+
 export type PuzzleCardBubble = { count: number; x: number; y: number; radius: number; maru: Array<{ value: PlaceValue; x: number; y: number; radius: number }> };
 export type PuzzleCardOperator = { symbol: OperatorSymbol; x: number; y: number; width: number; height: number; limit: OperatorUsageLimit };
 export type PuzzleCard = {
@@ -26,13 +41,14 @@ export type PuzzleCard = {
   operators: PuzzleCardOperator[];
 };
 
-export function getPuzzleCard(mark: number | 'pencil', stage: Pick<Stage, 'target' | 'bubbleCounts' | 'operatorLimits'>): PuzzleCard {
-  const FIELD = PUZZLE_CARD_FIELD;
+/** The parts of a puzzle's picture: upright as it is sent, unless another layout is given (the card a link shows lies on its side). */
+export function getPuzzleCard(mark: number | 'pencil', stage: Pick<Stage, 'target' | 'bubbleCounts' | 'operatorLimits'>, layout: PuzzleCardLayout = UPRIGHT): PuzzleCard {
+  const FIELD = layout.field;
   const toCardX = (x: number) => FIELD.left + x * FIELD.scale;
   const toCardY = (y: number) => FIELD.top + y * FIELD.scale;
 
   // The bubbles where the board itself puts them: in one row, or two when one would be crowded.
-  const bubbles = createPendingBubbles(FIELD.width, stage.bubbleCounts, 'fit', BUBBLE_ROW_Y).map((bubble): PuzzleCardBubble => {
+  const bubbles = createPendingBubbles(FIELD.width, stage.bubbleCounts, 'fit', layout.bubbleRowY).map((bubble): PuzzleCardBubble => {
     const radius = getEntityRadius(1, bubble.count);
     return {
       count: bubble.count,
@@ -58,13 +74,12 @@ export function getPuzzleCard(mark: number | 'pencil', stage: Pick<Stage, 'targe
     thickness: (BASIN_BODY_THICKNESS / 2) * FIELD.scale,
   };
 
-  const { operatorsLeft, operatorsTop, operatorWidth, operatorHeight, operatorGap } = PUZZLE_CARD_PANEL;
   const operators = OPERATORS.map((symbol, index): PuzzleCardOperator => ({
     symbol,
-    x: operatorsLeft + index * (operatorWidth + operatorGap),
-    y: operatorsTop,
-    width: operatorWidth,
-    height: operatorHeight,
+    x: layout.operators.left + index * (layout.operators.width + layout.operators.gap),
+    y: layout.operators.top,
+    width: layout.operators.width,
+    height: layout.operators.height,
     limit: stage.operatorLimits?.[symbol] ?? 'infinite',
   }));
 
@@ -76,14 +91,49 @@ export function getPuzzleCardFileName(number: number) {
   return `maru-puzzle-${number}.png`;
 }
 
-/** What the game's address needs after it to open this puzzle. */
-export function getPuzzleQuery(number: number) {
-  return `p=${number}`;
+/**
+ * The puzzle in one line, for the message its address is posted with: "#46  6 · 2 · 4 · 10 · 5 → 28 ?".
+ * Figures and signs only, so it reads the same in any language: these bubbles, that goal. The
+ * bubbles are set apart by dots and not by the signs to be found ("6 ? 2 ? 4"): that would look
+ * as if they had to be used in this order, and any order is allowed. A puzzle a player made has
+ * no number.
+ */
+export function getPuzzleLine(number: number | undefined, stage: Pick<Stage, 'target' | 'bubbleCounts'>) {
+  return `${number === undefined ? '' : `#${number}  `}${stage.bubbleCounts.join(' · ')} → ${stage.target} ?`;
 }
 
 /**
- * The puzzle an address asks for ("?p=46"), if it names one of the `count` puzzles. Anything
- * else (no "p", not a number, a number there is no puzzle for) asks for none.
+ * The page of one puzzle, as the site's address continues to reach it: "p/46". Every numbered
+ * puzzle has a page of its own, so that a link to it shows a card with that puzzle on it (a site
+ * that shows links reads the page as it is served, and one page can only say one thing).
+ */
+export function getPuzzlePage(number: number) {
+  return `p/${number}`;
+}
+
+/** The puzzle a page's path names ("/maru-maru-calc/p/46"), if it is one of the `count` puzzles. */
+export function readPuzzlePage(pathname: string, count: number): number | undefined {
+  const text = /\/p\/([0-9]{1,4})\/?$/.exec(pathname)?.[1];
+  if (text === undefined) {
+    return undefined;
+  }
+  const number = Number(text);
+  return number >= 1 && number <= count ? number : undefined;
+}
+
+/**
+ * The site's own path, with the "/" that ends it, from the path of one of the puzzle game's
+ * pages: "/maru-maru-calc/puzzle" and "/maru-maru-calc/p/46" both give "/maru-maru-calc/".
+ */
+export function getSitePath(pathname: string) {
+  return `${pathname.replace(/\/(?:puzzle|p\/[0-9]+)\/?$/, '').replace(/\/$/, '')}/`;
+}
+
+/**
+ * The puzzle an address asks for after "?" ("?p=46"), if it names one of the `count` puzzles.
+ * This is how addresses were written before every puzzle had a page; they are still about, so
+ * they still open their puzzle. Anything else (no "p", not a number, a number there is no puzzle
+ * for) asks for none.
  */
 export function readRequestedPuzzle(search: string, count: number): number | undefined {
   const text = new URLSearchParams(search).get('p');

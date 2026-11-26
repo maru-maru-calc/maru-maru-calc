@@ -485,9 +485,28 @@ test('the one-minute result can be handed to the device\'s "share" as a picture'
   await expect(share).toHaveText('');
   expect((await share.boundingBox())?.width).toBe((await page.getByTestId('quick-result-again').boundingBox())?.width);
 
-  // A press opens the ways of sending; the device's own share is the one that takes the picture along.
+  // A press opens the ways of sending. A result is shown to somebody, so the picture is the point:
+  // the device's own share, the one way the picture goes along, leads. It is the one filled
+  // button, right under the picture, as wide as the row of five places below it; the address to
+  // copy and the picture to keep come last.
   await share.click();
   await expect(page.getByTestId('share-panel')).toBeVisible();
+  const boxOf = async (testId: string) => (await page.getByTestId(testId).boundingBox()) as { x: number; y: number; width: number; height: number };
+  const device = await boxOf('share-device');
+  const picture = await boxOf('share-picture');
+  const places = [await boxOf('share-x'), await boxOf('share-line'), await boxOf('share-facebook'), await boxOf('share-bluesky'), await boxOf('share-hatena')];
+  const copy = await boxOf('share-copy');
+  expect(device.y).toBeGreaterThanOrEqual(picture.y + picture.height);
+  expect(device.y + device.height).toBeLessThanOrEqual(places[0].y);
+  for (const place of places) {
+    expect(place.y).toBe(places[0].y);
+    expect(place.width).toBe(56);
+  }
+  expect(places[0].y + places[0].height).toBeLessThanOrEqual(copy.y);
+  expect(Math.round(device.x)).toBe(Math.round(places[0].x));
+  expect(Math.round(device.x + device.width)).toBe(Math.round(places[4].x + places[4].width));
+  expect(await page.getByTestId('share-device').evaluate((button) => getComputedStyle(button).backgroundColor)).toBe('rgb(2, 132, 199)');
+  await expect(page.getByTestId('share-device')).toHaveText('');
   await page.getByTestId('share-device').click();
   const shared = await page.evaluate(async () => {
     const all = (window as unknown as { sharedByTest: Array<{ name: string; type: string; size: number; text: string | undefined; file: File }> }).sharedByTest;
@@ -570,6 +589,26 @@ test('a puzzle can be sent as a picture, and the address that goes with it opens
   expect(Math.round(shareBox.x)).toBe(Math.round(390 - (undoBox.x + undoBox.width)));
 
   await share.click();
+  // A puzzle is sent to be solved by as many as will: the three places most players use are the
+  // big buttons under the picture, and the rest are small under them, the device's own share among them.
+  const boxOf = async (testId: string) => (await page.getByTestId(testId).boundingBox()) as { x: number; y: number; width: number; height: number };
+  const picture = await boxOf('share-picture');
+  const big = [await boxOf('share-x'), await boxOf('share-line'), await boxOf('share-facebook')];
+  const small = [await boxOf('share-bluesky'), await boxOf('share-hatena'), await boxOf('share-copy'), await boxOf('share-save'), await boxOf('share-device')];
+  expect(big[0].y).toBeGreaterThanOrEqual(picture.y + picture.height);
+  for (const tile of big) {
+    expect(tile.y).toBe(big[0].y);
+    expect(tile.width).toBe(104);
+    expect(tile.height).toBe(64);
+  }
+  for (const tile of small) {
+    expect(tile.y).toBe(small[0].y);
+    expect(tile.y).toBeGreaterThanOrEqual(big[0].y + big[0].height);
+    expect(tile.width).toBe(56);
+  }
+  // The two rows are as wide as each other.
+  expect(Math.round(big[0].x)).toBe(Math.round(small[0].x));
+  expect(Math.round(big[2].x + big[2].width)).toBe(Math.round(small[4].x + small[4].width));
   await page.getByTestId('share-device').click();
   await page.getByTestId('share-close').click();
   const readShared = () =>
@@ -581,15 +620,18 @@ test('a puzzle can be sent as a picture, and the address that goes with it opens
     });
   const shared = await readShared();
   expect(shared).toMatchObject({ count: 1, name: 'maru-puzzle-46.png', type: 'image/png', width: 1080, height: 1350 });
+  // What goes with it: the puzzle in one line (its number, its bubbles, its goal) with the game's
+  // name as a tag, and under it the address of the puzzle's own page.
   const here = new URL(page.url());
-  expect(shared.text).toBe(`${here.origin}${here.pathname}?p=46`);
+  const site = `${here.origin}${here.pathname.replace(/puzzle$/, '')}`;
+  expect(shared.text).toBe(`#46  ${PUZZLE_STAGES[45].bubbles.join(' · ')} → ${PUZZLE_STAGES[45].goal} ?  #MaruMaruCalc\n${site}p/46`);
   // Sending it is not a move: the puzzle is as it was.
   await expect(page.locator('[data-testid^="pending-bubble-"]')).toHaveCount(PUZZLE_STAGES[45].bubbles.length);
 
   // Someone who has never played opens that address: puzzle 46 is there at once, without the start puzzle.
   const friendContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const friend = await friendContext.newPage();
-  await friend.goto(shared.text as string);
+  await friend.goto((shared.text as string).split('\n')[1]);
   await expect(friend.getByTestId('stage-goal-number')).toHaveText('#46');
   await expect(friend.getByTestId('stage-goal-target')).toHaveText(String(PUZZLE_STAGES[45].goal));
   expect((await readBoard(friend)).bubbles).toEqual([...PUZZLE_STAGES[45].bubbles].sort((left, right) => left - right));
@@ -613,7 +655,77 @@ test('a puzzle can be sent as a picture, and the address that goes with it opens
   await expect(page.getByTestId('stage-goal-number')).toHaveText('#47');
   await page.getByTestId('share-puzzle').click();
   await page.getByTestId('share-device').click();
-  expect(await readShared()).toMatchObject({ count: 2, name: 'maru-puzzle-47.png', text: `${here.origin}${here.pathname}?p=47` });
+  expect(await readShared()).toMatchObject({ count: 2, name: 'maru-puzzle-47.png', text: `#47  ${PUZZLE_STAGES[46].bubbles.join(' · ')} → ${PUZZLE_STAGES[46].goal} ?  #MaruMaruCalc\n${site}p/47` });
+});
+
+test('the tag after the message is in the language of the browser that posts it', async ({ browser }) => {
+  // The other tests run in a browser set to English and get "#MaruMaruCalc"; one set to Japanese gets the Japanese name.
+  const context = await browser.newContext({ locale: 'ja-JP', viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    const opened: string[] = [];
+    Object.assign(window, { openedByTest: opened });
+    window.open = (address?: string | URL) => {
+      opened.push(String(address));
+      return null;
+    };
+  });
+  await page.goto('/p/46');
+  await page.getByTestId('share-puzzle').click();
+  await page.getByTestId('share-x').click();
+  const opened = new URL((await page.evaluate(() => (window as unknown as { openedByTest: string[] }).openedByTest))[0]);
+  expect(opened.searchParams.get('text')).toBe(`#46  ${PUZZLE_STAGES[45].bubbles.join(' · ')} → ${PUZZLE_STAGES[45].goal} ?  #まるまる電卓`);
+  expect(opened.searchParams.get('url')).toMatch(/\/p\/46$/);
+  await context.close();
+});
+
+test('every numbered puzzle has a page of its own, and the older way of writing its address still opens it', async ({ page }) => {
+  await page.addInitScript(() => {
+    const shared: string[] = [];
+    Object.assign(window, { sharedByTest: shared });
+    Object.defineProperty(Navigator.prototype, 'canShare', { configurable: true, value: () => true });
+    Object.defineProperty(Navigator.prototype, 'share', { configurable: true, value: (data: ShareData) => (shared.push(String(data.text)), Promise.resolve()) });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  // The page of a puzzle opens that puzzle at once, without the start puzzle.
+  await page.goto('/p/46');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#46');
+  await expect(page.getByTestId('stage-goal-target')).toHaveText(String(PUZZLE_STAGES[45].goal));
+  expect((await readBoard(page)).bubbles).toEqual([...PUZZLE_STAGES[45].bubbles].sort((left, right) => left - right));
+  await expect(page.getByTestId('puzzle-choice')).toHaveCount(0);
+
+  // Sent from there, it is this same page; nothing of the address is doubled.
+  const site = new URL(page.url()).href.replace(/p\/46$/, '');
+  await page.getByTestId('share-puzzle').click();
+  await page.getByTestId('share-device').click();
+  await page.getByTestId('share-close').click();
+  const readLast = async () => (await page.evaluate(() => (window as unknown as { sharedByTest: string[] }).sharedByTest)).pop();
+  expect((await readLast())?.split('\n')[1]).toBe(`${site}p/46`);
+
+  // Played on from there, the next puzzle is sent with its own page, though the address bar still says 46.
+  await tapWay(page, PUZZLE_STAGES[45].solution.split(' '), 300);
+  await page.getByLabel('next stage', { exact: true }).first().click({ timeout: 30_000 });
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#47');
+  await page.getByTestId('share-puzzle').click();
+  await page.getByTestId('share-device').click();
+  expect((await readLast())?.split('\n')[1]).toBe(`${site}p/47`);
+
+  // The first and the last puzzle have pages; a number there is no puzzle for opens the start, as any visit does.
+  await page.goto('/p/1');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#1');
+  await page.goto('/p/100');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#100');
+  for (const address of ['/p/0', '/p/101', '/p/abc']) {
+    await page.goto(address);
+    await expect(page.getByTestId('stage-goal-number'), address).toHaveText('#0');
+  }
+
+  // Addresses written the older way are still about: they open their puzzle as before.
+  await page.goto('/puzzle?p=46');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#46');
+  await page.getByTestId('share-puzzle').click();
+  await page.getByTestId('share-device').click();
+  expect((await readLast())?.split('\n')[1]).toBe(`${site}p/46`);
 });
 
 test('an address that asks for a puzzle there is not opens the start, as any visit does', async ({ page }) => {
@@ -717,7 +829,8 @@ test('a player can make a puzzle: the bubbles, a goal from working them out, the
     return { count: all.length, name: all[0].name, type: all[0].file.type, text: all[0].text, width: picture.width, height: picture.height };
   });
   const here = new URL(page.url());
-  expect(shared).toEqual({ count: 1, name: 'maru-made-2.3.4-14.png', type: 'image/png', text: `${here.origin}${here.pathname}?m=2.3.4-14`, width: 1080, height: 1350 });
+  // A made puzzle has no card of its own where links are shown, so the line with it is what shows it there: no number, the bubbles, the goal.
+  expect(shared).toEqual({ count: 1, name: 'maru-made-2.3.4-14.png', type: 'image/png', text: `2 · 3 · 4 → 14 ?  #MaruMaruCalc\n${here.origin}${here.pathname}?m=2.3.4-14`, width: 1080, height: 1350 });
 
   // Worked out again another way, it is another puzzle: 2 + 3 + 4 = 9.
   await page.getByTestId('made-puzzle-again').click();
@@ -848,6 +961,8 @@ test('the ways of sending: five places that post the link, the link to copy, the
   const panel = page.getByTestId('share-panel');
   await expect(panel).toBeVisible();
   await expect(page.getByTestId('share-picture')).toBeVisible();
+  // This browser cannot pass a picture on, so the button for that is not offered.
+  await expect(page.getByTestId('share-device')).toHaveCount(0);
 
   // It lies over the whole screen at the screen's own size, all of it in view.
   for (const testId of ['share-panel', 'share-picture', 'share-x', 'share-line', 'share-facebook', 'share-bluesky', 'share-hatena', 'share-copy', 'share-save', 'share-close']) {
@@ -861,17 +976,20 @@ test('the ways of sending: five places that post the link, the link to copy, the
   const picture = (await page.getByTestId('share-picture').boundingBox()) as { width: number; height: number };
   expect(picture.height / picture.width).toBeCloseTo(1350 / 1080, 1);
 
-  // Each place gets the address that opens this puzzle, and nothing else.
+  // Each place gets the address of this puzzle's page. X, LINE and Bluesky take a message with
+  // it, and get the puzzle in one line; Facebook and Hatena Bookmark take the address alone.
   const here = new URL(page.url());
-  const address = encodeURIComponent(`${here.origin}${here.pathname}?p=46`);
+  const puzzlePage = `${here.origin}${here.pathname.replace(/puzzle$/, '')}p/46`;
+  const address = encodeURIComponent(puzzlePage);
+  const message = encodeURIComponent(`#46  ${PUZZLE_STAGES[45].bubbles.join(' · ')} → ${PUZZLE_STAGES[45].goal} ?  #MaruMaruCalc`);
   for (const place of ['x', 'line', 'facebook', 'bluesky', 'hatena']) {
     await page.getByTestId(`share-${place}`).click();
   }
   expect(await page.evaluate(() => (window as unknown as { openedByTest: string[] }).openedByTest)).toEqual([
-    `https://twitter.com/intent/tweet?url=${address}`,
-    `https://social-plugins.line.me/lineit/share?url=${address}`,
+    `https://twitter.com/intent/tweet?text=${message}&url=${address}`,
+    `https://social-plugins.line.me/lineit/share?url=${address}&text=${message}`,
     `https://www.facebook.com/sharer/sharer.php?u=${address}`,
-    `https://bsky.app/intent/compose?text=${address}`,
+    `https://bsky.app/intent/compose?text=${message}%0A${address}`,
     `https://b.hatena.ne.jp/add?mode=confirm&url=${address}`,
   ]);
   // Each place is shown by its own mark, whole and in its own proportions; the sheet has no word on it.
@@ -885,7 +1003,7 @@ test('the ways of sending: five places that post the link, the link to copy, the
   await expect(page.getByTestId('nav-icon-check')).toHaveCount(0);
   await page.getByTestId('share-copy').click();
   await expect(page.getByTestId('nav-icon-check')).toBeVisible();
-  expect(await page.evaluate(() => (window as unknown as { copiedByTest: string[] }).copiedByTest)).toEqual([`${here.origin}${here.pathname}?p=46`]);
+  expect(await page.evaluate(() => (window as unknown as { copiedByTest: string[] }).copiedByTest)).toEqual([puzzlePage]);
 
   // A press beside the sheet closes it; none of this was a move on the board.
   await page.getByTestId('share-panel-backdrop').click({ position: { x: 5, y: 5 } });
