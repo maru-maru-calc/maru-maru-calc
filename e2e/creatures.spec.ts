@@ -132,7 +132,7 @@ test('a tap on a mode reaches it while a decorative bubble is passing over it', 
 async function openModeSelect(page: Page) {
   await page.goto('/game');
   await page.getByLabel('bubble-5').click();
-  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
+  await expect(page.getByLabel('next stage')).toBeVisible();
   await page.getByLabel('next stage').click();
   await expect(page.getByTestId('mode-select')).toBeVisible();
 }

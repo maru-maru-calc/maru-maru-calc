@@ -117,7 +117,10 @@ test('subtraction with tens does not drift from the expression result', async ({
 
 async function openIsland(page: Page, label: string) {
   await page.getByLabel('bubble-5').click();
-  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 4000 });
+  // "Next" comes about 3.3 seconds after the bubble is pressed, however fast the machine: the
+  // opening plays out first. A wait of 4 seconds left 0.7 for everything else and ran out on a
+  // busy machine, so this takes the time every other check gets.
+  await expect(page.getByLabel('next stage')).toBeVisible();
   await page.getByLabel('next stage').click();
   await expect(page.getByTestId('mode-select')).toBeVisible();
   await page.getByLabel('marumaru mode', { exact: true }).click();
