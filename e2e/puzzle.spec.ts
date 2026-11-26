@@ -238,7 +238,6 @@ test('the board cannot be left scrolled sideways by a script or by focus', async
   expect(await page.getByTestId('operator-+').boundingBox()).toEqual(before);
 });
 
-/** Opens the numbered puzzle `number` (1 is the first), with every puzzle before it solved. */
 test('a tap on an operator reaches it while a decorative bubble is passing over it', async ({ page }) => {
   // The big bubble on the right takes about a minute to drift up to the operators, so the clock is wound forward.
   await page.clock.install();
@@ -269,6 +268,152 @@ test('a tap on an operator reaches it while a decorative bubble is passing over 
   expect(bubbleTopNow).toBeLessThan((bubbleTop as number) + 100);
 });
 
+test('held sideways, the board is at full size: the goal, the operators and the line are beside the bowl', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  // Six bubbles: the most the board ever has to hold.
+  await openPuzzle(page, 77);
+
+  // Nothing is shrunk: the board is laid out at the size it is shown.
+  expect(await boardScale(page)).toBeCloseTo(1, 3);
+  await expect(page.getByTestId('board-side-panel')).toBeVisible();
+
+  const box = async (testId: string) => {
+    const found = await page.getByTestId(testId).boundingBox();
+    expect(found, testId).not.toBeNull();
+    return found as { x: number; y: number; width: number; height: number };
+  };
+  const panel = await box('board-side-panel');
+  const plus = await box('operator-+');
+  const minus = await box('operator--');
+  const times = await box('operator-×');
+  const divide = await box('operator-÷');
+  // Two rows of two, each button big enough for a thumb.
+  expect(minus.y).toBe(plus.y);
+  expect(divide.y).toBe(times.y);
+  expect(times.x).toBe(plus.x);
+  expect(times.y).toBeGreaterThan(plus.y + plus.height);
+  for (const operator of [plus, minus, times, divide]) {
+    expect(operator.width).toBeGreaterThanOrEqual(48);
+    expect(operator.height).toBeGreaterThanOrEqual(48);
+  }
+
+  // The goal, the operators, the line and "back" are in the panel; the bubbles and "undo" are beside it, and all of it is on the screen.
+  const inPanel = [await box('stage-goal-title'), plus, minus, times, divide, await box('expression-display'), (await page.getByLabel('Back', { exact: true }).boundingBox()) as { x: number; y: number; width: number; height: number }];
+  for (const part of inPanel) {
+    expect(part.x).toBeGreaterThanOrEqual(panel.x);
+    expect(part.x + part.width).toBeLessThanOrEqual(panel.x + panel.width);
+    expect(part.y).toBeGreaterThanOrEqual(0);
+    expect(part.y + part.height).toBeLessThanOrEqual(390);
+  }
+  const besidePanel = [...(await page.locator('[data-testid^="pending-bubble-"]').evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().toJSON() as { x: number; y: number; width: number; height: number }))), await box('undo-move')];
+  expect(besidePanel).toHaveLength(7);
+  for (const part of besidePanel) {
+    expect(part.x).toBeGreaterThanOrEqual(panel.x + panel.width);
+    expect(part.x + part.width).toBeLessThanOrEqual(844);
+    expect(part.y).toBeGreaterThanOrEqual(0);
+    expect(part.y + part.height).toBeLessThanOrEqual(390);
+  }
+
+  // It plays to the end like this.
+  await tapWay(page, PUZZLE_STAGES[76].solution.split(' '), 300);
+  await expect(page.getByLabel('next stage', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+
+  // Turned upright, the operators are a row above the bowl again.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByTestId('board-side-panel')).toHaveCount(0);
+  expect((await box('operator-÷')).y).toBe((await box('operator-+')).y);
+  expect(await boardScale(page)).toBeCloseTo(1, 3);
+});
+
+test('a wide window with room to spare shows the board bigger, and a dragged maru still follows the pointer', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await openPuzzle(page, 1);
+  // As if the window were 480 high.
+  expect(await boardScale(page)).toBeCloseTo(1.5, 3);
+  const plus = await page.getByTestId('operator-+').boundingBox();
+  expect(plus?.height).toBeCloseTo(56 * 1.5, 1);
+
+  await page.locator('[data-testid^="pending-bubble-"]').first().click();
+  await page.waitForTimeout(2500);
+  // The topmost maru of the pile: nothing lies on it, and there is free water above.
+  const [startX, startY] = await page.evaluate(() => {
+    const top = Array.from(document.querySelectorAll('[data-testid^="bead-"]'))
+      .map((element) => element.getBoundingClientRect())
+      .sort((left, right) => left.y - right.y)[0];
+    return [top.x + top.width / 2, top.y + top.height / 2];
+  });
+  await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('[data-testid^="bead-"]')?.setAttribute('data-held', '1'), [startX, startY]);
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX + 15, startY - 45, { steps: 6 });
+  await page.mouse.move(startX + 30, startY - 90, { steps: 6 });
+  await page.waitForTimeout(250);
+  const held = await page.evaluate(() => {
+    const box = (document.querySelector('[data-held]') as HTMLElement).getBoundingClientRect();
+    return [box.x + box.width / 2, box.y + box.height / 2];
+  });
+  await page.mouse.up();
+  expect(Math.abs(held[0] - (startX + 30))).toBeLessThan(5);
+  expect(Math.abs(held[1] - (startY - 90))).toBeLessThan(5);
+});
+
+test('held sideways, the list is ten to a row with "back" beside it', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await openPuzzle(page, 3);
+  const backOnBoard = await page.getByLabel('Back', { exact: true }).boundingBox();
+  await page.getByLabel('Back', { exact: true }).click();
+  await expect(page.getByTestId('puzzle-list')).toBeVisible();
+
+  const cell = async (number: number) => (await page.getByTestId(`pick-puzzle-${number}`).boundingBox()) as { x: number; y: number; width: number; height: number };
+  const first = await cell(1);
+  const tenth = await cell(10);
+  const eleventh = await cell(11);
+  expect(tenth.y).toBe(first.y);
+  expect(eleventh.y).toBeGreaterThan(first.y);
+  expect(eleventh.x).toBe(first.x);
+  expect(tenth.x + tenth.width).toBeLessThanOrEqual(844);
+  expect(first.width).toBeGreaterThanOrEqual(48);
+
+  // "Back" is where it was on the board, to the left of the list.
+  const back = await page.getByTestId('puzzle-list-back').boundingBox();
+  expect(back).toEqual(backOnBoard);
+  expect((back?.x ?? 0) + (back?.width ?? 0)).toBeLessThan(first.x);
+
+  await page.getByTestId('pick-puzzle-20').click();
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#20');
+});
+
+test('held sideways, the choice is over the bowl and the one-minute result fits the screen', async ({ page }) => {
+  await page.clock.install();
+  await page.setViewportSize({ width: 844, height: 390 });
+  await openPuzzleGame(page, { version: 1, solved: [], startVisits: 9, quickScores: [9, 7, 7, 4, 2] });
+  await page.clock.resume();
+  await solveStartPuzzle(page);
+
+  const panel = await page.getByTestId('board-side-panel').boundingBox();
+  const choice = await page.getByTestId('choose-puzzles').boundingBox();
+  expect(choice?.x).toBeGreaterThan((panel?.x ?? 0) + (panel?.width ?? 0));
+
+  await page.getByTestId('choose-quick').click();
+  await expect(page.getByTestId('quick-time-left')).toBeVisible();
+  await page.clock.fastForward(62_000);
+  await expect(page.getByTestId('quick-result')).toBeVisible();
+
+  for (const testId of ['quick-result-count', 'quick-result-best', 'quick-result-back', 'quick-result-again']) {
+    const part = await page.getByTestId(testId).boundingBox();
+    expect(part, testId).not.toBeNull();
+    expect(part?.y, testId).toBeGreaterThanOrEqual(0);
+    expect((part?.y ?? 0) + (part?.height ?? 0), testId).toBeLessThanOrEqual(390);
+  }
+  await expect(page.getByTestId('quick-result-best').locator('> div')).toHaveCount(5);
+});
+
+/** How much bigger or smaller than it is laid out the board is shown. */
+function boardScale(page: Page) {
+  return page.getByTestId('fit-to-screen').evaluate((element) => element.getBoundingClientRect().height / (element as HTMLElement).offsetHeight);
+}
+
+/** Opens the numbered puzzle `number` (1 is the first), with every puzzle before it solved. */
 async function openPuzzle(page: Page, number: number) {
   await openPuzzleGame(page, { version: 1, solved: PUZZLE_GAME_STAGES.slice(0, number - 1).map((stage) => stage.id), startVisits: 9, quickScores: [] });
   await solveStartPuzzle(page);

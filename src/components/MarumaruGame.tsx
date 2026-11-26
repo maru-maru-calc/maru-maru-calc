@@ -13,14 +13,12 @@ import { BackgroundBubbleLayer, DraggableBubbleView, NO_BACKGROUND_BUBBLES } fro
 import {
   ANNIHILATION_ANIMATION_MS,
   BUBBLE_BURST_ANIMATION_MS,
+  BUBBLE_ROW_Y_BESIDE_PANEL,
   DETAILED_RELEASE_BEAD_LIMIT,
   DIVISION_FAILED_ANIMATION_MS,
   DIVISION_SPLIT_ANIMATION_MS,
   FIELD_BUBBLE_AUTO_BURST_IDLE_MS,
   FIELD_BUBBLE_AUTO_BURST_STEP_MS,
-  FIELD_MARGIN,
-  FOOTER_HEIGHT,
-  HEADER_HEIGHT,
   IDLE_CHECK_MS,
   IDLE_HINT_DELAY_MS,
   IDLE_HINT_PULSE_MS,
@@ -30,7 +28,6 @@ import {
   MERGE_ANIMATION_MS,
   MERGE_COOLDOWN_MS,
   MULTIPLICATION_EXPANSION_HOLD_MS,
-  OPERATOR_TABS_HEIGHT,
   PREVIEW_Y,
   QUEUED_MOVE_CHECK_MS,
   RESULT_READY_DELAY_MS,
@@ -64,6 +61,7 @@ import {
   createPendingBubbles,
   getBackgroundBubbleSpecs,
   getBasinFrameSegments,
+  getFieldSize,
   getEntityRadius,
   getEntityUnitCount,
   getMultiplierClusterRadius,
@@ -144,6 +142,7 @@ import { hasLegalMove } from '@/game/stage-rules';
 import { getStage } from '@/game/stages';
 import { BeadRole, BeadSign, BeadSnapshot, OperatorUsageLimits, PlaceValue, Stage } from '@/game/types';
 import { a11yLabel } from '@/i18n/a11y-label';
+import { SIDE_PANEL_WIDTH } from '@/layout/fit-board';
 import { usePrefersReducedMotion } from '@/layout/reduced-motion';
 
 export function MarumaruGame({
@@ -188,11 +187,13 @@ export function MarumaruGame({
   onLogoPress?: () => void;
   dentakuPractice?: DentakuPractice;
 }) {
-  const { width, height } = useBoardViewport();
+  const { width, height, arrangement } = useBoardViewport();
+  const isSideBySide = arrangement === 'sideBySide';
   const screenRef = useRef<View>(null);
   useStaysPut(screenRef);
-  const fieldWidth = Math.max(240, width - FIELD_MARGIN * 2);
-  const fieldHeight = Math.max(360, height - HEADER_HEIGHT - FOOTER_HEIGHT - OPERATOR_TABS_HEIGHT - 20);
+  const { width: fieldWidth, height: fieldHeight } = getFieldSize({ width, height, arrangement });
+  // In the panel the goal has a row of its own under the buttons; above the bowl it sits between them.
+  const titleMaxWidth = isSideBySide ? SIDE_PANEL_WIDTH - 32 : Math.max(168, fieldWidth - 132);
   const [stageIndex, setStageIndex] = useState(initialStageIndex);
   const stage = useMemo(
     () => (dentakuPractice ? createDentakuPracticeStage(dentakuPractice) : stages ? stages[Math.max(0, Math.min(stageIndex, stages.length - 1))] : getStage(stageIndex)),
@@ -397,7 +398,7 @@ export function MarumaruGame({
     const initialEntities = mode === 'launch' ? createLaunchBeads(engine, fieldWidth, fieldHeight) : [];
     entitiesRef.current = initialEntities;
     publishBeads(beadFrameStore, setBeads, initialEntities, fieldWidth, fieldHeight);
-    setPendingBubbles(createPendingBubbles(fieldWidth, mode === 'launch' ? [LAUNCH_BUBBLE_COUNT] : stage.bubbleCounts, bubbleRows));
+    setPendingBubbles(createPendingBubbles(fieldWidth, mode === 'launch' ? [LAUNCH_BUBBLE_COUNT] : stage.bubbleCounts, bubbleRows, isSideBySide ? BUBBLE_ROW_Y_BESIDE_PANEL : undefined));
     const initialExpression = mode === 'launch' ? [String(LAUNCH_INITIAL_TOTAL), '+'] : [];
     expressionTokensRef.current = initialExpression;
     setExpressionTokens(initialExpression);
@@ -432,7 +433,7 @@ export function MarumaruGame({
     lastFieldBubbleAutoBurstAtRef.current = 0;
     mergeReadySinceRef.current = undefined;
     resultReadySinceRef.current = undefined;
-  }, [bubbleRows, fadeOutResultSfx, fieldHeight, fieldWidth, markBubbleInteraction, mode, stage.bubbleCounts]);
+  }, [bubbleRows, fadeOutResultSfx, fieldHeight, fieldWidth, isSideBySide, markBubbleInteraction, mode, stage.bubbleCounts]);
 
   const onAllBubblesUsedRef = useRef(onAllBubblesUsed);
   onAllBubblesUsedRef.current = onAllBubblesUsed;
@@ -2072,145 +2073,173 @@ export function MarumaruGame({
   }, [hasAnswerPad]);
   const longFormProblem = dentakuPractice?.longFormMode ? getLongFormProblem(dentakuPractice) : undefined;
 
+  const header = (
+    <View style={[styles.header, isSideBySide && styles.headerInPanel]}>
+      <View style={[styles.headerTitleGroup, isSideBySide && styles.headerTitleGroupInPanel]}>
+        {onBack && mode !== 'launch' ? (
+          <Pressable accessibilityLabel={a11yLabel('Back')} accessibilityRole="button" onPress={goBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressedButton]}>
+            <NavImageIcon kind="back" size={29} />
+          </Pressable>
+        ) : null}
+        {(!dentakuPractice && (mode !== 'launch' || isClear)) || (dentakuPractice && isClear && !dentakuPractice.autoAdvance) ? (
+          <HeaderActionButton
+            isClear={isClear}
+            isFailed={isFailed}
+            failedAt={failedAt}
+            isLaunch={mode === 'launch'}
+            prefersReducedMotion={prefersReducedMotion}
+            onPress={isClear ? (mode === 'launch' ? completeLaunch : playNextStage) : retryStage}
+          />
+        ) : null}
+        {isLookingAtMaru ? (
+          <Pressable
+            accessibilityLabel={a11yLabel('answer')}
+            accessibilityRole="button"
+            testID="answer-after-looking"
+            onPress={answerAfterLooking}
+            style={({ pressed }) => [styles.headerRetryButton, pressed && styles.pressedButton]}
+          >
+            <NavImageIcon kind="skip" size={29} />
+          </Pressable>
+        ) : null}
+        {canSkipReplay ? (
+          <Pressable
+            accessibilityLabel={a11yLabel('skip the replay')}
+            accessibilityRole="button"
+            testID="skip-replay"
+            onPress={skipReplay}
+            style={({ pressed }) => [styles.headerRetryButton, pressed && styles.pressedButton]}
+          >
+            <NavImageIcon kind="skip" size={29} />
+          </Pressable>
+        ) : null}
+        <View style={styles.headerMainTitleShift}>
+          {mode === 'launch' ? (
+            <LaunchLogo onPress={onLogoPress} />
+          ) : dentakuPractice ? (
+            <KukuGoalTitle
+              practice={dentakuPractice}
+              input={kukuInput}
+              maxWidth={titleMaxWidth}
+              isWrong={kukuInputState === 'wrong'}
+            />
+          ) : (
+            <StageGoalTitle showsGoalParts={showsGoalAsMaru} stageMark={stageMark ?? stageNumberInIsland} target={target} maxWidth={titleMaxWidth} />
+          )}
+        </View>
+      </View>
+      <Text testID="current-total-value" style={styles.hiddenMetric}>
+        {total}
+      </Text>
+    </View>
+  );
+  const operatorRail = (
+    <OperatorRail
+      selectedOperator={queuedOperator ?? selectedOperator}
+      operatorSign={operatorSign}
+      operatorUsage={operatorUsage}
+      hasInputValue={hasExpressionValue(expressionTokens)}
+      hasActiveSelection={hasReleasedBubble || queuedOperator !== undefined}
+      isLocked={isStageReadyForResult(pendingBubbles)}
+      onSelect={selectOperator}
+      style={isSideBySide ? styles.operatorRailInPanel : undefined}
+    />
+  );
+  const field = (
+    <View style={[styles.field, { width: fieldWidth, height: fieldHeight }]}>
+      <BasinFrame segments={basinFrameSegments} />
+      {pendingBubbles.map((bubble) => {
+        const activePendingOperator = hasReleasedBubble ? selectedOperator : '+';
+        const bubbleSign: BeadSign = activePendingOperator === '×' || activePendingOperator === '÷' ? operatorSign : activePendingOperator === '-' ? -1 : 1;
+        return (
+          <DraggableBubbleView
+            key={bubble.id}
+            bubble={bubble}
+            sign={bubbleSign}
+            isMultiplier={activePendingOperator === '×'}
+            isDivider={activePendingOperator === '÷'}
+            isHinting={shouldPulsePendingBubbles}
+            onBurst={dentakuPractice ? () => undefined : burstBubble}
+            onMove={dentakuPractice ? () => undefined : moveBubble}
+          />
+        );
+      })}
+      {bubbleBurstAnimations.map((animation) => (
+        <BubbleBurst key={animation.id} animation={animation} />
+      ))}
+      {multiplicationExpansionAnimation ? <MultiplicationExpansionOverlay animation={multiplicationExpansionAnimation} /> : null}
+      {isClear && !prefersReducedMotion ? <ClearBubbleFireworks fieldWidth={fieldWidth} fieldHeight={fieldHeight} /> : null}
+      <BeadLayer
+        store={beadFrameStore}
+        expressionTokens={expressionTokens}
+        hiddenBeadId={divisionSplitAnimation?.resultBeadId}
+        draggingBeadId={draggingBeadId}
+        onMove={moveBead}
+        onDragStart={startDragBead}
+        onDragEnd={endDragBead}
+        onUnwrap={unwrapBeadGroup}
+      />
+      {mergeAnimation ? <MergePulse animation={mergeAnimation} /> : null}
+      {divisionSplitAnimation ? <DivisionSplitOverlay animation={divisionSplitAnimation} /> : null}
+      {divisionFailedAnimation ? <DivisionFailedOverlay animation={divisionFailedAnimation} /> : null}
+      {isFailed ? <FailedWaterOverlay failedAt={failedAt} /> : null}
+      {cornerBadge === undefined ? null : (
+        <View pointerEvents="none" testID="corner-badge" style={[styles.cornerBadge, isSideBySide && styles.fieldCornerBesidePanel]}>
+          <Text style={styles.cornerBadgeText}>{cornerBadge}</Text>
+        </View>
+      )}
+      {/* In the corner under the bowl, just above the end of the calculation line. The line's own box stays as it is on the opening screen. */}
+      {!dentakuPractice && mode !== 'launch' ? (
+        <Pressable
+          accessibilityLabel={a11yLabel('undo')}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canUndo }}
+          disabled={!canUndo}
+          testID="undo-move"
+          onPress={undoLastMove}
+          style={({ pressed }) => [styles.undoButton, isSideBySide && styles.fieldCornerBesidePanel, !canUndo && styles.undoButtonDisabled, pressed && styles.pressedButton]}
+        >
+          <NavImageIcon kind="undo" size={29} />
+        </Pressable>
+      ) : null}
+      {/* The whole board skips too; the button in the header is the one that says so. */}
+      {canSkipReplay ? <Pressable aria-hidden focusable={false} testID="skip-replay-field" onPress={skipReplay} style={styles.skipReplayField} /> : null}
+      {isLookingAtMaru ? <Pressable aria-hidden focusable={false} testID="look-at-maru-field" onPress={answerAfterLooking} style={styles.skipReplayField} /> : null}
+    </View>
+  );
+  // The line of the calculation so far.
+  const expressionLine = (
+    <View style={[styles.footer, isSideBySide ? styles.footerInPanel : { width: fieldWidth }]}>
+      <View style={styles.footerControls}>
+        {/* While the child reads the answer from the maru, the line stops before the "= result". */}
+        <ExpressionDisplay tokens={isReadingAnswerFromMaru ? stripExpressionResult(footerExpressionTokens) : footerExpressionTokens} />
+      </View>
+    </View>
+  );
+
   return (
     <View ref={screenRef} style={styles.screen}>
-      <View style={styles.header}>
-        <View style={styles.headerTitleGroup}>
-          {onBack && mode !== 'launch' ? (
-            <Pressable accessibilityLabel={a11yLabel('Back')} accessibilityRole="button" onPress={goBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressedButton]}>
-              <NavImageIcon kind="back" size={29} />
-            </Pressable>
-          ) : null}
-          {(!dentakuPractice && (mode !== 'launch' || isClear)) || (dentakuPractice && isClear && !dentakuPractice.autoAdvance) ? (
-            <HeaderActionButton
-              isClear={isClear}
-              isFailed={isFailed}
-              failedAt={failedAt}
-              isLaunch={mode === 'launch'}
-              prefersReducedMotion={prefersReducedMotion}
-              onPress={isClear ? (mode === 'launch' ? completeLaunch : playNextStage) : retryStage}
-            />
-          ) : null}
-          {isLookingAtMaru ? (
-            <Pressable
-              accessibilityLabel={a11yLabel('answer')}
-              accessibilityRole="button"
-              testID="answer-after-looking"
-              onPress={answerAfterLooking}
-              style={({ pressed }) => [styles.headerRetryButton, pressed && styles.pressedButton]}
-            >
-              <NavImageIcon kind="skip" size={29} />
-            </Pressable>
-          ) : null}
-          {canSkipReplay ? (
-            <Pressable
-              accessibilityLabel={a11yLabel('skip the replay')}
-              accessibilityRole="button"
-              testID="skip-replay"
-              onPress={skipReplay}
-              style={({ pressed }) => [styles.headerRetryButton, pressed && styles.pressedButton]}
-            >
-              <NavImageIcon kind="skip" size={29} />
-            </Pressable>
-          ) : null}
-          <View style={styles.headerMainTitleShift}>
-            {mode === 'launch' ? (
-              <LaunchLogo onPress={onLogoPress} />
-            ) : dentakuPractice ? (
-              <KukuGoalTitle
-                practice={dentakuPractice}
-                input={kukuInput}
-                maxWidth={Math.max(168, fieldWidth - 132)}
-                isWrong={kukuInputState === 'wrong'}
-              />
-            ) : (
-              <StageGoalTitle showsGoalParts={showsGoalAsMaru} stageMark={stageMark ?? stageNumberInIsland} target={target} maxWidth={Math.max(168, fieldWidth - 132)} />
-            )}
+      {isSideBySide ? (
+        // Wider than tall: the goal, the operators and the line are a panel on the left, the bowl has the whole height.
+        <View testID="board-side-by-side" style={styles.sideBySide}>
+          <View testID="board-side-panel" style={styles.sidePanel}>
+            {header}
+            {operatorRail}
+            <View style={styles.sidePanelSpace} />
+            {expressionLine}
           </View>
+          {field}
         </View>
-        <Text testID="current-total-value" style={styles.hiddenMetric}>
-          {total}
-        </Text>
-      </View>
-
-      <View style={[styles.playArea, { width: fieldWidth }]}>
-        <OperatorRail
-          selectedOperator={queuedOperator ?? selectedOperator}
-          operatorSign={operatorSign}
-          operatorUsage={operatorUsage}
-          hasInputValue={hasExpressionValue(expressionTokens)}
-          hasActiveSelection={hasReleasedBubble || queuedOperator !== undefined}
-          isLocked={isStageReadyForResult(pendingBubbles)}
-          onSelect={selectOperator}
-        />
-        <View style={[styles.field, { width: fieldWidth, height: fieldHeight }]}>
-          <BasinFrame segments={basinFrameSegments} />
-          {pendingBubbles.map((bubble) => {
-            const activePendingOperator = hasReleasedBubble ? selectedOperator : '+';
-            const bubbleSign: BeadSign = activePendingOperator === '×' || activePendingOperator === '÷' ? operatorSign : activePendingOperator === '-' ? -1 : 1;
-            return (
-              <DraggableBubbleView
-                key={bubble.id}
-                bubble={bubble}
-                sign={bubbleSign}
-                isMultiplier={activePendingOperator === '×'}
-                isDivider={activePendingOperator === '÷'}
-                isHinting={shouldPulsePendingBubbles}
-                onBurst={dentakuPractice ? () => undefined : burstBubble}
-                onMove={dentakuPractice ? () => undefined : moveBubble}
-              />
-            );
-          })}
-          {bubbleBurstAnimations.map((animation) => (
-            <BubbleBurst key={animation.id} animation={animation} />
-          ))}
-          {multiplicationExpansionAnimation ? <MultiplicationExpansionOverlay animation={multiplicationExpansionAnimation} /> : null}
-          {isClear && !prefersReducedMotion ? <ClearBubbleFireworks fieldWidth={fieldWidth} fieldHeight={fieldHeight} /> : null}
-          <BeadLayer
-            store={beadFrameStore}
-            expressionTokens={expressionTokens}
-            hiddenBeadId={divisionSplitAnimation?.resultBeadId}
-            draggingBeadId={draggingBeadId}
-            onMove={moveBead}
-            onDragStart={startDragBead}
-            onDragEnd={endDragBead}
-            onUnwrap={unwrapBeadGroup}
-          />
-          {mergeAnimation ? <MergePulse animation={mergeAnimation} /> : null}
-          {divisionSplitAnimation ? <DivisionSplitOverlay animation={divisionSplitAnimation} /> : null}
-          {divisionFailedAnimation ? <DivisionFailedOverlay animation={divisionFailedAnimation} /> : null}
-          {isFailed ? <FailedWaterOverlay failedAt={failedAt} /> : null}
-          {cornerBadge === undefined ? null : (
-            <View pointerEvents="none" testID="corner-badge" style={styles.cornerBadge}>
-              <Text style={styles.cornerBadgeText}>{cornerBadge}</Text>
-            </View>
-          )}
-          {/* In the corner under the bowl, just above the end of the calculation line. The line's own box stays as it is on the opening screen. */}
-          {!dentakuPractice && mode !== 'launch' ? (
-            <Pressable
-              accessibilityLabel={a11yLabel('undo')}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: !canUndo }}
-              disabled={!canUndo}
-              testID="undo-move"
-              onPress={undoLastMove}
-              style={({ pressed }) => [styles.undoButton, !canUndo && styles.undoButtonDisabled, pressed && styles.pressedButton]}
-            >
-              <NavImageIcon kind="undo" size={29} />
-            </Pressable>
-          ) : null}
-          {/* The whole board skips too; the button in the header is the one that says so. */}
-          {canSkipReplay ? <Pressable aria-hidden focusable={false} testID="skip-replay-field" onPress={skipReplay} style={styles.skipReplayField} /> : null}
-          {isLookingAtMaru ? <Pressable aria-hidden focusable={false} testID="look-at-maru-field" onPress={answerAfterLooking} style={styles.skipReplayField} /> : null}
-        </View>
-      </View>
-
-      <View style={[styles.footer, { width: fieldWidth }]}>
-        <View style={styles.footerControls}>
-          {/* While the child reads the answer from the maru, the line stops before the "= result". */}
-          <ExpressionDisplay tokens={isReadingAnswerFromMaru ? stripExpressionResult(footerExpressionTokens) : footerExpressionTokens} />
-        </View>
-      </View>
+      ) : (
+        <>
+          {header}
+          <View style={[styles.playArea, { width: fieldWidth }]}>
+            {operatorRail}
+            {field}
+          </View>
+          {expressionLine}
+        </>
+      )}
       {dentakuPractice && !isClear && (kukuInputState === 'input' || kukuInputState === 'wrong') ? (
         <KukuAnswerPad
           state={kukuInputState}

@@ -18,6 +18,9 @@ export const BASIN_FRAME_THICKNESS = 5;
 export const FIELD_ENTITY_INSET = 10;
 export const BASIN_ENTITY_GUARD_MARGIN = 3;
 export const BUBBLE_ROW_Y = 56;
+// Beside the panel the field starts at the top of the screen: a little lower, so the biggest
+// bubble (64 in radius) is whole.
+export const BUBBLE_ROW_Y_BESIDE_PANEL = 68;
 // Bubbles go in one row until their widths add up to more than this share of the board's width.
 export const PENDING_BUBBLE_ROW_FILL_LIMIT = 1.15;
 // How far below the first row the second one sits: about one big bubble.

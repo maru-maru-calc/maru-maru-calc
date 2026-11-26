@@ -16,6 +16,7 @@ import {
   TEXT_ACCENT_COLOR,
   TEXT_BASE_COLOR,
 } from '@/components/marumaru/constants';
+import { SIDE_PANEL_WIDTH } from '@/layout/fit-board';
 
 export const styles = StyleSheet.create({
   screen: {
@@ -38,6 +39,36 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: '100%',
+  },
+  // The panel beside the bowl, on a screen that is wider than tall: the same parts in the same
+  // order as above and below the bowl (goal, operators, the line), in a column on the left.
+  sideBySide: {
+    flex: 1,
+    zIndex: 1,
+    alignSelf: 'center',
+    flexDirection: 'row',
+  },
+  sidePanel: {
+    width: SIDE_PANEL_WIDTH,
+    // Clear of the one-minute game's time bar along the top edge.
+    paddingTop: GRID * 2,
+  },
+  sidePanelSpace: {
+    flex: 1,
+  },
+  // Beside the panel the field reaches the bottom of the screen: "undo" and the count stand
+  // level with the line of the calculation instead of on the edge.
+  fieldCornerBesidePanel: {
+    bottom: GRID * 2,
+  },
+  headerInPanel: {
+    minHeight: 0,
+    paddingTop: 0,
+    justifyContent: 'flex-start',
+  },
+  // The buttons keep their corners; the goal goes on a row of its own under them.
+  headerTitleGroupInPanel: {
+    paddingTop: HEADER_ACTION_BUTTON_SIZE + GRID / 2,
   },
   headerMainTitleShift: {
     transform: [{ translateY: 0 }],
@@ -494,6 +525,18 @@ export const styles = StyleSheet.create({
     gap: GRID,
     backgroundColor: '#C6E8F4',
   },
+  // Two rows of two.
+  operatorRailInPanel: {
+    height: 'auto',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+  },
+  operatorButtonInGrid: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: (SIDE_PANEL_WIDTH - GRID * 6 - GRID) / 2,
+    height: 56,
+  },
   operatorButton: {
     position: 'relative',
     flex: 1,
@@ -935,6 +978,10 @@ export const styles = StyleSheet.create({
     alignItems: 'stretch',
     paddingHorizontal: GRID * 3,
     paddingTop: GRID,
+    paddingBottom: GRID * 2,
+  },
+  footerInPanel: {
+    minHeight: 0,
     paddingBottom: GRID * 2,
   },
   footerControls: {

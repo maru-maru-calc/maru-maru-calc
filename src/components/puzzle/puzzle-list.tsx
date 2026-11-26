@@ -1,13 +1,18 @@
 // The list of the numbered puzzles: every one can be opened, solved or not, so nobody is held up
 // by a puzzle they cannot crack. No words: a row of small circles says how many bubbles the
 // puzzles below it have, a filled cell is a solved puzzle, a ringed one is the next to solve.
+//
+// On a screen that is wider than tall "back" goes to the left of the list instead of above it, so
+// the list has the whole height, and the rows are ten long where ten fit.
 import { useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useBoardViewport } from '@/components/marumaru/board-viewport';
 import { HEADER_ACTION_BUTTON_SIZE, RADIUS_LG } from '@/components/marumaru/constants';
 import { NavImageIcon } from '@/components/NavImageIcon';
+import { BACK_TO_LIST, getPuzzleListLayout } from '@/components/puzzle/list-layout';
 import { getPuzzleSections, PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
 import { a11yLabel } from '@/i18n/a11y-label';
 
@@ -15,13 +20,6 @@ const INK = '#12334A';
 const ACCENT = '#0284C7';
 const WATER = '#C6E8F4';
 const FONT = 'Helvetica';
-const CELL = 56;
-const GAP = 10;
-// Five cells and their gaps: the list keeps this width on any screen and sits in the middle.
-const LIST_WIDTH = CELL * 5 + GAP * 4;
-// How far above the next puzzle the list is scrolled, so the row before it shows too.
-const ROOM_ABOVE_NEXT = CELL + GAP * 3;
-
 const SECTIONS = getPuzzleSections();
 
 export function PuzzleList({
@@ -37,6 +35,9 @@ export function PuzzleList({
   onBack: () => void;
 }) {
   const solved = new Set(solvedIds);
+  const { columns, cell, gap, sideInset } = getPuzzleListLayout(useBoardViewport());
+  const isBesideBack = sideInset !== undefined;
+  const listWidth = cell * columns + gap * (columns - 1);
   const scrollRef = useRef<ScrollView>(null);
   const sectionTopRef = useRef(new Map<number, number>());
   const nextSection = SECTIONS.find((section) => nextPuzzle !== undefined && section.numbers.includes(nextPuzzle));
@@ -49,22 +50,28 @@ export function PuzzleList({
     if (sectionTop === undefined) {
       return;
     }
-    const row = Math.floor(nextSection.numbers.indexOf(nextPuzzle) / 5);
-    scrollRef.current?.scrollTo({ y: Math.max(0, sectionTop + SECTION_HEAD_HEIGHT + row * (CELL + GAP) - ROOM_ABOVE_NEXT), animated: false });
+    const row = Math.floor(nextSection.numbers.indexOf(nextPuzzle) / columns);
+    // Far enough above the next puzzle that the row before it shows too.
+    scrollRef.current?.scrollTo({ y: Math.max(0, sectionTop + SECTION_HEAD_HEIGHT + row * (cell + gap) - (cell + gap * 3)), animated: false });
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.screen, isBesideBack && styles.screenBesideBack]}>
+      <View style={isBesideBack ? [styles.sideHeader, { paddingLeft: sideInset, width: sideInset + HEADER_ACTION_BUTTON_SIZE + BACK_TO_LIST }] : styles.header}>
         <Pressable accessibilityLabel={a11yLabel('Back')} accessibilityRole="button" testID="puzzle-list-back" onPress={onBack} style={({ pressed }) => [styles.headerButton, pressed && styles.pressed]}>
           <NavImageIcon kind="back" size={29} />
         </Pressable>
       </View>
-      <ScrollView ref={scrollRef} testID="puzzle-list" contentContainerStyle={styles.content}>
+      <ScrollView
+        ref={scrollRef}
+        testID="puzzle-list"
+        style={isBesideBack && styles.listBesideBack}
+        contentContainerStyle={[styles.content, isBesideBack && { paddingTop: 8, paddingRight: sideInset }]}
+      >
         {SECTIONS.map((section) => (
           <View
             key={section.bubbleCount}
-            style={styles.section}
+            style={[styles.section, { width: listWidth }]}
             onLayout={(event: LayoutChangeEvent) => {
               sectionTopRef.current.set(section.bubbleCount, event.nativeEvent.layout.y);
               if (section === nextSection) {
@@ -77,7 +84,7 @@ export function PuzzleList({
                 <View key={index} style={styles.bubbleDot} />
               ))}
             </View>
-            <View style={styles.grid}>
+            <View style={[styles.grid, { gap }]}>
               {section.numbers.map((number) => {
                 const isSolved = solved.has(PUZZLE_GAME_STAGES[number - 1].id);
                 const isNext = number === nextPuzzle;
@@ -88,7 +95,7 @@ export function PuzzleList({
                     accessibilityRole="button"
                     testID={`pick-puzzle-${number}`}
                     onPress={() => onPick(number)}
-                    style={({ pressed }) => [styles.cell, isSolved && styles.cellSolved, isNext && styles.cellNext, pressed && styles.pressed]}
+                    style={({ pressed }) => [styles.cell, { width: cell, height: cell }, isSolved && styles.cellSolved, isNext && styles.cellNext, pressed && styles.pressed]}
                   >
                     <Text style={[styles.cellNumber, isSolved && styles.cellNumberSolved]}>{number}</Text>
                   </Pressable>
@@ -118,6 +125,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  screenBesideBack: {
+    flexDirection: 'row',
+  },
+  // "Back" beside the list, where it is on the board when the panel is beside the bowl.
+  sideHeader: {
+    paddingTop: 16,
+  },
+  listBesideBack: {
+    flex: 1,
+  },
   // The same button, in the same place, as "back" on the board.
   headerButton: {
     width: HEADER_ACTION_BUTTON_SIZE,
@@ -132,7 +149,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   section: {
-    width: LIST_WIDTH,
     marginBottom: 12,
   },
   sectionHead: {
@@ -152,11 +168,8 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: GAP,
   },
   cell: {
-    width: CELL,
-    height: CELL,
     borderRadius: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.62)',
     borderWidth: 3,
