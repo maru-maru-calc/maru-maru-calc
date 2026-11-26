@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { drawPuzzleLinkCard, getPuzzleLinkCardFile, PUZZLE_LINK_CARD_DRAWING, PUZZLE_LINK_CARD_HEIGHT, PUZZLE_LINK_CARD_WIDTH } from '@/components/puzzle/puzzle-link-card';
 import { PUZZLE_GAME_STAGES } from '@/game/puzzle-game';
 
-const projectDir = path.resolve(__dirname, '..', '..', '..');
+// Three folders up from this file; where a test runner gives no `__dirname`, the folder it was started in, which is the project's.
+const projectDir = typeof __dirname === 'string' ? path.resolve(__dirname, '..', '..', '..') : process.cwd();
 const cardsDir = path.join(projectDir, 'public', 'ogp');
 
 /** The width and height a JPEG file says it has (from its "start of frame" part), or undefined if it is not one. */

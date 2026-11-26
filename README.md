@@ -59,6 +59,12 @@ Web版はホーム画面に追加でき(`public/manifest.webmanifest`)、一度�
 
 Web版は1ページ構成(SPA)なので、`npm run export:web` の最後に `index.html` を `game.html` / `play.html` / `404.html` としてコピーしています。これで `/game` と `/play` が「404 Not Found」ではなく通常のページとして配信されます。
 
+パズルは 1 問ずつ自分のページを持っています(`/p/46` など)。SNS にアドレスを貼ったときに、その問題の絵がカードとして出るようにするためです。カードの絵(`public/ogp/puzzle-*.jpg`)はあらかじめ作ってリポジトリに入れてあり、`npm run export:web` の最後に 100 ページ分の HTML を書き出します。**パズルの内容やカードの描き方を変えたら、次を実行して、書き出されたファイルをコミットしてください**(忘れると `npm run test` が落ちて知らせます)。
+
+```sh
+npm run make:puzzle-cards
+```
+
 SNSやSlackで共有された時の表示用に、タイトル、description、OGP/Twitter Card、favicon、apple-touch-iconを設定しています。
 
 ## YouTube 向けビルド(パズルだけ)
