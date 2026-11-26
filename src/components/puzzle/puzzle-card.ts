@@ -1,17 +1,19 @@
 // The picture of one puzzle that a player can send to someone: where its parts go.
 //
-// It is the board as it stands before the first move, laid out as on a wide screen: the number
-// and the goal and the four operators (with how often each may be used) on the left, the bubbles
-// over the bowl on the right. No words, and no way to the goal. Drawing it is
+// It is the board as it stands before the first move, as a phone held upright shows it: the
+// number and the goal at the top, the four operators in a row (with how often each may be used),
+// the bubbles over the bowl. No words, no address, and no way to the goal. Drawing it is
 // platform/share-puzzle.ts.
-import { BASIN_BODY_THICKNESS, BUBBLE_ROW_Y_BESIDE_PANEL, OPERATORS } from '@/components/marumaru/constants';
+import { BASIN_BODY_THICKNESS, OPERATORS } from '@/components/marumaru/constants';
 import { createPendingBubbles, getBasinCurveMetrics, getContainedBeadParts, getContainedBeadPositions, getEntityRadius } from '@/components/marumaru/field-layout';
 import type { OperatorSymbol, OperatorUsageLimit, PlaceValue, Stage } from '@/game/types';
 
-// The field of a board 440 by 420, drawn one and a half times as big on the right of the picture.
-const FIELD = { width: 440, height: 420, scale: 1.5, left: 520, top: 0 };
-// The panel on the left: the goal over two rows of two operators.
-export const PUZZLE_CARD_PANEL = { left: 52, right: 468, titleBaseline: 158, operatorsTop: 214, operatorWidth: 200, operatorHeight: 104, operatorGap: 16 };
+// The field of a board 400 by 350, drawn 2.7 times as big across the picture, under the operators.
+export const PUZZLE_CARD_FIELD = { width: 400, height: 350, scale: 2.7, left: 0, top: 398 };
+// The first row of bubbles sits this far down the field: the biggest bubble is whole under the operators.
+const BUBBLE_ROW_Y = 72;
+// The top of the picture: the goal over a row of four operators.
+export const PUZZLE_CARD_PANEL = { centerX: 540, titleBaseline: 196, operatorsLeft: 48, operatorsTop: 246, operatorWidth: 228, operatorHeight: 124, operatorGap: 24 };
 
 export type PuzzleCardBubble = { count: number; x: number; y: number; radius: number; maru: Array<{ value: PlaceValue; x: number; y: number; radius: number }> };
 export type PuzzleCardOperator = { symbol: OperatorSymbol; x: number; y: number; width: number; height: number; limit: OperatorUsageLimit };
@@ -25,11 +27,12 @@ export type PuzzleCard = {
 };
 
 export function getPuzzleCard(mark: number | 'pencil', stage: Pick<Stage, 'target' | 'bubbleCounts' | 'operatorLimits'>): PuzzleCard {
+  const FIELD = PUZZLE_CARD_FIELD;
   const toCardX = (x: number) => FIELD.left + x * FIELD.scale;
   const toCardY = (y: number) => FIELD.top + y * FIELD.scale;
 
   // The bubbles where the board itself puts them: in one row, or two when one would be crowded.
-  const bubbles = createPendingBubbles(FIELD.width, stage.bubbleCounts, 'fit', BUBBLE_ROW_Y_BESIDE_PANEL).map((bubble): PuzzleCardBubble => {
+  const bubbles = createPendingBubbles(FIELD.width, stage.bubbleCounts, 'fit', BUBBLE_ROW_Y).map((bubble): PuzzleCardBubble => {
     const radius = getEntityRadius(1, bubble.count);
     return {
       count: bubble.count,
@@ -55,11 +58,11 @@ export function getPuzzleCard(mark: number | 'pencil', stage: Pick<Stage, 'targe
     thickness: (BASIN_BODY_THICKNESS / 2) * FIELD.scale,
   };
 
-  const { left, operatorsTop, operatorWidth, operatorHeight, operatorGap } = PUZZLE_CARD_PANEL;
+  const { operatorsLeft, operatorsTop, operatorWidth, operatorHeight, operatorGap } = PUZZLE_CARD_PANEL;
   const operators = OPERATORS.map((symbol, index): PuzzleCardOperator => ({
     symbol,
-    x: left + (index % 2) * (operatorWidth + operatorGap),
-    y: operatorsTop + Math.floor(index / 2) * (operatorHeight + operatorGap),
+    x: operatorsLeft + index * (operatorWidth + operatorGap),
+    y: operatorsTop,
     width: operatorWidth,
     height: operatorHeight,
     limit: stage.operatorLimits?.[symbol] ?? 'infinite',

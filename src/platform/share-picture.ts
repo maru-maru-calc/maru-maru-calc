@@ -2,21 +2,22 @@
 // saved as a file where the browser cannot share pictures. Web only: nothing here runs without a
 // document, and YouTube's build does not include it (its rules allow no way out of the game).
 import { RESULT_CARD_HEIGHT, RESULT_CARD_WIDTH } from '@/game/result-card';
-import type { PictureShare } from '@/platform/game-host';
+import type { PictureShare, ShareLinkId } from '@/platform/game-host';
 
 export const CARD_WATER = '#C6E8F4';
 export const CARD_INK = '#12334A';
 export const CARD_FONT = 'Helvetica, Arial, sans-serif';
 
 /**
- * Draws a picture and gets it ready to hand over. The drawing is done before the player asks: a
+ * Draws a picture and gets it ready to send. The drawing is done before the player asks: a
  * browser only lets a page open the share sheet in the moment of a tap, with nothing to wait for
  * in between. Undefined where there is no page to draw on.
  *
  * `query` is what the game's address needs after it to lead to what the picture shows ("p=46"
- * for a puzzle); the address itself is this page's own, without what a visit may have added.
+ * for a puzzle); the address itself is this page's own, without what a visit may have added. It
+ * goes along as text and is not drawn on the picture.
  */
-export async function preparePictureShare(fileName: string, query: string | undefined, draw: (context: CanvasRenderingContext2D, shownAddress: string) => void): Promise<PictureShare | undefined> {
+export async function preparePictureShare(fileName: string, query: string | undefined, draw: (context: CanvasRenderingContext2D) => void): Promise<PictureShare | undefined> {
   if (typeof document === 'undefined' || typeof window === 'undefined') {
     return undefined;
   }
@@ -28,38 +29,105 @@ export async function preparePictureShare(fileName: string, query: string | unde
     return undefined;
   }
   const address = `${window.location.origin}${window.location.pathname}${query ? `?${query}` : ''}`;
-  draw(context, address.replace(/^https?:\/\//, ''));
+  draw(context);
 
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+  const blob = await toPngBlob(canvas);
   if (!blob) {
     return undefined;
   }
   const file = new File([blob], fileName, { type: 'image/png' });
-  const canShareFile = canShare(file);
-
   const previewUrl = URL.createObjectURL(blob);
 
   return {
     previewUrl,
     release: () => URL.revokeObjectURL(previewUrl),
-    share() {
-      if (!canShareFile) {
-        saveFile(file);
-        return;
-      }
-      const saveUnlessClosed = (error: unknown) => {
-        // Closing the share sheet without choosing is not a failure. Anything else: the file, at least.
-        if (!(error instanceof Error && error.name === 'AbortError')) {
-          saveFile(file);
+    shareWithDevice: canShare(file)
+      ? () => {
+          // Closing the share sheet without choosing is not a failure. Anything else: the file, at least.
+          const saveUnlessClosed = (error: unknown) => {
+            if (!(error instanceof Error && error.name === 'AbortError')) {
+              saveFile(file);
+            }
+          };
+          try {
+            navigator.share({ files: [file], text: address }).catch(saveUnlessClosed);
+          } catch (error) {
+            saveUnlessClosed(error);
+          }
         }
-      };
-      try {
-        navigator.share({ files: [file], text: address }).catch(saveUnlessClosed);
-      } catch (error) {
-        saveUnlessClosed(error);
-      }
+      : undefined,
+    save: () => saveFile(file),
+    copyAddress: () => copyText(address),
+    openLink: (place) => {
+      window.open(SHARE_PAGES[place](encodeURIComponent(address)), '_blank', 'noopener,noreferrer');
     },
   };
+}
+
+// How long the browser gets to make the file in its own time before it is made on the spot.
+const BLOB_PATIENCE_MS = 300;
+
+/**
+ * The drawing as a PNG file. A browser makes it in the page's idle moments, which is kind to the
+ * game; but Chrome, when it finds no idle moment (a page that is not being repainted), only gives
+ * up waiting after almost seven seconds, and the share button would be that late. So the browser
+ * gets a moment, and after that the file is made at once, which takes a few hundredths of a second.
+ */
+function toPngBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    let isDone = false;
+    const done = (blob: Blob | null) => {
+      if (!isDone) {
+        isDone = true;
+        resolve(blob);
+      }
+    };
+    canvas.toBlob(done, 'image/png');
+    setTimeout(() => {
+      if (isDone) {
+        return;
+      }
+      try {
+        const bytes = atob(canvas.toDataURL('image/png').split(',')[1]);
+        const data = new Uint8Array(bytes.length);
+        for (let index = 0; index < bytes.length; index += 1) {
+          data[index] = bytes.charCodeAt(index);
+        }
+        done(new Blob([data], { type: 'image/png' }));
+      } catch {
+        // Left to the browser after all.
+      }
+    }, BLOB_PATIENCE_MS);
+  });
+}
+
+// The pages that post a link, as each place documents them. They take the address; none takes a picture.
+const SHARE_PAGES: Record<ShareLinkId, (address: string) => string> = {
+  x: (address) => `https://twitter.com/intent/tweet?url=${address}`,
+  line: (address) => `https://social-plugins.line.me/lineit/share?url=${address}`,
+  facebook: (address) => `https://www.facebook.com/sharer/sharer.php?u=${address}`,
+};
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // An older browser, or one that keeps the clipboard to itself: the old way, through a text box.
+    try {
+      const box = document.createElement('textarea');
+      box.value = text;
+      box.style.position = 'fixed';
+      box.style.opacity = '0';
+      document.body.appendChild(box);
+      box.select();
+      const copied = document.execCommand('copy');
+      box.remove();
+      return copied;
+    } catch {
+      return false;
+    }
+  }
 }
 
 /** Whether this browser's "share" takes a picture. Asking must never be what breaks the result screen. */
@@ -85,11 +153,11 @@ function saveFile(file: File) {
 
 // The bubbles that drift over the board, standing still: [x, y, radius].
 const WATER_BUBBLES: Array<[number, number, number]> = [
-  [1085, 150, 96],
-  [118, 392, 62],
-  [226, 118, 30],
-  [1010, 452, 40],
-  [932, 60, 18],
+  [960, 210, 120],
+  [110, 760, 78],
+  [170, 150, 38],
+  [930, 900, 50],
+  [760, 80, 24],
 ];
 
 /** The water, with or without the bubbles that drift over the board. */
@@ -132,16 +200,6 @@ export function drawMaru(context: CanvasRenderingContext2D, x: number, y: number
   context.arc(x - radius * 0.3, y - radius * 0.3, radius * 0.24, 0, Math.PI * 2);
   context.fillStyle = kind.shineColor;
   context.fill();
-}
-
-/** The game's address, small, in a bottom corner. */
-export function drawAddress(context: CanvasRenderingContext2D, shownAddress: string, side: 'left' | 'right', size = 26, maxWidth = RESULT_CARD_WIDTH - 72) {
-  context.font = `700 ${size}px ${CARD_FONT}`;
-  context.textBaseline = 'alphabetic';
-  context.textAlign = side;
-  context.fillStyle = 'rgba(18, 51, 74, 0.6)';
-  // Longer than `maxWidth`, it is drawn narrower, not cut off.
-  context.fillText(shownAddress, side === 'right' ? RESULT_CARD_WIDTH - 36 : 36, RESULT_CARD_HEIGHT - 28, maxWidth);
 }
 
 /** The same clock face as the one-minute game's sign. */

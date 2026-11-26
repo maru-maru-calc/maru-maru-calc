@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MarumaruGame } from '@/components/MarumaruGame';
 import { FitToScreen } from '@/components/puzzle/fit-to-screen';
-import { PuzzleChoice, PuzzleEnd, puzzleScreenStyle, QuickResult, ShareButton } from '@/components/puzzle/parts';
+import { PuzzleChoice, PuzzleEnd, puzzleScreenStyle, QuickResult } from '@/components/puzzle/parts';
 import { PuzzleList } from '@/components/puzzle/puzzle-list';
 import { QuickGame } from '@/components/puzzle/quick-game';
 import type { MadePuzzle } from '@/game/made-puzzle';
@@ -102,7 +102,7 @@ function PuzzleScreens({ host }: { host: GameHost }) {
     setScreen({ name: 'quick', round: Date.now() });
   };
   // A made puzzle exists only in the address it is sent with: where nothing can be sent, none can be made.
-  const { preparePuzzleShare, making } = host;
+  const { preparePuzzleShare, making, ShareButton } = host;
   const showMaker = preparePuzzleShare && making ? () => setScreen({ name: 'make', bubbles: making.firstBubbles }) : undefined;
 
   if (screen.name === 'start') {
@@ -137,7 +137,7 @@ function PuzzleScreens({ host }: { host: GameHost }) {
         onStageClear={(stageId) => update(addSolvedPuzzle(progress, stageId))}
         onLastStageNext={() => setScreen({ name: 'end' })}
         cornerSlot={
-          preparePuzzleShare
+          preparePuzzleShare && ShareButton
             ? (stage, number) => <ShareButton label="share this puzzle" testID="share-puzzle" shareKey={stage.id} prepare={() => preparePuzzleShare({ number }, stage)} />
             : undefined
         }
@@ -181,6 +181,7 @@ function PuzzleScreens({ host }: { host: GameHost }) {
         onChange={(bubbles) => setScreen({ name: 'make', bubbles })}
         onBack={showStart}
         onNext={() => setScreen({ name: 'makeBoard', bubbles: screen.bubbles, round: Date.now() })}
+        onRandom={() => setScreen({ name: 'made', puzzle: making.createRandom(screen.bubbles.length) })}
       />
     );
   }
@@ -205,6 +206,7 @@ function PuzzleScreens({ host }: { host: GameHost }) {
         onBack={() => setScreen({ name: 'make', bubbles: puzzle.bubbles })}
         onAgain={() => setScreen({ name: 'makeBoard', bubbles: puzzle.bubbles, round: Date.now() })}
         onPlay={() => setScreen({ name: 'playMade', puzzle, stage: making.createStage(puzzle), round: Date.now(), isSolved: false, isOwn: true })}
+        onRandom={() => setScreen({ name: 'made', puzzle: making.createRandom(puzzle.bubbles.length) })}
       />
     );
   }
@@ -223,7 +225,7 @@ function PuzzleScreens({ host }: { host: GameHost }) {
           onStageClear={() => setScreen({ ...screen, isSolved: true })}
           onLastStageNext={showStart}
           cornerSlot={
-            preparePuzzleShare
+            preparePuzzleShare && ShareButton
               ? (stage) => <ShareButton label="share this puzzle" testID="share-puzzle" shareKey={stage.id} prepare={() => preparePuzzleShare({ made: puzzle }, stage)} />
               : undefined
           }
@@ -237,7 +239,7 @@ function PuzzleScreens({ host }: { host: GameHost }) {
   }
 
   if (screen.name === 'quickResult') {
-    return <QuickResult solved={screen.solved} scores={progress.quickScores} rank={screen.rank} prepareShare={host.prepareResultShare} onAgain={showQuick} onBack={showStart} />;
+    return <QuickResult solved={screen.solved} scores={progress.quickScores} rank={screen.rank} prepareShare={host.prepareResultShare} ShareButton={ShareButton} onAgain={showQuick} onBack={showStart} />;
   }
 
   return <PuzzleEnd solved={getPuzzleProgress(progress.solved).solved} total={PUZZLE_GAME_STAGES.length} onBack={showStart} />;

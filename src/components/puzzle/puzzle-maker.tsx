@@ -1,5 +1,6 @@
 // Making a puzzle, without words: choose the bubbles, work them out on the board (what they come
-// to is the goal), then see the puzzle as it will be sent, with the number of ways to its goal.
+// to is the goal), then see the puzzle as it will be sent. Or choose only how many bubbles and
+// let the die do the rest.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -10,8 +11,8 @@ import { useBoardViewport } from '@/components/marumaru/board-viewport';
 import { HEADER_ACTION_BUTTON_SIZE, RADIUS_LG } from '@/components/marumaru/constants';
 import { ChevronIcon, NavImageIcon, PencilIcon } from '@/components/NavImageIcon';
 import { OperatorImageIcon } from '@/components/OperatorImageIcon';
-import { ShareButton } from '@/components/puzzle/parts';
-import { countWays, createMadePuzzleStage, createMakingStage, isMadePuzzleGoal, MADE_PUZZLE_RULES } from '@/game/made-puzzle';
+import { ShareButton } from '@/components/puzzle/share-button';
+import { createMadePuzzleStage, createMakingStage, isMadePuzzleGoal, MADE_PUZZLE_RULES } from '@/game/made-puzzle';
 import type { MadePuzzle } from '@/game/made-puzzle';
 import { RESULT_CARD_HEIGHT, RESULT_CARD_WIDTH } from '@/game/result-card';
 import { a11yLabel } from '@/i18n/a11y-label';
@@ -32,8 +33,21 @@ export const FIRST_BUBBLES = [2, 3, 4];
 /**
  * Step one: the bubbles. Each has an arrow above and below it for one more and one less; the row
  * underneath adds a bubble or takes the last one away. The arrow at the top goes on to the board.
+ * The die makes a whole puzzle of that many bubbles by chance, numbers and goal, and skips the board.
  */
-export function PuzzleMaker({ bubbles, onChange, onBack, onNext }: { bubbles: number[]; onChange: (bubbles: number[]) => void; onBack: () => void; onNext: () => void }) {
+export function PuzzleMaker({
+  bubbles,
+  onChange,
+  onBack,
+  onNext,
+  onRandom,
+}: {
+  bubbles: number[];
+  onChange: (bubbles: number[]) => void;
+  onBack: () => void;
+  onNext: () => void;
+  onRandom: () => void;
+}) {
   const { minBubbles, maxBubbles, minNumber, maxNumber } = MADE_PUZZLE_RULES;
   const setNumber = (index: number, value: number) => onChange(bubbles.map((bubble, at) => (at === index ? value : bubble)));
 
@@ -74,6 +88,10 @@ export function PuzzleMaker({ bubbles, onChange, onBack, onNext }: { bubbles: nu
           <StepButton label="one bubble more" testID="maker-add" isOff={bubbles.length >= maxBubbles} onPress={() => onChange([...bubbles, bubbles[bubbles.length - 1]])}>
             <OperatorImageIcon operator="+" size={24} />
           </StepButton>
+          <View style={styles.countRowSpace} />
+          <Pressable accessibilityLabel={a11yLabel('make one by chance')} accessibilityRole="button" testID="maker-random" onPress={onRandom} style={({ pressed }) => [styles.button, styles.buttonStrong, pressed && styles.pressed]}>
+            <NavImageIcon kind="dice" size={29} />
+          </Pressable>
         </View>
       </View>
     </SafeAreaView>
@@ -132,9 +150,8 @@ export function MakingBoard({ bubbles, onBack, onMade }: { bubbles: number[]; on
 }
 
 /**
- * Step three: the puzzle as it will be sent, and in how many ways its goal can be reached (for
- * the maker's eyes only; the picture does not say). Back to the bubbles, work it out again for
- * another goal, try it as a player would, or send it.
+ * Step three: the puzzle as it will be sent. Back to the bubbles, work it out again for another
+ * goal, let the die make another, try it as a player would, or send it.
  */
 export function MadePuzzleResult({
   puzzle,
@@ -142,22 +159,17 @@ export function MadePuzzleResult({
   onBack,
   onAgain,
   onPlay,
+  onRandom,
 }: {
   puzzle: MadePuzzle;
   prepareShare: NonNullable<GameHost['preparePuzzleShare']>;
   onBack: () => void;
   onAgain: () => void;
   onPlay: () => void;
+  onRandom: () => void;
 }) {
   const viewport = useBoardViewport();
   const stage = useMemo(() => createMadePuzzleStage(puzzle), [puzzle]);
-  // Counting can take a moment with six bubbles: the screen comes up first.
-  const [ways, setWays] = useState<number | undefined>(undefined);
-  useEffect(() => {
-    setWays(undefined);
-    const timer = setTimeout(() => setWays(countWays(puzzle)), 0);
-    return () => clearTimeout(timer);
-  }, [puzzle]);
   // The picture itself, as it will be sent.
   const [picture, setPicture] = useState<PictureShare | undefined>(undefined);
   const prepare = () =>
@@ -166,17 +178,14 @@ export function MadePuzzleResult({
       return ready;
     });
 
-  const pictureWidth = Math.max(160, Math.min(viewport.width - 48, 480, ((viewport.height - 200) * RESULT_CARD_WIDTH) / RESULT_CARD_HEIGHT));
+  // Upright, as tall as the screen leaves room for above the buttons.
+  const pictureHeight = Math.max(150, Math.min(viewport.height - 150, 520, ((viewport.width - 48) * RESULT_CARD_HEIGHT) / RESULT_CARD_WIDTH));
 
   return (
     <SafeAreaView style={styles.screen}>
       <View testID="made-puzzle" style={styles.resultCenter}>
-        <View style={[styles.picture, { width: pictureWidth, height: (pictureWidth * RESULT_CARD_HEIGHT) / RESULT_CARD_WIDTH }]}>
+        <View style={[styles.picture, { height: pictureHeight, width: (pictureHeight * RESULT_CARD_WIDTH) / RESULT_CARD_HEIGHT }]}>
           {picture ? <Image accessibilityLabel={a11yLabel('the puzzle you made')} testID="made-puzzle-picture" source={{ uri: picture.previewUrl }} style={styles.pictureImage} /> : null}
-        </View>
-        <View accessibilityLabel={a11yLabel(ways === undefined ? 'counting the ways' : `ways to the goal: ${ways}`)} testID="made-puzzle-ways" style={styles.waysRow}>
-          <NavImageIcon kind="next" size={24} />
-          <Text testID="made-puzzle-ways-count" style={styles.waysCount}>{ways === undefined ? '…' : ways}</Text>
         </View>
         <View style={styles.buttonRow}>
           <Pressable accessibilityLabel={a11yLabel('change the bubbles')} accessibilityRole="button" testID="made-puzzle-back" onPress={onBack} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
@@ -184,6 +193,9 @@ export function MadePuzzleResult({
           </Pressable>
           <Pressable accessibilityLabel={a11yLabel('work it out again')} accessibilityRole="button" testID="made-puzzle-again" onPress={onAgain} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
             <NavImageIcon kind="retry" size={29} />
+          </Pressable>
+          <Pressable accessibilityLabel={a11yLabel('make one by chance')} accessibilityRole="button" testID="made-puzzle-random" onPress={onRandom} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
+            <NavImageIcon kind="dice" size={29} />
           </Pressable>
           <Pressable accessibilityLabel={a11yLabel('play this puzzle')} accessibilityRole="button" testID="made-puzzle-play" onPress={onPlay} style={({ pressed }) => [styles.button, pressed && styles.pressed]}>
             <NavImageIcon kind="play" size={29} />
@@ -292,21 +304,11 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  waysRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    height: 32,
-  },
-  waysCount: {
-    color: INK,
-    fontSize: 24,
-    lineHeight: 28,
-    fontWeight: '900',
-    fontFamily: FONT,
-  },
   buttonRow: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 12,
+  },
+  countRowSpace: {
+    width: 12,
   },
 });

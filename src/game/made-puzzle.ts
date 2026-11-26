@@ -1,8 +1,8 @@
 // A puzzle a player made: some bubbles and a goal, with every operator free. It has no number
 // and lives in no list: all of it is in the address it is sent with ("?m=2.4.10.5-28"), so
 // whoever opens the address has the puzzle.
-import { solveStage } from './stage-rules';
-import type { Stage } from './types';
+import { applyMove } from './stage-rules';
+import type { OperatorSymbol, Stage } from './types';
 
 export type MadePuzzle = { bubbles: number[]; goal: number };
 
@@ -53,21 +53,79 @@ export function createMadePuzzleStage(puzzle: MadePuzzle): Stage {
   };
 }
 
+const OPERATORS: OperatorSymbol[] = ['+', '-', '×', '÷'];
+
 /**
- * In how many ways the goal can be reached. As in the numbered puzzles, "3 + 2" and "2 + 3" at
- * the start are one way (so are "3 × 2" and "2 × 3"): which of the first two bubbles goes in
- * first makes no difference there. Two bubbles with the same number are one choice.
+ * Every amount these bubbles can come to when all are used, with the number of ways to it.
+ *
+ * As in the numbered puzzles, "3 + 2" and "2 + 3" at the start are one way (so are "3 × 2" and
+ * "2 × 3"): which of the first two bubbles goes in first makes no difference there, so only the
+ * one with the smaller bubble first is counted. Two bubbles with the same number are one choice.
  */
-export function countWays(puzzle: MadePuzzle): number {
-  const ways = new Set<string>();
-  for (const way of solveStage(createMadePuzzleStage(puzzle)).winning) {
-    const steps = way.split(' ');
-    if ((steps[1] === '+' || steps[1] === '×') && Number(steps[2]) < Number(steps[0])) {
-      [steps[0], steps[2]] = [steps[2], steps[0]];
+export function countWaysByGoal(bubbles: number[]): Map<number, number> {
+  const ways = new Map<number, number>();
+  const play = (total: number, rest: number[], first: number | undefined) => {
+    if (rest.length === 0) {
+      ways.set(total, (ways.get(total) ?? 0) + 1);
+      return;
     }
-    ways.add(steps.join(' '));
+    const tried = new Set<number>();
+    for (let index = 0; index < rest.length; index += 1) {
+      const bubble = rest[index];
+      if (tried.has(bubble)) {
+        continue;
+      }
+      tried.add(bubble);
+      const others = [...rest.slice(0, index), ...rest.slice(index + 1)];
+      for (const operator of OPERATORS) {
+        // The second bubble of a start that reads the same both ways: the smaller one goes first.
+        if (first !== undefined && (operator === '+' || operator === '×') && bubble < first) {
+          continue;
+        }
+        const next = applyMove(total, operator, bubble);
+        if (next !== undefined) {
+          play(next, others, undefined);
+        }
+      }
+    }
+  };
+  const firsts = new Set<number>();
+  bubbles.forEach((bubble, index) => {
+    if (!firsts.has(bubble)) {
+      firsts.add(bubble);
+      play(bubble, [...bubbles.slice(0, index), ...bubbles.slice(index + 1)], bubble);
+    }
+  });
+  return ways;
+}
+
+/** In how many ways the goal can be reached. */
+export function countWays(puzzle: MadePuzzle): number {
+  return countWaysByGoal(puzzle.bubbles).get(puzzle.goal) ?? 0;
+}
+
+/**
+ * A puzzle made by chance: `count` different numbers and a goal they can reach. A goal with one
+ * way only is taken where there is one (there nearly always is), from 1 to 99 where there is one
+ * of those, so that the puzzle is a puzzle; otherwise the goal with the fewest ways.
+ */
+export function createRandomPuzzle(count: number, random: () => number = Math.random): MadePuzzle {
+  const { minBubbles, maxBubbles, minGoal, maxGoal } = MADE_PUZZLE_RULES;
+  const size = Math.max(minBubbles, Math.min(maxBubbles, Math.floor(count) || minBubbles));
+  const pick = (length: number) => Math.floor(random() * length) % length;
+  // Different numbers from 2 to 10: a 1 adds little, and bigger ones make the amounts hard to follow.
+  const pool = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const bubbles: number[] = [];
+  while (bubbles.length < size) {
+    bubbles.push(pool.splice(pick(pool.length), 1)[0]);
   }
-  return ways.size;
+
+  const goals = [...countWaysByGoal(bubbles).entries()].filter(([goal]) => Number.isInteger(goal) && goal >= minGoal && goal <= maxGoal);
+  const fewest = Math.min(...goals.map(([, ways]) => ways));
+  const best = goals.filter(([, ways]) => ways === fewest).map(([goal]) => goal);
+  const small = best.filter((goal) => goal <= 99);
+  const from = small.length > 0 ? small : best;
+  return { bubbles, goal: from[pick(from.length)] };
 }
 
 /** The puzzle as it is written in an address: the bubbles with dots between, a dash, the goal. */

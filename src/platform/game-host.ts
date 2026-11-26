@@ -4,14 +4,35 @@ import type { MadePuzzle } from '@/game/made-puzzle';
 import type { Stage } from '@/game/types';
 import type { PuzzleSaveSlot } from '@/storage/puzzle-progress';
 
+/** The places a link can be posted to straight from the game. */
+export type ShareLinkId = 'x' | 'line' | 'facebook';
+
 /**
- * A picture drawn and ready: `share` hands it over at once, so it can be called from a tap.
- * `previewUrl` shows the same picture on the screen, until `release` gives its memory back.
+ * A picture drawn and ready, with the address that leads to what it shows, and the ways of
+ * sending them. Everything here can be called from a tap, with nothing to wait for first.
  */
-export type PictureShare = { share: () => void; previewUrl: string; release: () => void };
+export type PictureShare = {
+  /** Shows the picture on the screen, until `release` gives its memory back. */
+  previewUrl: string;
+  release: () => void;
+  /**
+   * Hands the picture and the address to the device's own "share" (a phone's share sheet), the
+   * only way a picture can go along. Undefined where the browser cannot share pictures.
+   */
+  shareWithDevice: (() => void) | undefined;
+  /** Saves the picture as a file. */
+  save: () => void;
+  /** Puts the address on the clipboard; resolves to whether that worked. */
+  copyAddress: () => Promise<boolean>;
+  /** Opens the page of that place that posts the address. Such pages take an address and no picture. */
+  openLink: (place: ShareLinkId) => void;
+};
 
 /** A puzzle that can be sent and asked for by address: one of the numbered ones, or one a player made. */
 export type SharedPuzzle = { number: number } | { made: MadePuzzle };
+
+/** What the share button is told: its name, what the picture shows (a new key draws a new picture), and how to draw it. */
+export type ShareButtonProps = { label: string; testID: string; shareKey: string; prepare: () => Promise<PictureShare | undefined> };
 
 /**
  * Everything of making a puzzle: its three screens, and a made puzzle as a stage the board can
@@ -21,7 +42,7 @@ export type PuzzleMaking = {
   /** The bubbles a new puzzle starts from. */
   firstBubbles: number[];
   /** Step one: the bubbles. */
-  Bubbles: ComponentType<{ bubbles: number[]; onChange: (bubbles: number[]) => void; onBack: () => void; onNext: () => void }>;
+  Bubbles: ComponentType<{ bubbles: number[]; onChange: (bubbles: number[]) => void; onBack: () => void; onNext: () => void; onRandom: () => void }>;
   /** Step two: the board on which the maker works them out; what they come to is the goal. */
   Board: ComponentType<{ bubbles: number[]; onBack: () => void; onMade: (puzzle: MadePuzzle) => void }>;
   /** Step three: the finished puzzle, as it will be sent. */
@@ -31,8 +52,11 @@ export type PuzzleMaking = {
     onBack: () => void;
     onAgain: () => void;
     onPlay: () => void;
+    onRandom: () => void;
   }>;
   createStage: (puzzle: MadePuzzle) => Stage;
+  /** A whole puzzle made by chance, of this many bubbles: numbers and a goal that can be reached. */
+  createRandom: (count: number) => MadePuzzle;
 };
 
 /**
@@ -66,6 +90,8 @@ export type GameHost = {
    * ones, or a made one. Undefined where a visit cannot ask for one, or when it asks for none.
    */
   getRequestedPuzzle: ((count: number) => SharedPuzzle | undefined) | undefined;
+  /** The share button, with the ways of sending it opens. Undefined where nothing can be shared. */
+  ShareButton: ComponentType<ShareButtonProps> | undefined;
   /**
    * Making a puzzle of one's own. Undefined where nothing can be shared: a made puzzle exists
    * only in the address it is sent with.

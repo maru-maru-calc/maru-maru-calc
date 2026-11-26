@@ -19,21 +19,22 @@ describe('the picture of one puzzle', () => {
     });
   });
 
-  it('keeps every part on the picture, the bubbles clear of the panel and the maru inside their bubbles', () => {
+  it('keeps every part on the picture, the bubbles under the operators and the maru inside their bubbles', () => {
     PUZZLE_GAME_STAGES.forEach((stage, index) => {
       const card = getPuzzleCard(index + 1, stage);
+      const operatorsBottom = Math.max(...card.operators.map((operator) => operator.y + operator.height));
       for (const bubble of card.bubbles) {
-        expect(bubble.x - bubble.radius >= PUZZLE_CARD_PANEL.right).toBe(true);
+        expect(bubble.y - bubble.radius >= operatorsBottom).toBe(true);
+        expect(bubble.x - bubble.radius >= 0).toBe(true);
         expect(bubble.x + bubble.radius <= RESULT_CARD_WIDTH).toBe(true);
-        expect(bubble.y - bubble.radius >= 0).toBe(true);
         expect(bubble.y + bubble.radius <= RESULT_CARD_HEIGHT).toBe(true);
         for (const maru of bubble.maru) {
           expect(Math.hypot(maru.x - bubble.x, maru.y - bubble.y) + maru.radius <= bubble.radius).toBe(true);
         }
       }
       for (const operator of card.operators) {
-        expect(operator.x >= PUZZLE_CARD_PANEL.left && operator.x + operator.width <= PUZZLE_CARD_PANEL.right).toBe(true);
-        expect(operator.y + operator.height <= RESULT_CARD_HEIGHT - 80).toBe(true);
+        expect(operator.x >= 0 && operator.x + operator.width <= RESULT_CARD_WIDTH).toBe(true);
+        expect(operator.y > PUZZLE_CARD_PANEL.titleBaseline).toBe(true);
       }
       // The bowl's lowest point is on the picture, under the bubbles.
       const bottom = card.bowl.centerY + card.bowl.radius + card.bowl.thickness / 2;
@@ -42,14 +43,14 @@ describe('the picture of one puzzle', () => {
     });
   });
 
-  it('puts the operators in two rows of two, and a puzzle of six bubbles in two rows of three', () => {
+  it('is laid out as a phone held upright shows the board: four operators in a row, six bubbles in two rows of three', () => {
+    expect(RESULT_CARD_HEIGHT > RESULT_CARD_WIDTH).toBe(true);
     const card = getPuzzleCard(77, PUZZLE_GAME_STAGES[76]);
     const [plus, minus, times, divide] = card.operators;
-    expect(minus.y).toBe(plus.y);
-    expect(divide.y).toBe(times.y);
-    expect(times.x).toBe(plus.x);
-    expect(times.y >= plus.y + plus.height).toBe(true);
-    expect(minus.x >= plus.x + plus.width).toBe(true);
+    expect(new Set([plus.y, minus.y, times.y, divide.y]).size).toBe(1);
+    expect(minus.x >= plus.x + plus.width && times.x >= minus.x + minus.width && divide.x >= times.x + times.width).toBe(true);
+    // The row is in the middle of the picture.
+    expect(Math.abs(plus.x - (RESULT_CARD_WIDTH - (divide.x + divide.width))) < 1).toBe(true);
     expect(card.bubbles.length).toBe(6);
     expect(new Set(card.bubbles.map((bubble) => bubble.y)).size).toBe(2);
   });
