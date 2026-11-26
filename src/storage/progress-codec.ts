@@ -1,3 +1,4 @@
+import { withRegroupedDentakuStages } from '@/game/dentaku';
 import { isKukuFactId } from '@/game/kuku-weak-facts';
 
 export type StoredProgress = {
@@ -50,7 +51,7 @@ export function parseStoredProgress(raw: string | null | undefined): StoredProgr
   const candidate = parsed as Record<string, unknown>;
   return {
     marumaru: uniqueStrings(candidate.marumaru),
-    dentaku: uniqueStrings(candidate.dentaku),
+    dentaku: withRegroupedDentakuStages(uniqueStrings(candidate.dentaku)),
     longForm: uniqueStrings(candidate.longForm),
     // Absent in progress saved before the facts were remembered.
     kukuWeak: uniqueStrings(candidate.kukuWeak).filter(isKukuFactId),

@@ -43,6 +43,11 @@ export const DENTAKU_WORLDS: Array<{ id: DentakuWorldId; label: string }> = [
   { id: 'mixed4', label: '+−×÷' },
 ];
 
+/** How many questions a stage of one operator asks. ひっさん mode asks the same number. */
+export const DENTAKU_QUESTIONS_PER_STAGE = 5;
+/** Stages per operator: four lengths (2 to 5 numbers) of five levels each. */
+export const DENTAKU_OPERATOR_STAGE_COUNT = 20;
+
 export const DENTAKU_STAGES: DentakuStage[] = [
   // Each times table twice: in order, then out of order. The small line under the label shows which.
   ...Array.from({ length: 9 }, (_, index) => {
@@ -104,17 +109,28 @@ export function createDentakuQuestions(stage: DentakuStage, seed = Date.now(), w
   }
 
   if (stage.kind === 'binary') {
-    return [createSingleOperatorQuestion(stage.operator ?? '+', stage.operandCount ?? 2, random, stage.isEndless ? 0 : stage.problemNumber ?? 1)];
+    if (stage.isEndless) {
+      return [createSingleOperatorQuestion(stage.operator ?? '+', stage.operandCount ?? 2, random, 0)];
+    }
+    // One level, practised five times over: five different questions of the same kind.
+    const questions: DentakuQuestion[] = [];
+    for (let attempt = 0; questions.length < DENTAKU_QUESTIONS_PER_STAGE && attempt < 200; attempt += 1) {
+      const question = createSingleOperatorQuestion(stage.operator ?? '+', stage.operandCount ?? 2, random, stage.problemNumber ?? 1);
+      if (!questions.some((asked) => asked.prompt === question.prompt)) {
+        questions.push(question);
+      }
+    }
+    return questions;
   }
 
   return [createMixedQuestion(stage.operatorCount ?? 2, random, stage.problemNumber ?? 1)];
 }
 
 function createProblemStages(worldId: DentakuWorldId, title: string, operator: DentakuOperator): DentakuStage[] {
-  const stages = Array.from({ length: 100 }, (_, index) => {
+  const stages = Array.from({ length: DENTAKU_OPERATOR_STAGE_COUNT }, (_, index) => {
     const problemNumber = index + 1;
     return {
-      id: `dentaku-${worldId}-${problemNumber}`,
+      id: getDentakuOperatorStageId(worldId, problemNumber),
       worldId,
       title,
       label: `#${problemNumber}`,
@@ -138,6 +154,35 @@ function createProblemStages(worldId: DentakuWorldId, title: string, operator: D
       isEndless: true,
     },
   ];
+}
+
+function getDentakuOperatorStageId(worldId: DentakuWorldId, stageNumber: number) {
+  // "set": the stage is a set of five questions. Without it the id would be one of the old
+  // one-question stages ("dentaku-addition-7"), which meant something else.
+  return `dentaku-${worldId}-set-${stageNumber}`;
+}
+
+/**
+ * Cleared stage ids, with the ones of today's stages added that earlier progress amounts to.
+ *
+ * Each operator used to have a hundred stages of one question, five to a level. A level is now one
+ * stage of five questions, so a stage counts as cleared when all five of its old stages were.
+ * The old ids are kept as they are.
+ */
+export function withRegroupedDentakuStages(clearedStageIds: string[]): string[] {
+  const cleared = new Set(clearedStageIds);
+  const regrouped: string[] = [];
+  for (const worldId of ['addition', 'subtraction', 'multiplication', 'division'] as const) {
+    for (let stageNumber = 1; stageNumber <= DENTAKU_OPERATOR_STAGE_COUNT; stageNumber += 1) {
+      const stageId = getDentakuOperatorStageId(worldId, stageNumber);
+      const firstOldNumber = (stageNumber - 1) * DENTAKU_QUESTIONS_PER_STAGE + 1;
+      const wereAllCleared = Array.from({ length: DENTAKU_QUESTIONS_PER_STAGE }, (_, index) => `dentaku-${worldId}-${firstOldNumber + index}`).every((oldId) => cleared.has(oldId));
+      if (wereAllCleared && !cleared.has(stageId)) {
+        regrouped.push(stageId);
+      }
+    }
+  }
+  return regrouped.length > 0 ? [...clearedStageIds, ...regrouped] : clearedStageIds;
 }
 
 function createMixedProblemStages(): DentakuStage[] {
@@ -165,12 +210,12 @@ function createKukuDanQuestions(dan: number): DentakuQuestion[] {
 /**
  * How hard a single-operator stage is, from 1 to 5.
  *
- * The hundred stages of an operator come in stretches of 25 with the same number of numbers (2, 3,
- * 4, then 5). Inside a stretch the numbers grow in five steps of five stages, so "#1" and "#25"
- * are no longer the same kind of question.
+ * The twenty stages of an operator come in stretches of five with the same number of numbers (2, 3,
+ * 4, then 5). Inside a stretch the numbers grow from stage to stage, so "#1" and "#5" are not the
+ * same kind of question.
  */
 export function getDentakuLevel(problemNumber: number): DentakuLevel {
-  return (Math.floor(((Math.max(1, problemNumber) - 1) % 25) / 5) + 1) as DentakuLevel;
+  return (((Math.max(1, problemNumber) - 1) % 5) + 1) as DentakuLevel;
 }
 
 function createSingleOperatorQuestion(operator: DentakuOperator, operandCount: 2 | 3 | 4 | 5, random: () => number, problemNumber: number): DentakuQuestion {
@@ -390,16 +435,7 @@ function inEitherOrder(pair: number[], random: () => number): number[] {
 }
 
 function getOperandCountForProblem(problemNumber: number): 2 | 3 | 4 | 5 {
-  if (problemNumber <= 25) {
-    return 2;
-  }
-  if (problemNumber <= 50) {
-    return 3;
-  }
-  if (problemNumber <= 75) {
-    return 4;
-  }
-  return 5;
+  return Math.min(5, 2 + Math.floor((Math.max(1, problemNumber) - 1) / 5)) as 2 | 3 | 4 | 5;
 }
 
 function createMixedQuestion(operatorCount: 2 | 3 | 4, random: () => number, problemNumber: number): DentakuQuestion {

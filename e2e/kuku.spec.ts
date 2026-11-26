@@ -157,14 +157,14 @@ test('later dentaku stages use bigger numbers, and a skipped replay ends on the 
   await clearLaunch(page);
   await page.getByLabel('dentaku mode', { exact: true }).click();
   await page.getByLabel('+', { exact: true }).click();
-  await page.getByTestId('kuku-stage-dentaku-addition-21').scrollIntoViewIfNeeded();
-  await page.getByTestId('kuku-stage-dentaku-addition-21').click();
+  await page.getByTestId('kuku-stage-dentaku-addition-set-5').scrollIntoViewIfNeeded();
+  await page.getByTestId('kuku-stage-dentaku-addition-set-5').click();
 
-  // #21 to #25: two digits plus one digit, into the next ten.
+  // #5: two digits plus one digit, into the next ten.
   const prompt = await page.getByTestId('kuku-question-title').innerText();
   const match = prompt.match(/^(\d{2}) \+ (\d) = \?$/);
   if (!match) {
-    throw new Error(`Unexpected prompt for addition #21: ${prompt}`);
+    throw new Error(`Unexpected prompt for addition #5: ${prompt}`);
   }
   const left = Number(match[1]);
   const right = Number(match[2]);
@@ -180,25 +180,73 @@ test('later dentaku stages use bigger numbers, and a skipped replay ends on the 
   await expect(page.getByLabel('skip the replay')).toHaveCount(0);
 });
 
-test('dentaku non-kuku next button opens the next problem instead of returning to stage select', async ({ page }) => {
+test('a calculator stage asks five different questions of one kind, and the next stage follows', async ({ page }) => {
   await page.goto('/game');
 
   await clearLaunch(page);
   await page.getByLabel('dentaku mode', { exact: true }).click();
   await expect(page.getByTestId('dentaku-world-select')).toBeVisible();
   await page.getByLabel('+', { exact: true }).click();
-  await expect(page.getByTestId('kuku-stage-dentaku-addition-1')).toBeVisible();
+  // Twenty stages and the endless one, where there used to be a hundred of one question each.
+  await expect(page.locator('[data-testid^="kuku-stage-dentaku-addition-"]')).toHaveCount(21);
 
-  await page.getByTestId('kuku-stage-dentaku-addition-1').click();
-  const firstPrompt = await page.getByTestId('kuku-question-title').innerText();
+  await page.getByTestId('kuku-stage-dentaku-addition-set-1').click();
   await expect(page.getByTestId('long-form-panel')).toHaveCount(0);
-  await answerCurrentDentakuQuestion(page);
-  await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 10000 });
-  await page.getByLabel('next stage').click();
+  const title = page.getByTestId('kuku-question-title');
+  const progress = page.getByTestId('kuku-question-progress');
 
+  const asked: string[] = [];
+  for (let question = 1; question <= 5; question += 1) {
+    await expect(progress).toHaveText(`${question}/5`, { timeout: 10000 });
+    const prompt = await title.innerText();
+    // #1: up to 5 + 5.
+    expect(prompt).toMatch(/^[1-5] \+ [1-5] = \?$/);
+    asked.push(prompt);
+    await answerCurrentDentakuQuestion(page);
+    await expect(page.getByLabel('next stage')).toBeVisible({ timeout: 10000 });
+    if (question < 5) {
+      // Not cleared until all five are done.
+      expect(await clearedDentakuStages(page)).not.toContain('dentaku-addition-set-1');
+    }
+    await page.getByLabel('next stage').click();
+  }
+  expect(new Set(asked).size).toBe(5);
+
+  // The next stage has started: a bigger number, still within ten.
+  await expect(progress).toHaveText('1/5');
   await expect(page.getByTestId('kuku-keypad')).toBeVisible();
-  await expect(page.getByTestId('kuku-question-title')).not.toHaveText(firstPrompt);
-  await expect(page.getByTestId('kuku-stage-dentaku-addition-2')).not.toBeVisible();
+  const [left, right] = (await title.innerText()).match(/\d+/g)!.map(Number);
+  expect(Math.max(left, right)).toBeGreaterThanOrEqual(6);
+  expect(left + right).toBeLessThanOrEqual(10);
+  expect(await clearedDentakuStages(page)).toContain('dentaku-addition-set-1');
+});
+
+test('five one-question stages cleared before the change count as the stage that replaced them', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!window.localStorage.getItem('marumaru-calc:progress')) {
+      window.localStorage.setItem(
+        'marumaru-calc:progress',
+        JSON.stringify({
+          version: 1,
+          marumaru: [],
+          // #1 to #5 and #6 to #9 of the old hundred: today's #1 whole, today's #2 not yet.
+          dentaku: [1, 2, 3, 4, 5, 6, 7, 8, 9].map((number) => `dentaku-addition-${number}`),
+          longForm: [],
+          hasSeenIntro: true,
+        }),
+      );
+    }
+  });
+  await page.goto('/game');
+  await page.getByLabel('dentaku mode', { exact: true }).click();
+  await page.getByLabel('+', { exact: true }).click();
+  await expect(page.getByTestId('kuku-stage-dentaku-addition-set-1')).toBeVisible();
+
+  const cleared = await clearedDentakuStages(page);
+  expect(cleared).toContain('dentaku-addition-set-1');
+  expect(cleared).not.toContain('dentaku-addition-set-2');
+  // What was saved before is still there.
+  expect(cleared).toContain('dentaku-addition-9');
 });
 
 test('long form mode opens binary stages with a long-form panel', async ({ page }) => {
@@ -377,13 +425,17 @@ test('dentaku accepts zero input', async ({ page }) => {
   await clearLaunch(page);
   await page.getByLabel('dentaku mode', { exact: true }).click();
   await page.getByLabel('-', { exact: true }).click();
-  await page.getByTestId('kuku-stage-dentaku-subtraction-1').click();
+  await page.getByTestId('kuku-stage-dentaku-subtraction-set-1').click();
 
   await page.getByTestId('kuku-key-0').click();
   await expect(page.getByTestId('kuku-question-title')).toContainText('= 0');
   await page.getByTestId('kuku-key-5').click();
   await expect(page.getByTestId('kuku-question-title')).toContainText('= 0');
 });
+
+async function clearedDentakuStages(page: Page) {
+  return page.evaluate(() => (JSON.parse(window.localStorage.getItem('marumaru-calc:progress') ?? '{}').dentaku ?? []) as string[]);
+}
 
 async function clearLaunch(page: Page) {
   await page.getByLabel('bubble-5').click();
