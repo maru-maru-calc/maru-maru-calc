@@ -144,6 +144,7 @@ async function recordMarumaruMode(browser) {
   await page.getByTestId('stage-multiplication-25').click();
   await page.getByLabel('bubble-8').first().waitFor({ state: 'visible', timeout: 6000 });
   await page.waitForTimeout(1200);
+  await waitForClearBoard(page);
 
   // The poster is the stage as it opens.
   const posterPath = path.join(OUTPUT_DIR, 'mode-marumaru-poster.png');
@@ -275,6 +276,7 @@ async function capturePuzzlePoster(browser) {
   await page.getByTestId(`pick-puzzle-${PUZZLE_POSTER_NUMBER}`).click();
   await page.locator('[data-testid^="pending-bubble-"]').first().waitFor({ state: 'visible', timeout: 6000 });
   await page.waitForTimeout(1500);
+  await waitForClearBoard(page);
 
   const outputPath = path.join(OUTPUT_DIR, 'mode-puzzle-poster.png');
   await page.screenshot({ path: outputPath });
@@ -309,6 +311,25 @@ function findWay(first, others, goal, operators) {
     return undefined;
   };
   return search(first, others, [first]);
+}
+
+/**
+ * Waits for a moment at which no decorative bubble of any size lies over a button, a number bubble
+ * or the goal. The bubbles drift over everything; a poster should show the board, not one of them
+ * sitting on the ÷.
+ */
+async function waitForClearBoard(page) {
+  await page.waitForFunction(
+    () => {
+      const parts = [...document.querySelectorAll('[data-testid^="operator-"], [data-testid^="pending-bubble-"], [data-testid="stage-goal-target"], [data-testid="stage-goal-number"], [data-testid="undo-move"]')].map((part) => part.getBoundingClientRect());
+      return [...document.querySelectorAll('[data-testid^="background-bubble-"]')].every((bubble) => {
+        const box = bubble.getBoundingClientRect();
+        return box.width < 40 || parts.every((part) => box.right < part.left || box.left > part.right || box.bottom < part.top || box.top > part.bottom);
+      });
+    },
+    null,
+    { timeout: 180000, polling: 200 },
+  );
 }
 
 async function clickBubble(page, count) {
