@@ -1,5 +1,5 @@
 // Every style of the game screen.
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 import {
   BASIN_FRAME_THICKNESS,
@@ -824,9 +824,14 @@ export const styles = StyleSheet.create({
     shadowRadius: 9,
     shadowOffset: { width: 0, height: 0 },
   },
+  // At the field's corner, and moved from there to where its maru is (see BeadLayer). In a
+  // browser each is a layer of its own, so a maru that rolls is moved, not painted again.
   draggableBeadHitArea: {
     position: 'absolute',
+    left: 0,
+    top: 0,
     zIndex: 1,
+    ...(Platform.OS === 'web' ? ({ willChange: 'transform' } as object) : null),
   },
   bead: {
     position: 'absolute',

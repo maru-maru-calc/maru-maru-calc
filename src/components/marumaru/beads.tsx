@@ -1,6 +1,6 @@
 // The maru themselves, the layer that draws them, and the tray they sit in.
-import { memo, useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import { PanResponder, Text, View } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { PanResponder, Platform, Text, View } from 'react-native';
 
 import { useBoardScale } from '@/components/marumaru/board-viewport';
 import { TAP_DRIFT_TO_BURST_THRESHOLD } from '@/components/marumaru/constants';
@@ -18,6 +18,7 @@ import {
 } from '@/components/marumaru/field-layout';
 import { canBurstBead, findAlmostMergeBeadIds } from '@/components/marumaru/field-physics';
 import { styles } from '@/components/marumaru/styles';
+import { keepSameMaru } from '@/game/bead-snapshots';
 import type { BeadFrameStore } from '@/game/bead-snapshots';
 import { getBeadKind } from '@/game/beads';
 import { getDisplayBeadsForPendingPriorityExpression } from '@/game/expression';
@@ -190,9 +191,48 @@ export const BasinFrame = memo(function BasinFrame({ segments }: { segments: Ret
   );
 });
 
+/** What the layer shows: the maru (one may stand in for a multiplication that is waiting), and which of them are about to merge. */
+type ShownMaru = { beads: BeadSnapshot[]; almostMergeIds: Set<string> };
+
+function getShownMaru(beads: BeadSnapshot[], expressionTokens: string[]): ShownMaru {
+  const shown = getDisplayBeadsForPendingPriorityExpression(beads, expressionTokens);
+  return { beads: shown, almostMergeIds: findAlmostMergeBeadIds(shown) };
+}
+
+/** Whether two showings are drawn the same, but for where the maru are. */
+function looksTheSame(before: ShownMaru, after: ShownMaru) {
+  if (keepSameMaru(before.beads, after.beads) !== before.beads || before.almostMergeIds.size !== after.almostMergeIds.size) {
+    return false;
+  }
+  for (const id of before.almostMergeIds) {
+    if (!after.almostMergeIds.has(id)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// In a browser a maru is moved by writing its place straight onto its element. Elsewhere there
+// is no element to write to, and a maru that moves is drawn again as before.
+const MOVES_ELEMENTS = Platform.OS === 'web';
+
+/** A maru's element and how far its corner is from its middle (half its ring for presses). */
+type MaruElement = { node: unknown; offset: number };
+
+/** Puts a maru's element where the maru is. The same words React writes for the same place. */
+function moveElement(element: MaruElement, x: number, y: number) {
+  (element.node as { style: { transform: string } }).style.transform = `translateX(${x - element.offset}px) translateY(${y - element.offset}px)`;
+}
+
 /**
  * Draws the maru. It is the only part of the game that listens to where the maru are, so a maru
- * that moves redraws this layer and nothing else.
+ * that moves touches this layer and nothing else.
+ *
+ * While maru only move, nothing is drawn again at all: each element is moved where it stands
+ * (and moved as a layer of its own, so the browser neither lays the board out again nor paints
+ * it). With a few dozen maru rolling at once, drawing each of them again on every frame was most
+ * of the work of a frame. The layer is drawn again only when what there is to see changes: a
+ * maru comes or goes, turns into another, or lights up before a merge.
  */
 export const BeadLayer = memo(function BeadLayer({
   store,
@@ -213,30 +253,65 @@ export const BeadLayer = memo(function BeadLayer({
   onDragEnd: (beadId: string) => void;
   onUnwrap: (beadId: string) => void;
 }) {
-  const beads = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
-  const displayBeads = useMemo(() => getDisplayBeadsForPendingPriorityExpression(beads, expressionTokens), [beads, expressionTokens]);
-  const almostMergeBeadIds = useMemo(() => findAlmostMergeBeadIds(displayBeads), [displayBeads]);
+  const [, drawAgain] = useReducer((count: number) => count + 1, 0);
+  // Drawn from the maru as they are at this moment, so a maru drawn anew starts where it is.
+  const shown = getShownMaru(store.getSnapshot(), expressionTokens);
+  // The maru as they are now, place included: written on every frame, read by presses and drags.
+  const latestRef = useRef({ shown, hiddenBeadId, expressionTokens });
+  latestRef.current = { shown, hiddenBeadId, expressionTokens };
+  const elementsRef = useRef(new Map<string, MaruElement>());
+
+  useEffect(
+    () =>
+      store.subscribe(() => {
+        const latest = latestRef.current;
+        const next = getShownMaru(store.getSnapshot(), latest.expressionTokens);
+        const isSameLook = looksTheSame(latest.shown, next);
+        latestRef.current = { ...latest, shown: next };
+        if (MOVES_ELEMENTS) {
+          for (const bead of next.beads) {
+            const element = elementsRef.current.get(bead.id);
+            if (element) {
+              moveElement(element, bead.x, bead.y);
+            }
+          }
+        }
+        if (!isSameLook || !MOVES_ELEMENTS) {
+          drawAgain();
+        }
+      }),
+    [store],
+  );
+
+  const keepElement = useCallback((beadId: string, node: unknown, offset: number) => {
+    if (node) {
+      elementsRef.current.set(beadId, { node, offset });
+    } else {
+      elementsRef.current.delete(beadId);
+    }
+  }, []);
+  const getBead = useCallback((beadId: string) => latestRef.current.shown.beads.find((bead) => bead.id === beadId), []);
   // Which maru a press means is asked at the moment of the press, of the maru as they are then.
-  const shownRef = useRef({ beads: displayBeads, hiddenBeadId });
-  shownRef.current = { beads: displayBeads, hiddenBeadId };
   const findBeadAtPoint = useCallback((x: number, y: number) => {
-    const shown = shownRef.current;
-    return findBeadAt(shown.beads.filter((bead) => bead.id !== shown.hiddenBeadId), x, y);
+    const latest = latestRef.current;
+    return findBeadAt(latest.shown.beads.filter((bead) => bead.id !== latest.hiddenBeadId), x, y);
   }, []);
 
   return (
     <>
-      {displayBeads.map((bead) =>
+      {shown.beads.map((bead) =>
         hiddenBeadId === bead.id ? null : (
           <DraggableBeadView
             key={bead.id}
             bead={bead}
+            getBead={getBead}
+            keepElement={keepElement}
             findBeadAt={findBeadAtPoint}
             onMove={onMove}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
             isDragging={draggingBeadId === bead.id}
-            isAlmostMerge={almostMergeBeadIds.has(bead.id)}
+            isAlmostMerge={shown.almostMergeIds.has(bead.id)}
             onTap={onUnwrap}
           />
         ),
@@ -246,7 +321,12 @@ export const BeadLayer = memo(function BeadLayer({
 });
 
 type DraggableBeadViewProps = {
+  /** The maru as it was when it was last drawn. Where it is now is asked of `getBead`. */
   bead: BeadSnapshot;
+  /** The maru as it is at this moment, place included (undefined once it is gone). */
+  getBead: (beadId: string) => BeadSnapshot | undefined;
+  /** Hands the layer this maru's element, so that the layer can move it; null when the element goes. */
+  keepElement: (beadId: string, node: unknown, offset: number) => void;
   /** The maru a press at this point of the field means: this one, or a neighbour the press is nearer to. */
   findBeadAt: (x: number, y: number) => BeadSnapshot | undefined;
   onMove: (beadId: string, x: number, y: number) => void;
@@ -280,15 +360,17 @@ const DraggableBeadView = memo(function DraggableBeadView(props: DraggableBeadVi
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: (event) => {
           const latest = latestRef.current;
+          // This maru where it is now: it may have rolled on since it was last drawn.
+          const self = latest.getBead(latest.bead.id) ?? latest.bead;
           // Where in the field the press is. It is given from the corner of this maru's own
           // ring, in screen points; the board may be shown shrunk or enlarged.
           const { locationX, locationY } = event.nativeEvent;
-          const reach = getBeadHitRadius(latest.bead);
+          const reach = getBeadHitRadius(self);
           const meant =
             Number.isFinite(locationX) && Number.isFinite(locationY)
-              ? latest.findBeadAt(latest.bead.x - reach + locationX / boardScaleRef.current, latest.bead.y - reach + locationY / boardScaleRef.current)
+              ? latest.findBeadAt(self.x - reach + locationX / boardScaleRef.current, self.y - reach + locationY / boardScaleRef.current)
               : undefined;
-          const held = meant ?? latest.bead;
+          const held = meant ?? self;
           startPositionRef.current = { x: held.x, y: held.y };
           hasDraggedRef.current = false;
           heldRef.current = held;
@@ -340,15 +422,21 @@ const DraggableBeadView = memo(function DraggableBeadView(props: DraggableBeadVi
     [],
   );
 
+  const { keepElement } = props;
+  const beadId = bead.id;
+  const keepOwnElement = useCallback((node: unknown) => keepElement(beadId, node, beadOffset), [beadId, beadOffset, keepElement]);
+
   return (
     <View
+      ref={keepOwnElement}
       accessibilityLabel={a11yLabel(`bead-${bead.role}-${bead.count}`)}
       testID={`bead-${bead.role}-${bead.count}-${bead.id}`}
       style={[
         styles.draggableBeadHitArea,
         {
-          left: bead.x - hitSize / 2,
-          top: bead.y - hitSize / 2,
+          // Placed by moving it from the field's corner, not by its left and top: a move changes
+          // neither the layout nor (as a layer of its own) what is painted.
+          transform: [{ translateX: bead.x - beadOffset }, { translateY: bead.y - beadOffset }],
           width: hitSize,
           height: hitSize,
           borderRadius: hitSize / 2,
@@ -371,18 +459,22 @@ const DraggableBeadView = memo(function DraggableBeadView(props: DraggableBeadVi
   );
 }, areDraggableBeadPropsEqual);
 
-/** A maru that did not move, change or get picked up does not need to be drawn again. */
+/**
+ * A maru that did not change or get picked up does not need to be drawn again. Where its element
+ * can be moved as it stands, a maru that only moved does not either.
+ */
 function areDraggableBeadPropsEqual(previous: DraggableBeadViewProps, next: DraggableBeadViewProps) {
   return (
     previous.bead.id === next.bead.id &&
-    previous.bead.x === next.bead.x &&
-    previous.bead.y === next.bead.y &&
+    (MOVES_ELEMENTS || (previous.bead.x === next.bead.x && previous.bead.y === next.bead.y)) &&
     previous.bead.value === next.bead.value &&
     previous.bead.count === next.bead.count &&
     previous.bead.sign === next.bead.sign &&
     previous.bead.role === next.bead.role &&
     previous.isDragging === next.isDragging &&
     previous.isAlmostMerge === next.isAlmostMerge &&
+    previous.getBead === next.getBead &&
+    previous.keepElement === next.keepElement &&
     previous.findBeadAt === next.findBeadAt &&
     previous.onMove === next.onMove &&
     previous.onDragStart === next.onDragStart &&
