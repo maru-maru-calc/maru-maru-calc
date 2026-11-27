@@ -926,6 +926,100 @@ test('maru that only roll are moved where they stand, and nothing of them is dra
   await expect(page.getByLabel('next stage', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
 });
 
+test('a × or ÷ does not wait for the maru to finish merging or cancelling', async ({ page }) => {
+  // × and ÷ work on the whole amount, so they used to wait until the board had come to rest: one
+  // merge, one cancelled pair at a time. With many maru that took many seconds (about thirteen
+  // after 9 × 9), and meanwhile the bubble that was pressed did nothing. Now the board is brought
+  // to rest at once and the move happens.
+  await page.setViewportSize({ width: 390, height: 844 });
+  const waiting = page.locator('[data-testid^="pending-bubble-"]');
+  const maru = page.locator('[data-testid^="bead-"]');
+
+  // After a multiplication: 81 maru are merging ten by ten when the next × comes.
+  await page.goto('/puzzle?m=9.9.9-729');
+  await expect(waiting).toHaveCount(3);
+  await tapWay(page, ['9', '×', '9'], 300);
+  // Left alone for a while, the product's bubbles burst and the merging is well under way.
+  await expect.poll(() => maru.count(), { timeout: 15_000 }).toBeGreaterThan(20);
+  await page.getByTestId('operator-×').click();
+  await waiting.first().click();
+  await expect(waiting).toHaveCount(0, { timeout: 2000 });
+  // The amount is the right one: the puzzle is solved.
+  await expect(page.getByTestId('puzzle-choice')).toBeVisible({ timeout: 30_000 });
+
+  // After a subtraction: nine maru are still being cancelled one pair at a time when the × comes.
+  await page.goto('/puzzle?m=9.5.3.7.10-88');
+  await expect(waiting).toHaveCount(5);
+  await tapWay(page, ['5', '×', '7', '-', '9'], 300);
+  await page.getByTestId('operator-×').click();
+  await page.locator('[data-testid^="pending-bubble-3-"]').first().click();
+  await expect(waiting).toHaveCount(1, { timeout: 2000 });
+  await page.getByTestId('operator-+').click();
+  await waiting.first().click();
+  await expect(page.getByTestId('puzzle-choice')).toBeVisible({ timeout: 30_000 });
+
+  // A division that does not come out even is still shown as such, and nothing is lost by it.
+  await page.goto('/puzzle?m=9.9.2.3-86');
+  await tapWay(page, ['9', '×', '9'], 300);
+  await expect.poll(() => maru.count(), { timeout: 15_000 }).toBeGreaterThan(20);
+  await page.getByTestId('operator-÷').click();
+  await page.locator('[data-testid^="pending-bubble-2-"]').first().click();
+  // 81 does not divide by 2: the bubble stays.
+  await page.waitForTimeout(1500);
+  await expect(waiting).toHaveCount(2);
+  await page.getByTestId('operator-+').click();
+  await page.locator('[data-testid^="pending-bubble-2-"]').first().click();
+  await expect(waiting).toHaveCount(1, { timeout: 2000 });
+});
+
+test('a press on a bubble that the phone cuts off still bursts it', async ({ browser }) => {
+  // A phone can take a touch away in the middle of a press (for a gesture of its own, or when the
+  // page loses the screen). The bubble under it used to stay, with nothing to show for the press.
+  const context = await browser.newContext({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  await page.goto('/p/1');
+  const waiting = page.locator('[data-testid^="pending-bubble-"]');
+  await expect(waiting).toHaveCount(3);
+  const device = await context.newCDPSession(page);
+  const centerOf = async (testId: string) => {
+    const box = (await page.locator(`[data-testid^="${testId}"]`).first().boundingBox()) as { x: number; y: number; width: number; height: number };
+    return { x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2) };
+  };
+  // A press on a bubble, carried `steps` small steps to the right before it ends.
+  const press = async (testId: string, end: 'touchCancel' | 'touchEnd', steps = 0) => {
+    const point = await centerOf(testId);
+    await device.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point] });
+    for (let step = 1; step <= steps; step += 1) {
+      await device.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: point.x + step * 8, y: point.y }] });
+      await page.waitForTimeout(30);
+    }
+    await device.send('Input.dispatchTouchEvent', { type: end, touchPoints: [] });
+  };
+
+  // Cut off where it began: the bubble bursts, as for a press that was let go.
+  await press('pending-bubble-6-', 'touchCancel');
+  await expect(waiting).toHaveCount(2);
+  await expect(page.locator('[data-testid^="bead-"]')).toHaveCount(6);
+
+  // Cut off while the bubble was being carried somewhere: it stays, where it was carried to. (It
+  // follows the finger all the way: it used to stay within a step of where it had been.)
+  const before = await centerOf('pending-bubble-8-');
+  await press('pending-bubble-8-', 'touchCancel', 10);
+  await page.waitForTimeout(400);
+  await expect(waiting).toHaveCount(2);
+  const carried = await centerOf('pending-bubble-8-');
+  expect(carried.x - before.x).toBeGreaterThan(60);
+  expect(carried.x - before.x).toBeLessThanOrEqual(82);
+
+  // Carried and let go, it bursts, as a bubble that is let go always has.
+  await press('pending-bubble-8-', 'touchEnd', 5);
+  await expect(waiting).toHaveCount(1);
+
+  // The board does not let a touch scroll or zoom the page from under a press.
+  expect(await waiting.first().evaluate((bubble) => getComputedStyle(bubble.parentElement as Element).touchAction)).toBe('none');
+  await context.close();
+});
+
 test('an address that asks for a puzzle there is not opens the start, as any visit does', async ({ page }) => {
   await page.goto('/puzzle?p=0');
   await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');

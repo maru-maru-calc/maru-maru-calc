@@ -289,6 +289,9 @@ export function MarumaruGame({
   const engineRef = useRef<Matter.Engine | null>(null);
   const entitiesRef = useRef<BeadEntity[]>([]);
   const consumedPendingBubbleIdsRef = useRef<Set<string>>(new Set());
+  // Counts how often the board was brought to rest at once (see settleBoardNow). What was on its
+  // way to the board then (the bubbles of a product) is already part of what the board was given.
+  const boardSettledCountRef = useRef(0);
   const pendingBubblesRef = useRef<PendingBubble[]>([]);
   const mergeAnimationRef = useRef<MergeAnimation | undefined>(undefined);
   const annihilationAnimationRef = useRef<AnnihilationAnimation | undefined>(undefined);
@@ -785,8 +788,14 @@ export function MarumaruGame({
       expressionHistoryRef.current = stripExpressionResult(nextExpressionTokens);
       setExpressionTokens(nextExpressionTokens);
       publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
+      const settledCount = boardSettledCountRef.current;
       setTimeout(() => {
         if (engineRef.current !== engine) {
+          return;
+        }
+        if (boardSettledCountRef.current !== settledCount) {
+          // The board was brought to rest in the meantime, this product included.
+          setMultiplicationExpansionAnimation((current) => (current?.id === expansionId ? undefined : current));
           return;
         }
 
@@ -1009,7 +1018,7 @@ export function MarumaruGame({
         setRefusedMoves((count) => count + 1);
         return;
       }
-      if (hasPriorValue && (activeOperator === '×' || activeOperator === '÷') && isBoardBusyForPriorityOperation()) {
+      if (hasPriorValue && (activeOperator === '×' || activeOperator === '÷') && !readyBoardForPriorityOperation()) {
         consumedPendingBubbleIdsRef.current.delete(bubble.id);
         if (canBoardBecomeReadyForPriorityOperation()) {
           // The maru are still settling: pop it once they have, instead of dropping the tap.
@@ -1179,6 +1188,61 @@ export function MarumaruGame({
     );
   };
 
+  /**
+   * Brings the board to rest at once: everything on it becomes the amount so far, as the few maru
+   * it would end up as by itself. Returns whether it did.
+   *
+   * × and ÷ work on the whole amount, so they need the maru at rest: merged ten by ten, and what
+   * was taken away cancelled. The board does that one merge and one pair at a time, each with
+   * its animation. After a multiplication that is many seconds (thirteen for 9 × 9), and all that
+   * time a × or ÷ and the bubble after it did nothing that could be seen. The player who goes on
+   * has seen enough of it: the rest is skipped, and the move happens now.
+   */
+  const settleBoardNow = () => {
+    const engine = engineRef.current;
+    const amount = getPendingOperationExpressionValue(expressionTokensRef.current);
+    if (!engine || amount === undefined || amount <= 0 || !Number.isInteger(amount)) {
+      return false;
+    }
+
+    const entities = entitiesRef.current;
+    const positive = entities.filter((entity) => entity.sign > 0);
+    const center = positive.length > 0 ? getEntityCenter(positive) : entities.length > 0 ? getEntityCenter(entities) : { x: fieldWidth / 2, y: fieldHeight * 0.42 };
+    removeBodies(engine, entities);
+    entitiesRef.current = [];
+    // Nothing that was going on with those maru goes on. The refs are what the board is asked
+    // about before the screen is drawn again, so they are cleared here too.
+    boardSettledCountRef.current += 1;
+    mergeAnimationRef.current = undefined;
+    annihilationAnimationRef.current = undefined;
+    multiplicationExpansionAnimationRef.current = undefined;
+    setMergeAnimation(undefined);
+    setAnnihilationAnimation(undefined);
+    setMultiplicationExpansionAnimation(undefined);
+    mergeReadySinceRef.current = undefined;
+    // Where the maru were; the field keeps whatever is put on it inside itself.
+    addReleasedBeads(amount, 1, center);
+    publishBeads(beadFrameStore, setBeads, entitiesRef.current, fieldWidth, fieldHeight);
+    playMergeSfx();
+    return true;
+  };
+
+  /**
+   * Whether the board is at rest for a × or ÷, bringing it to rest at once if it is not. It is
+   * left to finish by itself only where the wait is short and worth seeing (a division being
+   * shown, or shown not to come out even), and in the practice of the learning app, where the
+   * maru merging is the lesson.
+   */
+  const readyBoardForPriorityOperation = () => {
+    if (!isBoardBusyForPriorityOperation()) {
+      return true;
+    }
+    if (dentakuPractice || divisionSplitAnimationRef.current || divisionFailedAnimationRef.current) {
+      return false;
+    }
+    return settleBoardNow() && !isBoardBusyForPriorityOperation();
+  };
+
   const selectOperator = useCallback(
     (operator: OperatorButtonSymbol) => {
       markBubbleInteraction();
@@ -1192,7 +1256,7 @@ export function MarumaruGame({
         holdTap({ operator });
         return;
       }
-      if ((operator === '×' || operator === '÷') && isBoardBusyForPriorityOperation()) {
+      if ((operator === '×' || operator === '÷') && !readyBoardForPriorityOperation()) {
         if (canBoardBecomeReadyForPriorityOperation()) {
           // Remember the tap and show it as chosen; it takes effect when the maru have settled.
           // (It used to be dropped without a sign, and the next bubble was then added instead.)
@@ -1258,7 +1322,7 @@ export function MarumaruGame({
     }
 
     const interval = setInterval(() => {
-      if (isBoardBusyForPriorityOperation()) {
+      if (!readyBoardForPriorityOperation()) {
         if (!canBoardBecomeReadyForPriorityOperation()) {
           clearQueuedMove();
         }

@@ -411,9 +411,13 @@ export const styles = StyleSheet.create({
     alignSelf: 'center',
     alignItems: 'center',
   },
+  // Bubbles and maru are pressed and carried about on it, so in a browser a touch that starts
+  // here is the game's and not the start of a scroll or a zoom of the page (which would take the
+  // touch away in the middle of a press, or zoom in on two quick taps).
   field: {
     overflow: 'hidden',
     backgroundColor: '#C6E8F4',
+    ...(Platform.OS === 'web' ? ({ touchAction: 'none' } as object) : null),
   },
   failedScreenVeil: {
     ...StyleSheet.absoluteFillObject,
