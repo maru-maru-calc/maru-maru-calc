@@ -4,7 +4,7 @@ import { PanResponder, Pressable, View } from 'react-native';
 
 import { BeadView, BubbleNumberBadge } from '@/components/marumaru/beads';
 import { useBoardScale } from '@/components/marumaru/board-viewport';
-import { BACKGROUND_BUBBLE_TICK_MS } from '@/components/marumaru/constants';
+import { BACKGROUND_BUBBLE_TICK_MS, TAP_DRIFT_TO_BURST_THRESHOLD } from '@/components/marumaru/constants';
 import {
   getEntityRadius,
   getMultiplierBubbleParts,
@@ -123,22 +123,42 @@ export function DraggableBubbleView({
   const boardScale = useBoardScale();
   const isOperatorBubble = isMultiplier || isDivider;
   const radius = isOperatorBubble ? getMultiplierClusterRadius(bubble.count) : getEntityRadius(1, bubble.count);
+  // The handlers are made once per bubble and read whatever is current through this ref. They
+  // used to be made again whenever the bubble moved, which threw away how far the finger had
+  // travelled: a bubble that was carried stayed within a step of where it had been.
+  const latestRef = useRef({ bubble, boardScale, onBurst, onMove });
+  latestRef.current = { bubble, boardScale, onBurst, onMove };
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: () => {
-          startPositionRef.current = { x: bubble.x, y: bubble.y };
+          const { bubble: pressed } = latestRef.current;
+          startPositionRef.current = { x: pressed.x, y: pressed.y };
         },
         onPanResponderMove: (_event, gesture) => {
-          onMove(bubble.id, startPositionRef.current.x + gesture.dx / boardScale, startPositionRef.current.y + gesture.dy / boardScale);
+          const latest = latestRef.current;
+          // The finger's travel is in screen points; the board may be shown shrunk or enlarged.
+          latest.onMove(latest.bubble.id, startPositionRef.current.x + gesture.dx / latest.boardScale, startPositionRef.current.y + gesture.dy / latest.boardScale);
         },
         onPanResponderRelease: () => {
-          onBurst(bubble);
+          latestRef.current.onBurst(latestRef.current.bubble);
+        },
+        // The press is the bubble's until the finger is lifted: a page that scrolls a little under
+        // it (a phone's address bar sliding away does that) is no reason to give it up.
+        onPanResponderTerminationRequest: () => false,
+        // A press can still be cut off from outside: the phone takes the touch for a gesture of
+        // its own, or the page loses the screen. If the finger had not gone anywhere, it was a
+        // press on this bubble all the same, and the bubble bursts. (It used to stay, with nothing
+        // to show that the press had been lost.) A bubble that was being carried is left where it is.
+        onPanResponderTerminate: (_event, gesture) => {
+          if (Math.hypot(gesture.dx, gesture.dy) <= TAP_DRIFT_TO_BURST_THRESHOLD) {
+            latestRef.current.onBurst(latestRef.current.bubble);
+          }
         },
       }),
-    [boardScale, bubble, onBurst, onMove],
+    [],
   );
 
   return (
