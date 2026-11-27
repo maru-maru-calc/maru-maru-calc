@@ -884,7 +884,7 @@ test('maru that only roll are moved where they stand, and nothing of them is dra
   const seen = await page.evaluate(
     () =>
       new Promise<{ moves: number; other: string[]; places: number; styles: Array<{ left: string; top: string; layer: string }> }>((resolve) => {
-        const elements = [...document.querySelectorAll('[data-testid^="bead-"]')] as HTMLElement[];
+        const elements = Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="bead-"]'));
         const places = new Set<string>();
         const other: string[] = [];
         let moves = 0;
