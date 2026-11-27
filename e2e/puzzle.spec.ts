@@ -870,6 +870,62 @@ test('on a phone the share button goes straight to the phone\'s own share, with 
   await without.close();
 });
 
+test('maru that only roll are moved where they stand, and nothing of them is drawn again', async ({ page }) => {
+  // With a few dozen maru on the board, drawing each of them again on every frame made the board
+  // heavy. A maru that rolls now only has its element moved (as a layer of its own).
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/p/1');
+  await expect(page.getByTestId('stage-goal-number')).toHaveText('#1');
+  await page.locator('[data-testid^="pending-bubble-6-"]').first().click();
+  const maru = page.locator('[data-testid^="bead-"]');
+  await expect(maru).toHaveCount(6);
+
+  // Watched while they fall into the bowl and roll: every change to them, and to anything inside them.
+  const seen = await page.evaluate(
+    () =>
+      new Promise<{ moves: number; other: string[]; places: number; styles: Array<{ left: string; top: string; layer: string }> }>((resolve) => {
+        const elements = [...document.querySelectorAll('[data-testid^="bead-"]')] as HTMLElement[];
+        const places = new Set<string>();
+        const other: string[] = [];
+        let moves = 0;
+        const observer = new MutationObserver((records) => {
+          for (const record of records) {
+            const target = record.target as HTMLElement;
+            if (record.type === 'attributes' && record.attributeName === 'style' && elements.includes(target)) {
+              moves += 1;
+              places.add(target.style.transform);
+            } else {
+              other.push(`${record.type} ${record.attributeName ?? ''} on ${target.getAttribute?.('data-testid') ?? target.nodeName}`);
+            }
+          }
+        });
+        for (const element of elements) {
+          observer.observe(element, { attributes: true, childList: true, characterData: true, subtree: true });
+        }
+        setTimeout(() => {
+          observer.disconnect();
+          resolve({ moves, other, places: places.size, styles: elements.map((element) => ({ left: getComputedStyle(element).left, top: getComputedStyle(element).top, layer: getComputedStyle(element).willChange })) });
+        }, 600);
+      }),
+  );
+  // They moved, many times, each to places of its own ...
+  expect(seen.moves).toBeGreaterThan(20);
+  expect(seen.places).toBeGreaterThan(20);
+  // ... and that is all that happened to them: nothing inside a maru was touched, none was put in or taken out.
+  expect(seen.other).toEqual([]);
+  // Each stands at the field's corner and is moved from there, as a layer of its own.
+  for (const style of seen.styles) {
+    expect(style).toEqual({ left: '0px', top: '0px', layer: 'transform' });
+  }
+
+  // They end up lying in the bowl, inside the field, where the board can go on with them.
+  await page.getByTestId('operator-÷').click();
+  await page.locator('[data-testid^="pending-bubble-2-"]').first().click();
+  await page.getByTestId('operator-+').click();
+  await page.locator('[data-testid^="pending-bubble-8-"]').first().click();
+  await expect(page.getByLabel('next stage', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+});
+
 test('an address that asks for a puzzle there is not opens the start, as any visit does', async ({ page }) => {
   await page.goto('/puzzle?p=0');
   await expect(page.getByTestId('stage-goal-number')).toHaveText('#0');
